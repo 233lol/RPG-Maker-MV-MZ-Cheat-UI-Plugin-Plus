@@ -12,20 +12,29 @@ mdifonts := cheat-engine/www/cheat/fonts/materialdesignicons-webfont.woff2
 # 打包时要一起打进去的源码：改动其中任意文件都应触发重新打包
 src := $(shell find cheat-engine/www/cheat cheat-engine/www/_cheat_initialize -type f 2>/dev/null)
 
-.PHONY: all clean vendor $(type)
+# 默认生产构建；`make dev` 会以 VUE=dev 覆盖，仅在打包期间使用开发构建
+VUE ?= prod
+
+.PHONY: all clean vendor dev prod ui-vendor $(type)
 
 all: $(type)
 
-vendor: $(shiki) $(vuetify) $(vue) $(vuetifycss) $(mdicss) $(mdifonts)
+vendor: $(vuetifycss) $(mdicss) $(mdifonts) ui-vendor
 
-$(shiki):
-	pnpm run vendor:shiki
+# 每次构建都强制按当前 VUE 重新生成 shiki / vue / vuetify，
+# 避免上一次的 dev 构建被误打包进产物
+ui-vendor:
+	pnpm run vendor:shiki$(if $(filter dev,$(VUE)),:dev)
+	pnpm run vendor:vue$(if $(filter dev,$(VUE)),:dev)
+	pnpm run vendor:vuetify$(if $(filter dev,$(VUE)),:dev)
 
-$(vuetify):
-	pnpm run vendor:vuetify
+# dev: 使用 Vue 开发构建打包（组件告警 + Devtools），便于排查问题
+dev:
+	$(MAKE) VUE=dev $(type)
 
-$(vue):
-	pnpm run vendor:vue
+# prod: 使用 Vue 生产构建打包（与 make 等价）
+prod:
+	$(MAKE) VUE=prod $(type)
 
 $(vuetifycss) $(mdicss) $(mdifonts):
 	pnpm run vendor:assets
@@ -36,7 +45,7 @@ clean:
 
 # tools/pack.mjs prefixes MV archives with www/ and leaves MZ archives at the
 # root, so both can be extracted directly into the game root directory.
-%-$(hash).zip: $(src) $(verfn) $(shiki) $(vuetify) $(vue) $(vuetifycss) $(mdicss) $(mdifonts)
+%-$(hash).zip: $(src) $(verfn) ui-vendor $(vuetifycss) $(mdicss) $(mdifonts)
 	node tools/pack.mjs $* $@
 	ln -s -f $@ $*-latest.zip
 

@@ -225,58 +225,42 @@ export default {
                 </template>
             </div>
             <div class="d-flex align-center justify-end" style="width: 96px;">
-                <v-tooltip v-if="item.isContainer" location="bottom">
-                    <template #activator="{ props }">
-                        <v-btn
-                            v-bind="props"
-                            icon
-                            size="x-small"
-                            color="amber"
-                            @click.stop="enterEntry(item)">
-                            <v-icon size="small">mdi-arrow-right-bold</v-icon>
-                        </v-btn>
-                    </template>
-                    <span>进入 {{ item.name }}</span>
-                </v-tooltip>
-                <v-tooltip v-if="item.isContainer" location="bottom">
-                    <template #activator="{ props }">
-                        <v-btn
-                            v-bind="props"
-                            icon
-                            size="x-small"
-                            color="light-blue"
-                            @click.stop="openJsonEditor(item)">
-                            <v-icon size="small">mdi-code-json</v-icon>
-                        </v-btn>
-                    </template>
-                    <span>编辑 JSON</span>
-                </v-tooltip>
-                <v-tooltip v-if="item.isContainer" location="bottom">
-                    <template #activator="{ props }">
-                        <v-btn
-                            v-bind="props"
-                            icon
-                            size="x-small"
-                            color="teal"
-                            @click.stop="openJsonAdd(item)">
-                            <v-icon size="small">mdi-plus</v-icon>
-                        </v-btn>
-                    </template>
-                    <span>在 {{ item.name }} 内新增属性 / 元素</span>
-                </v-tooltip>
-                <v-tooltip v-if="!item.isRoot" location="bottom">
-                    <template #activator="{ props }">
-                        <v-btn
-                            v-bind="props"
-                            icon
-                            size="x-small"
-                            color="red"
-                            @click.stop="confirmDeleteEntry(item)">
-                            <v-icon size="small">mdi-delete</v-icon>
-                        </v-btn>
-                    </template>
-                    <span>删除</span>
-                </v-tooltip>
+                <v-btn
+                    v-if="item.isContainer"
+                    :title="'进入 ' + item.name"
+                    icon
+                    size="x-small"
+                    color="amber"
+                    @click.stop="enterEntry(item)">
+                    <v-icon size="small">mdi-arrow-right-bold</v-icon>
+                </v-btn>
+                <v-btn
+                    v-if="item.isContainer"
+                    title="编辑 JSON"
+                    icon
+                    size="x-small"
+                    color="light-blue"
+                    @click.stop="openJsonEditor(item)">
+                    <v-icon size="small">mdi-code-json</v-icon>
+                </v-btn>
+                <v-btn
+                    v-if="item.isContainer"
+                    :title="'在 ' + item.name + ' 内新增属性 / 元素'"
+                    icon
+                    size="x-small"
+                    color="teal"
+                    @click.stop="openJsonAdd(item)">
+                    <v-icon size="small">mdi-plus</v-icon>
+                </v-btn>
+                <v-btn
+                    v-if="!item.isRoot"
+                    title="删除"
+                    icon
+                    size="x-small"
+                    color="red"
+                    @click.stop="confirmDeleteEntry(item)">
+                    <v-icon size="small">mdi-delete</v-icon>
+                </v-btn>
             </div>
         </div>
 

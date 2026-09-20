@@ -30,9 +30,17 @@ make mv
 # 仅打包 MZ
 make mz
 
+# 使用 Vue 开发构建打包（组件告警 + Devtools，排查问题时用）
+make dev
+
+# 切回 Vue 生产构建并重新打包
+make prod
+
 # 清理构建产物
 make clean
 ```
+
+`make` / `make mv` / `make mz` 每次构建都会强制使用 Vue 生产构建，即使之前执行过 `make dev`，也不会把开发版误打包进产物；`make dev` 仅在本次打包使用开发构建。
 
 构建产物位于项目根目录：
 - `mv-<commit-hash>.zip` / `mv-latest.zip`
@@ -53,9 +61,12 @@ MV 游戏的可执行文件所在目录下是 `www/`，而 MZ 游戏直接以 `j
 
 | 命令 | 产物 | 说明 |
 |---|---|---|
-| `pnpm run vendor:shiki` | `cheat-engine/www/cheat/libs/shiki.bundle.mjs` | Shiki 语法高亮引擎 (esbuild 打包) |
-| `pnpm run vendor:vuetify` | `cheat-engine/www/cheat/libs/vuetify.js` | Vuetify 4 ESM (esbuild 打包) |
-| `pnpm run vendor:vue` | `cheat-engine/www/cheat/libs/vue.js` | 从 `node_modules/vue/dist/vue.esm-browser.js` 复制 |
+| `pnpm run vendor:shiki` | `cheat-engine/www/cheat/libs/shiki.bundle.mjs` | Shiki 语法高亮引擎（esbuild 打包，生产压缩） |
+| `pnpm run vendor:shiki:dev` | `cheat-engine/www/cheat/libs/shiki.bundle.mjs` | 同上但未压缩且内联 sourcemap（排查问题时用） |
+| `pnpm run vendor:vuetify` | `cheat-engine/www/cheat/libs/vuetify.js` | Vuetify 4 ESM（esbuild 打包，生产压缩） |
+| `pnpm run vendor:vuetify:dev` | `cheat-engine/www/cheat/libs/vuetify.js` | 同上但未压缩（Vuetify 堆栈可读，排查问题时用） |
+| `pnpm run vendor:vue` | `cheat-engine/www/cheat/libs/vue.js` | 复制生产构建 `vue.esm-browser.prod.js`（更快） |
+| `pnpm run vendor:vue:dev` | `cheat-engine/www/cheat/libs/vue.js` | 复制开发构建 `vue.esm-browser.js`（有告警 + Devtools，排查问题时用） |
 | `pnpm run vendor:assets` | `css/vuetify.css`, `css/materialdesignicons.css`, `fonts/*` | 从 npm 包复制 CSS 和字体 |
 | `pnpm run vendor:libs` | - | 运行 `vendor:vuetify` + `vendor:vue` + `vendor:assets` |
 

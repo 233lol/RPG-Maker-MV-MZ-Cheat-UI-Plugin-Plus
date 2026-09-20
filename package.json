@@ -4,8 +4,11 @@
   "type": "module",
   "scripts": {
     "vendor:shiki": "node tools/build-shiki.mjs",
+    "vendor:shiki:dev": "node tools/build-shiki.mjs dev",
     "vendor:vuetify": "node tools/build-vuetify.mjs",
+    "vendor:vuetify:dev": "node tools/build-vuetify.mjs dev",
     "vendor:vue": "node tools/copy-vue.mjs",
+    "vendor:vue:dev": "node tools/copy-vue.mjs dev",
     "vendor:assets": "node tools/copy-vendor-assets.mjs",
     "vendor:libs": "node tools/build-vuetify.mjs && node tools/copy-vue.mjs && node tools/copy-vendor-assets.mjs"
   },

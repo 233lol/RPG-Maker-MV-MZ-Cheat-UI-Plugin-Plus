@@ -3,9 +3,11 @@
 ## Build
 
 ```shell
-pnpm i && make           # build both MV & MZ
+pnpm i && make           # build both MV & MZ with the Vue production build
 make mv                  # build only MV
 make mz                  # build only MZ
+make dev                 # build both with the Vue dev build (warnings + Devtools)
+make prod                # switch back to the Vue production build and rebuild
 ```
 
 Output: `mv-<hash>.zip` and/or `mz-<hash>.zip`. Packing is done by `node tools/pack.mjs <mv|mz> <output.zip>` (fflate); MV archives are prefixed with `www/` (MV game root), MZ archives are not.
@@ -14,9 +16,12 @@ Vendor scripts (all available via `pnpm run vendor:*`):
 
 | Command | Output |
 |---|---|
-| `vendor:shiki` | `cheat-engine/www/cheat/libs/shiki.bundle.mjs` |
-| `vendor:vuetify` | `cheat-engine/www/cheat/libs/vuetify.js` |
-| `vendor:vue` | `cheat-engine/www/cheat/libs/vue.js` (copied from `node_modules/vue/dist/vue.esm-browser.js`) |
+| `vendor:shiki` | `cheat-engine/www/cheat/libs/shiki.bundle.mjs` (minified production bundle) |
+| `vendor:shiki:dev` | same file but unminified with inline sourcemap (for debugging) |
+| `vendor:vuetify` | `cheat-engine/www/cheat/libs/vuetify.js` (minified production bundle) |
+| `vendor:vuetify:dev` | same file but unminified (readable Vuetify stack traces, for debugging) |
+| `vendor:vue` | `cheat-engine/www/cheat/libs/vue.js` (production build `vue.esm-browser.prod.js`) |
+| `vendor:vue:dev` | same file but development build `vue.esm-browser.js` (warnings + Vue Devtools, for debugging) |
 | `vendor:assets` | `css/vuetify.css`, `css/materialdesignicons.css`, `fonts/*` (copied from npm packages) |
 
 `vendor:shiki` is auto-triggered by Makefile dependency. `make vendor` runs all four.
