@@ -9,6 +9,9 @@ vuetifycss := cheat-engine/www/cheat/css/vuetify.css
 mdicss := cheat-engine/www/cheat/css/materialdesignicons.css
 mdifonts := cheat-engine/www/cheat/fonts/materialdesignicons-webfont.woff2
 
+# 打包时要一起打进去的源码：改动其中任意文件都应触发重新打包
+src := $(shell find cheat-engine/www/cheat cheat-engine/www/_cheat_initialize -type f 2>/dev/null)
+
 .PHONY: all clean vendor $(type)
 
 all: $(type)
@@ -33,7 +36,7 @@ clean:
 
 # tools/pack.mjs prefixes MV archives with www/ and leaves MZ archives at the
 # root, so both can be extracted directly into the game root directory.
-%-$(hash).zip: $(verfn) $(shiki) $(vuetify) $(vue) $(vuetifycss) $(mdicss) $(mdifonts)
+%-$(hash).zip: $(src) $(verfn) $(shiki) $(vuetify) $(vue) $(vuetifycss) $(mdicss) $(mdifonts)
 	node tools/pack.mjs $* $@
 	ln -s -f $@ $*-latest.zip
 

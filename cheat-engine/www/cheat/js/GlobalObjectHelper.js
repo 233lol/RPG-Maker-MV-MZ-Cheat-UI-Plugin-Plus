@@ -385,14 +385,67 @@ const EDITABLE_KINDS = new Set([
 // 不显示 / 不处理的类型（函数是方法，不作为变量处理）
 const HIDDEN_KINDS = new Set(["function"]);
 
+// 深度搜索时绝不进入的宿主对象：NW.js / Chromium 的内建对象带有原生
+// getter，遍历它们可能直接导致渲染进程崩溃（表现为游戏窗口瞬间消失）。
+const UNSAFE_TRAVERSAL_NAMES = new Set([
+  "window",
+  "self",
+  "top",
+  "parent",
+  "frames",
+  "globalThis",
+  "global",
+  "document",
+  "location",
+  "navigator",
+  "history",
+  "screen",
+  "performance",
+  "crypto",
+  "caches",
+  "indexedDB",
+  "localStorage",
+  "sessionStorage",
+  "console",
+  "customElements",
+  "visualViewport",
+  "speechSynthesis",
+  "external",
+  "frameElement",
+  "clientInformation",
+  "applicationCache",
+  "styleMedia",
+  "trustedTypes",
+  "launchQueue",
+  "scheduler",
+  "cookieStore",
+  "navigation",
+  "chrome",
+  "webkitStorageInfo",
+  "nw",
+  "process",
+  "require",
+  "module",
+  "exports",
+  "Buffer",
+]);
+
 // 预览文本的最大长度
 const MAX_PREVIEW_LENGTH = 160;
 
-// 深度搜索的默认限制（避免遍历整个对象图导致卡顿）
+// 单个容器最多枚举多少个键（避免对超大数组 / 对象调用 Object.keys 时撑爆内存）
+const MAX_ENUMERATED_KEYS = 10000;
+
+// 统计子项数量时的上限（仅用于预览文案）
+const MAX_CHILD_COUNT = 10000;
+
+// 深度搜索的默认限制（避免遍历整个对象图导致卡顿），可在面板里手动调整
 const SEARCH_DEFAULT_OPTIONS = {
   maxDepth: 4,
   maxResults: 300,
   maxNodes: 30000,
+  maxKeysPerNode: MAX_ENUMERATED_KEYS,
+  maxTimeMs: 2000,
 };
 
 export function getValueKind(value) {
@@ -406,28 +459,34 @@ export function getValueKind(value) {
     return type;
   }
 
-  if (Array.isArray(value)) {
-    return "array";
-  }
+  // 某些宿主对象（被 revoke 的 Proxy、跨域 WindowProxy 等）的 instanceof
+  // 会抛出异常，这里统一兜底为 object，后续读取都会被保护。
+  try {
+    if (Array.isArray(value)) {
+      return "array";
+    }
 
-  if (isDomNode(value)) {
-    return "dom";
-  }
+    if (isDomNode(value)) {
+      return "dom";
+    }
 
-  if (value instanceof Date) {
-    return "date";
-  }
+    if (value instanceof Date) {
+      return "date";
+    }
 
-  if (value instanceof RegExp) {
-    return "regexp";
-  }
+    if (value instanceof RegExp) {
+      return "regexp";
+    }
 
-  if (value instanceof Map) {
-    return "map";
-  }
+    if (value instanceof Map) {
+      return "map";
+    }
 
-  if (value instanceof Set) {
-    return "set";
+    if (value instanceof Set) {
+      return "set";
+    }
+  } catch (error) {
+    return "object";
   }
 
   return "object";
@@ -475,48 +534,73 @@ function truncate(text) {
 
 function countChildren(value) {
   try {
-    return Object.keys(value).length;
+    if (Array.isArray(value)) {
+      return value.length;
+    }
+
+    if (ArrayBuffer.isView(value) && typeof value.length === "number") {
+      return value.length;
+    }
+
+    let count = 0;
+    for (const key in value) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) {
+        continue;
+      }
+
+      count++;
+      if (count >= MAX_CHILD_COUNT) {
+        break;
+      }
+    }
+
+    return count;
   } catch (error) {
     return 0;
   }
 }
 
 export function formatValuePreview(value, kind) {
-  switch (kind) {
-    case "null":
-      return "null";
-    case "undefined":
-      return "undefined";
-    case "string":
-      return truncate(JSON.stringify(value));
-    case "number":
-    case "boolean":
-    case "bigint":
-      return String(value);
-    case "symbol":
-    case "function":
-      try {
-        return truncate(String(value));
-      } catch (error) {
-        return String(kind);
+  try {
+    switch (kind) {
+      case "null":
+        return "null";
+      case "undefined":
+        return "undefined";
+      case "string": {
+        if (value.length > MAX_PREVIEW_LENGTH) {
+          return `${JSON.stringify(value.slice(0, MAX_PREVIEW_LENGTH))}…`;
+        }
+
+        return truncate(JSON.stringify(value));
       }
-    case "array":
-      return `数组(${countChildren(value)} 项)`;
-    case "object":
-      return `对象(${countChildren(value)} 个属性)`;
-    case "map":
-    case "set":
-      return `${kind}(${value.size} 项)`;
-    case "date":
-      return Number.isNaN(value.getTime())
-        ? "Invalid Date"
-        : value.toISOString();
-    case "regexp":
-      return String(value);
-    case "dom":
-      return truncate(`${value.nodeName || "DOM"}`);
-    default:
-      return truncate(String(value));
+      case "number":
+      case "boolean":
+      case "bigint":
+        return String(value);
+      case "symbol":
+      case "function":
+        return truncate(String(value));
+      case "array":
+        return `数组(${countChildren(value)} 项)`;
+      case "object":
+        return `对象(${countChildren(value)} 个属性)`;
+      case "map":
+      case "set":
+        return `${kind}(${value.size} 项)`;
+      case "date":
+        return Number.isNaN(value.getTime())
+          ? "Invalid Date"
+          : value.toISOString();
+      case "regexp":
+        return String(value);
+      case "dom":
+        return truncate(`${value.nodeName || "DOM"}`);
+      default:
+        return truncate(String(value));
+    }
+  } catch (error) {
+    return "（无法读取）";
   }
 }
 
@@ -598,16 +682,93 @@ export function parseValueByKind(text, kind) {
   }
 }
 
-export function getContainerKeys(container) {
+export function getContainerKeys(container, limit = MAX_ENUMERATED_KEYS) {
   if (container === null || container === undefined) {
     return [];
   }
 
+  const max =
+    Number.isFinite(limit) && limit > 0
+      ? Math.floor(limit)
+      : MAX_ENUMERATED_KEYS;
+  const keys = [];
+
   try {
-    return Object.keys(container);
+    // 对超大数组直接按下标生成键，避免 Object.keys 为每个元素分配字符串而
+    // 耗尽内存（游戏里的 $dataMap.data / tile 数组动辄上百万项）。
+    if (Array.isArray(container)) {
+      const length = container.length;
+
+      if (length <= max) {
+        return Object.keys(container);
+      }
+
+      for (let index = 0; index < max; index++) {
+        keys.push(String(index));
+      }
+
+      return keys;
+    }
+
+    for (const key in container) {
+      if (!Object.prototype.hasOwnProperty.call(container, key)) {
+        continue;
+      }
+
+      keys.push(key);
+      if (keys.length >= max) {
+        break;
+      }
+    }
   } catch (error) {
-    return [];
+    return keys;
   }
+
+  return keys;
+}
+
+// 判断一个容器是否可以安全地递归进入：
+// 原型链上出现「非 Object / Array 的原生构造函数」时（DOM、NW.js、原生扩展
+// 对象等）返回 false，避免遍历它们的原生 getter 导致进程崩溃。
+const NATIVE_FUNCTION_RE = /\{\s*\[native code\]\s*\}/;
+const SAFE_ROOT_CTORS = new Set([Object, Array]);
+const protoNativeCache = new WeakMap();
+
+export function isTraversableContainer(value) {
+  try {
+    let proto = Object.getPrototypeOf(value);
+
+    while (proto !== null) {
+      let isNative = protoNativeCache.get(proto);
+
+      if (isNative === undefined) {
+        let ctor = null;
+        try {
+          ctor = Object.prototype.hasOwnProperty.call(proto, "constructor")
+            ? proto.constructor
+            : null;
+        } catch (error) {
+          ctor = null;
+        }
+
+        isNative =
+          typeof ctor === "function" &&
+          !SAFE_ROOT_CTORS.has(ctor) &&
+          NATIVE_FUNCTION_RE.test(Function.prototype.toString.call(ctor));
+        protoNativeCache.set(proto, isNative);
+      }
+
+      if (isNative) {
+        return false;
+      }
+
+      proto = Object.getPrototypeOf(proto);
+    }
+  } catch (error) {
+    return false;
+  }
+
+  return true;
 }
 
 export function getChildValue(container, key) {
@@ -899,7 +1060,7 @@ export function searchGlobalTree(root, keyword, options = {}) {
     .toLowerCase();
 
   if (!keywordText) {
-    return { results: [], truncated: false };
+    return { results: [], truncated: false, reason: null };
   }
 
   const settings = Object.assign({}, SEARCH_DEFAULT_OPTIONS, options);
@@ -907,19 +1068,37 @@ export function searchGlobalTree(root, keyword, options = {}) {
   const results = [];
   const visited = new WeakSet();
   const queue = [{ value: root, depth: 0, path: basePath }];
+  const deadline =
+    settings.maxTimeMs > 0 ? Date.now() + settings.maxTimeMs : Infinity;
+  let queueIndex = 0;
   let nodeCount = 0;
-  let truncated = false;
+  let reason = null;
 
-  const reachLimit = () =>
-    results.length >= settings.maxResults || nodeCount >= settings.maxNodes;
+  const reachLimit = () => {
+    if (results.length >= settings.maxResults) {
+      reason = "results";
+      return true;
+    }
 
-  while (queue.length > 0) {
+    if (nodeCount >= settings.maxNodes) {
+      reason = "nodes";
+      return true;
+    }
+
+    if (Date.now() >= deadline) {
+      reason = "time";
+      return true;
+    }
+
+    return false;
+  };
+
+  while (queueIndex < queue.length) {
     if (reachLimit()) {
-      truncated = true;
       break;
     }
 
-    const node = queue.shift();
+    const node = queue[queueIndex++];
     const container = node.value;
 
     if (!isContainerKind(getValueKind(container))) {
@@ -932,13 +1111,21 @@ export function searchGlobalTree(root, keyword, options = {}) {
 
     visited.add(container);
 
-    for (const key of getContainerKeys(container)) {
+    const remainingBudget = Math.max(1, settings.maxNodes - nodeCount);
+    const keyLimit = Math.min(settings.maxKeysPerNode, remainingBudget);
+
+    for (const key of getContainerKeys(container, keyLimit)) {
       if (reachLimit()) {
-        truncated = true;
         break;
       }
 
       nodeCount++;
+
+      const name = String(key);
+
+      if (UNSAFE_TRAVERSAL_NAMES.has(name)) {
+        continue;
+      }
 
       const child = getChildValue(container, key);
       if (!child.ok) {
@@ -953,7 +1140,6 @@ export function searchGlobalTree(root, keyword, options = {}) {
       }
 
       const preview = formatValuePreview(value, kind);
-      const name = String(key);
       const childPath = [...node.path, key];
       const matched =
         name.toLowerCase().includes(keywordText) ||
@@ -973,18 +1159,31 @@ export function searchGlobalTree(root, keyword, options = {}) {
         });
       }
 
-      if (node.depth < settings.maxDepth && isContainerKind(kind)) {
+      if (
+        node.depth < settings.maxDepth &&
+        isContainerKind(kind) &&
+        isTraversableContainer(value)
+      ) {
         queue.push({ value, depth: node.depth + 1, path: childPath });
       }
     }
   }
 
-  return { results, truncated };
+  return { results, truncated: reason !== null, reason };
 }
 
-// 深度搜索的结果条数限制（供 UI 显示）
+// 深度搜索的默认上限（供 UI 显示 / 手动调整）
 export const SEARCH_LIMITS = {
   maxDepth: SEARCH_DEFAULT_OPTIONS.maxDepth,
   maxResults: SEARCH_DEFAULT_OPTIONS.maxResults,
+  maxNodes: SEARCH_DEFAULT_OPTIONS.maxNodes,
+  maxKeysPerNode: SEARCH_DEFAULT_OPTIONS.maxKeysPerNode,
+  maxTimeMs: SEARCH_DEFAULT_OPTIONS.maxTimeMs,
+};
+
+export const SEARCH_LIMIT_REASONS = {
+  results: "已达到结果数量上限",
+  nodes: "已达到遍历节点数上限",
+  time: "已达到时间上限",
 };
 

@@ -1,9 +1,11 @@
 import PageJump from "../components/PageJump.js";
 import { Alert } from "../js/AlertHelper.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
+import { KeyValueStorage } from "../js/KeyValueStorage.js";
 import { markRaw } from "../libs/vue.js";
 import {
   ROOT_FILTERS,
+  SEARCH_LIMIT_REASONS,
   SEARCH_LIMITS,
   createEntry,
   deleteChildValue,
@@ -71,6 +73,20 @@ export default {
                 </v-btn>
             </template>
             <span>重新加载游戏数据</span>
+        </v-tooltip>
+        <v-tooltip location="bottom">
+            <template #activator="{ props }">
+                <v-btn
+                    v-bind="props"
+                    color="teal"
+                    size="small"
+                    icon
+                    class="ml-2"
+                    @click="openSearchLimits">
+                    <v-icon>mdi-tune-variant</v-icon>
+                </v-btn>
+            </template>
+            <span>深度搜索上限设置</span>
         </v-tooltip>
     </div>
 
@@ -276,7 +292,7 @@ export default {
     <div v-if="searchActive" class="mt-2">
         <div class="text-body-small text-grey-lighten-1 mb-1">
             深度搜索结果 {{ deepSearchResults.length }} 项
-            <span v-if="deepSearchTruncated">（已达到搜索上限，结果可能不完整）</span>
+            <span v-if="deepSearchTruncated">（{{ deepSearchLimitReason || '已达到搜索上限' }}，结果可能不完整）</span>
         </div>
         <div class="hide-scrollbar" style="max-height: 290px; overflow-y: auto;">
             <div
@@ -303,7 +319,7 @@ export default {
                 </v-btn>
             </div>
             <div v-if="deepSearchResults.length === 0" class="pa-3 text-body-small text-grey-lighten-1">
-                {{ deepSearching ? '搜索中...' : '没有匹配的嵌套变量（最多搜索 ' + searchMaxDepth + ' 层）' }}
+                {{ deepSearching ? '搜索中...' : '没有匹配的嵌套变量（最多搜索 ' + searchLimits.maxDepth + ' 层）' }}
             </div>
         </div>
     </div>
@@ -386,6 +402,93 @@ export default {
             </v-card-actions>
         </v-card>
     </v-dialog>
+    <v-dialog v-model="limitsDialog.show" max-width="560" persistent>
+        <v-card
+            @keydown.stop
+            @keyup.stop
+            @keypress.stop>
+            <v-card-title class="d-flex align-center">
+                <v-btn icon size="small" @click="limitsDialog.show = false">
+                    <v-icon>mdi-close</v-icon>
+                </v-btn>
+                <span class="text-title-large ml-2">深度搜索上限</span>
+                <v-spacer></v-spacer>
+            </v-card-title>
+            <v-card-text>
+                <v-row dense>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model.number="limitsDialog.maxDepth"
+                            type="number"
+                            min="1"
+                            label="最大深度"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                            @keydown.stop>
+                        </v-text-field>
+                    </v-col>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model.number="limitsDialog.maxKeysPerNode"
+                            type="number"
+                            min="1"
+                            label="每层最大属性数"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                            @keydown.stop>
+                        </v-text-field>
+                    </v-col>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model.number="limitsDialog.maxResults"
+                            type="number"
+                            min="1"
+                            label="最大结果数"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                            @keydown.stop>
+                        </v-text-field>
+                    </v-col>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model.number="limitsDialog.maxNodes"
+                            type="number"
+                            min="1"
+                            label="最大节点数"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                            @keydown.stop>
+                        </v-text-field>
+                    </v-col>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model.number="limitsDialog.maxTimeMs"
+                            type="number"
+                            min="1"
+                            label="最大耗时(ms)"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                            @keydown.stop>
+                        </v-text-field>
+                    </v-col>
+                </v-row>
+                <div class="text-body-small text-grey-lighten-1 mt-3">
+                    数值越大搜索越完整，但越慢、越占内存。搜索被截断时结果上方会提示原因。
+                </div>
+            </v-card-text>
+            <v-card-actions>
+                <v-btn variant="text" @click="resetSearchLimits">恢复默认</v-btn>
+                <v-spacer></v-spacer>
+                <v-btn variant="text" @click="limitsDialog.show = false">取消</v-btn>
+                <v-btn color="primary" @click="saveSearchLimits">保存</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 </v-card>
     `,
 
@@ -397,8 +500,13 @@ export default {
       searchTimer: null,
       deepSearchResults: [],
       deepSearchTruncated: false,
+      deepSearchLimitReason: "",
       deepSearching: false,
-      searchMaxDepth: SEARCH_LIMITS.maxDepth,
+
+      // 深度搜索上限（可在对话框里修改并持久化）
+      searchLimits: { ...SEARCH_LIMITS },
+      limitsDialog: { show: false, ...SEARCH_LIMITS },
+      limitStorage: null,
 
       // 顶层筛选（取值与 ROOT_FILTERS 相同：all / rpg / plugin）
       rootFilter: ROOT_FILTERS.all,
@@ -441,6 +549,10 @@ export default {
   },
 
   created() {
+    this.limitStorage = new KeyValueStorage(
+      "./www/cheat-settings/global-search.json",
+    );
+    this.loadSearchLimits();
     this.container = markRaw(window);
     this.reloadRootGlobals();
     this.navigateTo([], {});
@@ -460,6 +572,7 @@ export default {
     deepSearch() {
       this.deepSearchResults = [];
       this.deepSearchTruncated = false;
+      this.deepSearchLimitReason = "";
       this.scheduleSearch();
     },
 
@@ -674,6 +787,7 @@ export default {
       this.search = "";
       this.deepSearchResults = [];
       this.deepSearchTruncated = false;
+      this.deepSearchLimitReason = "";
 
       this.$nextTick(() => {
         this.pagination.page = page;
@@ -974,12 +1088,31 @@ export default {
       if (!this.searchActive) {
         this.deepSearchResults = [];
         this.deepSearchTruncated = false;
+        this.deepSearchLimitReason = "";
         return;
       }
 
       this.searchTimer = window.setTimeout(() => {
         this.runDeepSearch(this.search);
       }, 300);
+    },
+
+    // 深度搜索的起点：在根层只搜索当前筛选出的全局变量，
+    // 避免遍历 window 上的浏览器 / NW.js 宿主对象（会直接搞崩进程）。
+    buildSearchRoot() {
+      if (!this.isRoot) {
+        return this.container || window;
+      }
+
+      const root = {};
+      getRootNamesByFilter(this.rootScan, this.rootFilter).forEach((name) => {
+        const child = getChildValue(window, name);
+        if (child.ok) {
+          root[name] = child.value;
+        }
+      });
+
+      return root;
     },
 
     runDeepSearch(keyword) {
@@ -990,21 +1123,80 @@ export default {
       this.deepSearching = true;
 
       try {
-        const { results, truncated } = searchGlobalTree(
-          this.container || window,
+        const { results, truncated, reason } = searchGlobalTree(
+          this.buildSearchRoot(),
           keyword,
-          { basePath: this.path.slice() },
+          { basePath: this.path.slice(), ...this.searchLimits },
         );
 
         this.deepSearchResults = results;
         this.deepSearchTruncated = truncated;
+        this.deepSearchLimitReason = truncated
+          ? SEARCH_LIMIT_REASONS[reason] || ""
+          : "";
       } catch (error) {
         this.deepSearchResults = [];
         this.deepSearchTruncated = false;
+        this.deepSearchLimitReason = "";
         Alert.error(`搜索失败: ${String(error)}`);
       } finally {
         this.deepSearching = false;
       }
+    },
+
+    // ---------- 深度搜索上限设置 ----------
+
+    loadSearchLimits() {
+      try {
+        const raw = this.limitStorage.getItem("limits");
+        if (!raw) {
+          return;
+        }
+
+        const saved = JSON.parse(raw);
+        const merged = { ...SEARCH_LIMITS };
+
+        Object.keys(merged).forEach((key) => {
+          const value = Number(saved[key]);
+          if (Number.isFinite(value) && value > 0) {
+            merged[key] = value;
+          }
+        });
+
+        this.searchLimits = merged;
+      } catch (error) {
+        this.searchLimits = { ...SEARCH_LIMITS };
+      }
+    },
+
+    openSearchLimits() {
+      this.limitsDialog = { show: true, ...this.searchLimits };
+    },
+
+    resetSearchLimits() {
+      this.limitsDialog = { show: true, ...SEARCH_LIMITS };
+    },
+
+    saveSearchLimits() {
+      const next = { ...SEARCH_LIMITS };
+
+      Object.keys(next).forEach((key) => {
+        const value = Math.floor(Number(this.limitsDialog[key]));
+        if (Number.isFinite(value) && value > 0) {
+          next[key] = value;
+        }
+      });
+
+      this.searchLimits = next;
+      this.limitsDialog = { show: false, ...next };
+
+      try {
+        this.limitStorage.setItem("limits", JSON.stringify(next));
+      } catch (error) {
+        Alert.warn("保存搜索上限失败");
+      }
+
+      this.scheduleSearch();
     },
 
     clearSearchTimer() {
