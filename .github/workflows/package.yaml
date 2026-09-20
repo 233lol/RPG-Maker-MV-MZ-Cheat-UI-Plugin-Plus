@@ -34,6 +34,6 @@ jobs:
         with:
           name: ${{ env.SHORT_SHA }}.zip
           path: |
-            mv-${{ env.SHORT_SHA }}.tar.gz
-            mz-${{ env.SHORT_SHA }}.tar.gz
-          compression-level: 9
+            mv-${{ env.SHORT_SHA }}.zip
+            mz-${{ env.SHORT_SHA }}.zip
+          compression-level: 0

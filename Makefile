@@ -28,16 +28,16 @@ $(vuetifycss) $(mdicss) $(mdifonts):
 	pnpm run vendor:assets
 
 clean:
-	-rm -f *.tar.gz *-latest.tar.gz $(verfn) $(shiki) $(vuetify) $(vue) $(vuetifycss) $(mdicss)
+	-rm -f *.zip *-latest.zip $(verfn) $(shiki) $(vuetify) $(vue) $(vuetifycss) $(mdicss)
 	-rm -f cheat-engine/www/cheat/fonts/materialdesignicons-webfont.*
 
-%-$(hash).tar.gz: $(verfn) $(shiki) $(vuetify) $(vue) $(vuetifycss) $(mdicss) $(mdifonts)
-	GZIP=-9 COPYFILE_DISABLE=1 tar --exclude='*DS_Store' -czvf $@ \
-		-C cheat-engine/www cheat \
-		-C _cheat_initialize/$* js
-	ln -s -f $@ $*-latest.tar.gz
+# tools/pack.mjs prefixes MV archives with www/ and leaves MZ archives at the
+# root, so both can be extracted directly into the game root directory.
+%-$(hash).zip: $(verfn) $(shiki) $(vuetify) $(vue) $(vuetifycss) $(mdicss) $(mdifonts)
+	node tools/pack.mjs $* $@
+	ln -s -f $@ $*-latest.zip
 
-$(type):%:%-$(hash).tar.gz
+$(type):%:%-$(hash).zip
 	@echo finished packing $@
 
 $(verfn):

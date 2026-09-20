@@ -5,6 +5,9 @@ venv/
 deploy/output
 
 # Build output
+mv-*.zip
+mz-*.zip
+*-latest.zip
 mv-*.tar.gz
 mz-*.tar.gz
 mv-*.tar.xz

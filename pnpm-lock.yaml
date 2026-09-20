@@ -127,6 +127,9 @@ importers:
       esbuild:
         specifier: ^0.27.7
         version: 0.27.7
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       shiki:
         specifier: ^4.4.3
         version: 4.4.3
@@ -454,6 +457,9 @@ packages:
 
   estree-walker@2.0.2:
     resolution: {integrity: sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w==}
+
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
 
   hast-util-to-html@9.0.5:
     resolution: {integrity: sha512-OguPdidb+fbHQSU4Q4ZiLKnzWo8Wwsf5bZfbvu7//a9oTYoqD/fWpe96NuHkoS9h0ccGOTe0C4NGXdtS0iObOw==}
@@ -834,6 +840,8 @@ snapshots:
       '@esbuild/win32-x64': 0.27.7
 
   estree-walker@2.0.2: {}
+
+  fflate@0.8.3: {}
 
   hast-util-to-html@9.0.5:
     dependencies:

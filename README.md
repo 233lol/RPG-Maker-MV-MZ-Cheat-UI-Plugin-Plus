@@ -35,8 +35,19 @@ make clean
 ```
 
 构建产物位于项目根目录：
-- `mv-<commit-hash>.tar.gz` / `mv-latest.tar.gz`
-- `mz-<commit-hash>.tar.gz` / `mz-latest.tar.gz`
+- `mv-<commit-hash>.zip` / `mv-latest.zip`
+- `mz-<commit-hash>.zip` / `mz-latest.zip`
+
+### 压缩包结构
+
+MV 游戏的可执行文件所在目录下是 `www/`，而 MZ 游戏直接以 `js/`、`index.html` 为游戏根目录，因此两个压缩包的顶层结构不同：
+
+| 压缩包 | 顶层目录 | 说明 |
+|---|---|---|
+| `mv-*.zip` | `www/cheat/`、`www/js/main.js` | 解压到游戏根目录后文件会进入 `www/` |
+| `mz-*.zip` | `cheat/`、`js/main.js` | 解压到游戏根目录后文件直接在根目录 |
+
+两者均直接解压覆盖到游戏根目录（包含 `Game.exe` 的那一层）即可，无需手动切换目录。
 
 ### Vendor 构建脚本
 
@@ -88,7 +99,7 @@ make vendor            # 生成全部 vendor 文件
 
 ## CI
 
-GitHub Actions 在推送到 `main`、`vue-3` 时自动构建并上传 `.tar.gz` 产物。
+GitHub Actions 在推送到 `main`、`vue-3` 时自动构建并上传 `.zip` 产物。
 
 ## 许可证
 
