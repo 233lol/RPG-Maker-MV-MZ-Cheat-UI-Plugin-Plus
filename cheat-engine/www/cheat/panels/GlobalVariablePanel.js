@@ -423,7 +423,7 @@ export default {
       refreshTimer: null,
 
       // 分页
-      pagination: { page: 1, itemsPerPage: 20 },
+      pagination: { page: 1, itemsPerPage: 50 },
       itemsPerPageOptions: [10, 20, 50, 100, { title: "全部", value: -1 }],
 
       // JSON 编辑对话框
