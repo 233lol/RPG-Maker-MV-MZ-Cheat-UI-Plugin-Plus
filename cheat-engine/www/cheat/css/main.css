@@ -76,6 +76,31 @@ body::-webkit-scrollbar {
   font-size: 11px !important;
 }
 
+/* global variable tree panel */
+.global-var-link {
+  cursor: pointer;
+}
+
+.global-var-link:hover {
+  text-decoration: underline;
+}
+
+.global-var-name-link {
+  cursor: pointer;
+}
+
+.global-var-name-link:hover {
+  text-decoration: underline;
+}
+
+.global-var-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.global-var-row-highlight {
+  background-color: rgba(255, 183, 77, 0.16);
+}
+
 /* z-index for cheat components - lower than overlays */
 .z-index-cheat-0 {
   z-index: 1000 !important;

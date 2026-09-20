@@ -6,6 +6,7 @@ import WeaponSettingPanel from "./panels/WeaponSettingPanel.js";
 import ArmorSettingPanel from "./panels/ArmorSettingPanel.js";
 import SkillSettingPanel from "./panels/SkillSettingPanel.js";
 import VariableSettingPanel from "./panels/VariableSettingPanel.js";
+import GlobalVariablePanel from "./panels/GlobalVariablePanel.js";
 import SwitchSettingPanel from "./panels/SwitchSettingPanel.js";
 import SaveRecallPanel from "./panels/SaveRecallPanel.js";
 import TeleportPanel from "./panels/TeleportPanel.js";
@@ -24,6 +25,7 @@ export default {
     ArmorSettingPanel,
     SkillSettingPanel,
     VariableSettingPanel,
+    GlobalVariablePanel,
     SwitchSettingPanel,
     SaveRecallPanel,
     TeleportPanel,
@@ -144,6 +146,11 @@ export default {
               name: "变量",
               icon: "mdi-variable",
               component: "variable-setting-panel",
+          },
+          {
+              name: "全局变量",
+              icon: "mdi-file-tree",
+              component: "global-variable-panel",
           },
         {
           name: "开关",
