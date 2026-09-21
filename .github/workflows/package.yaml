@@ -8,7 +8,7 @@ on:
     paths:
       - "cheat-engine/**"
       - "package.json"
-      - "package-lock.json"
+      - "pnpm-lock.yaml"
   workflow_dispatch:
 
 jobs:
