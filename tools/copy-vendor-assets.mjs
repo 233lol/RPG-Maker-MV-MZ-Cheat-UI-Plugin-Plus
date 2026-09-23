@@ -7,16 +7,30 @@ const root = resolve(__dirname, '..');
 const destCss = resolve(root, 'cheat-engine/www/cheat/css');
 const destFonts = resolve(root, 'cheat-engine/www/cheat/fonts');
 
+// 与 vue / shiki / vuetify 一致：默认拷生产（压缩）版 CSS，
+// `pnpm run vendor:assets:dev` / `make dev` 切换为可读的开发版。
+// 未压缩的 vuetify.css / materialdesignicons.css 比 min 版大 30% / 20%，
+// 下载与 CSS 解析都是纯开销，生产包没必要带。
+const useDev = process.argv[2] === 'dev';
+const mode = useDev ? 'dev' : 'prod';
+
 // Vuetify CSS
-const vuetifySrc = resolve(root, 'node_modules/vuetify/dist/vuetify.css');
+const vuetifyFile = useDev ? 'vuetify.css' : 'vuetify.min.css';
+const vuetifySrc = resolve(root, 'node_modules/vuetify/dist', vuetifyFile);
 const vuetifyDest = resolve(destCss, 'vuetify.css');
 copyFileSync(vuetifySrc, vuetifyDest);
-console.log(`Copied vuetify.css -> ${vuetifyDest}`);
+console.log(`Copied ${vuetifyFile} (${mode}) -> ${vuetifyDest}`);
 
-// Material Design Icons CSS
-const mdiSrc = resolve(root, 'node_modules/@mdi/font/css/materialdesignicons.css');
+// Material Design Icons CSS（压缩版同样做下面的 woff2 过滤）
+const mdiFile = useDev ? 'materialdesignicons.css' : 'materialdesignicons.min.css';
+const mdiSrc = resolve(root, 'node_modules/@mdi/font/css', mdiFile);
 const mdiDest = resolve(destCss, 'materialdesignicons.css');
 let mdiCss = readFileSync(mdiSrc, 'utf8');
+
+// 去掉 sourceMappingURL 注释：对应的 .map 文件不会被打包，
+// 留着只会让 DevTools 打开时白发一次 404 请求
+mdiCss = mdiCss.replace(/\/\*#\s*sourceMappingURL=[^*]*\*\/\s*$/, '');
+
 // Strip non-woff2 font formats, keep only woff2
 mdiCss = mdiCss.replace(
   /@font-face\s*\{[\s\S]*?\}/,
@@ -29,7 +43,7 @@ mdiCss = mdiCss.replace(
   }
 );
 writeFileSync(mdiDest, mdiCss);
-console.log(`Copied materialdesignicons.css (woff2 only) -> ${mdiDest}`);
+console.log(`Copied ${mdiFile} (woff2 only, ${mode}) -> ${mdiDest}`);
 
 // Material Design Icons Fonts (woff2 only)
 const mdiFontsSrc = resolve(root, 'node_modules/@mdi/font/fonts');

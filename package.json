@@ -10,6 +10,7 @@
     "vendor:vue": "node tools/copy-vue.mjs",
     "vendor:vue:dev": "node tools/copy-vue.mjs dev",
     "vendor:assets": "node tools/copy-vendor-assets.mjs",
+    "vendor:assets:dev": "node tools/copy-vendor-assets.mjs dev",
     "vendor:libs": "node tools/build-vuetify.mjs && node tools/copy-vue.mjs && node tools/copy-vendor-assets.mjs"
   },
   "devDependencies": {

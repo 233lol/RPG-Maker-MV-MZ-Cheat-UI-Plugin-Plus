@@ -27,6 +27,7 @@ ui-vendor:
 	pnpm run vendor:shiki$(if $(filter dev,$(VUE)),:dev)
 	pnpm run vendor:vue$(if $(filter dev,$(VUE)),:dev)
 	pnpm run vendor:vuetify$(if $(filter dev,$(VUE)),:dev)
+	pnpm run vendor:assets$(if $(filter dev,$(VUE)),:dev)
 
 # dev: 使用 Vue 开发构建打包（组件告警 + Devtools），便于排查问题
 dev:
@@ -37,7 +38,7 @@ prod:
 	$(MAKE) VUE=prod $(type)
 
 $(vuetifycss) $(mdicss) $(mdifonts):
-	pnpm run vendor:assets
+	pnpm run vendor:assets$(if $(filter dev,$(VUE)),:dev)
 
 clean:
 	-rm -f *.zip *-latest.zip $(verfn) $(shiki) $(vuetify) $(vue) $(vuetifycss) $(mdicss)

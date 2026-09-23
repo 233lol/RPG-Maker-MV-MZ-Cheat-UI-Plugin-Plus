@@ -22,7 +22,7 @@ Vendor scripts (all available via `pnpm run vendor:*`):
 | `vendor:vuetify:dev` | same file but unminified (readable Vuetify stack traces, for debugging) |
 | `vendor:vue` | `cheat-engine/www/cheat/libs/vue.js` (production build `vue.esm-browser.prod.js`) |
 | `vendor:vue:dev` | same file but development build `vue.esm-browser.js` (warnings + Vue Devtools, for debugging) |
-| `vendor:assets` | `css/vuetify.css`, `css/materialdesignicons.css`, `fonts/*` (copied from npm packages) |
+| `vendor:assets` | `css/vuetify.css`, `css/materialdesignicons.css`, `fonts/*` (copied from npm packages; prod = minified `*.min.css` + no sourceMappingURL, `vendor:assets:dev` = unminified) |
 
 `vendor:shiki` is auto-triggered by Makefile dependency. `make vendor` runs all four.
 

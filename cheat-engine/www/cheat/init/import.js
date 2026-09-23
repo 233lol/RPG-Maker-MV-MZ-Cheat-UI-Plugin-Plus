@@ -63,13 +63,28 @@ function applyCheat() {
 
   document.body.appendChild(appDiv);
 
-  // import in head
-  document.head.innerHTML += `
-<link href="cheat/css/roboto.css" rel="stylesheet">
-<link href="cheat/css/materialdesignicons.css" rel="stylesheet">
-<link href="cheat/css/vuetify.css" rel="stylesheet">
-<link href="cheat/css/main.css" rel="stylesheet">
-`;
+  // import in head：只做增量插入，不要用 innerHTML += ——
+  // 那等价于「把整个 head 序列化成字符串再整段重新解析」，游戏自带的
+  // link / style / meta 会全部销毁重建，既有样式表可能被重新请求并引起闪烁。
+  const cheatStyleSheets = [
+    "cheat/css/roboto.css",
+    "cheat/css/materialdesignicons.css",
+    "cheat/css/vuetify.css",
+    "cheat/css/main.css",
+  ];
+
+  // 按数组顺序依次追加，保证层叠顺序（vuetify.css 在 main.css 之前），与原实现一致；
+  // 已存在相同 href 时跳过，重复执行不会插入两份
+  cheatStyleSheets.forEach((href) => {
+    if (document.querySelector(`link[href="${href}"]`)) {
+      return;
+    }
+
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    document.head.appendChild(link);
+  });
 
   // import in body
   __addScript("module", "cheat/init/setup.js");
