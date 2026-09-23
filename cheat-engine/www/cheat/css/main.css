@@ -93,12 +93,126 @@ body::-webkit-scrollbar {
   text-decoration: underline;
 }
 
+/* 行虚拟化辅助：屏外的行跳过 layout / paint，压掉列表的展示延迟。
+   contain-intrinsic-size 的两行写法用于兼容不支持 auto 关键字的旧内核。 */
 .global-var-row {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  content-visibility: auto;
+  contain-intrinsic-size: 32px;
+  contain-intrinsic-size: auto 32px;
+}
+
+.global-var-deep-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  content-visibility: auto;
+  contain-intrinsic-size: 44px;
+  contain-intrinsic-size: auto 44px;
 }
 
 .global-var-row-highlight {
   background-color: rgba(255, 183, 77, 0.16);
+}
+
+/* 行内图标 / 操作按钮：用原生 span 替代 v-icon / v-btn / v-chip，
+   50 行能省下 150+ 个 Vuetify 组件的挂载与更新成本 */
+.global-var-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  margin-right: 4px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.global-var-icon--container {
+  color: #ffc107; /* amber */
+}
+
+.global-var-icon--plain {
+  color: #bdbdbd; /* grey-lighten-1 */
+}
+
+.global-var-plugin-badge {
+  flex: none;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background-color: #3f51b5; /* indigo */
+  color: #fff;
+  font-size: 10px;
+  line-height: 15px;
+}
+
+.global-var-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-left: 2px;
+  border-radius: 50%;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.global-var-action:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.global-var-action--enter {
+  color: #ffc107; /* amber */
+}
+
+.global-var-action--json {
+  color: #4dd0e1; /* light-blue */
+}
+
+.global-var-action--add {
+  color: #26a69a; /* teal */
+}
+
+.global-var-action--delete {
+  color: #ef5350; /* red */
+}
+
+/* 行内编辑：默认显示文本，点击才切成输入框（原生 input 替代 v-text-field） */
+.global-var-value-editable {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.global-var-value-editable:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.global-var-edit-input {
+  width: 150px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 12px;
+  outline: none;
+}
+
+.global-var-edit-input:focus {
+  border-color: #ffc107;
+}
+
+.global-var-bool-input {
+  width: 16px;
+  height: 16px;
+  margin: 0 6px 0 0;
+  cursor: pointer;
+  accent-color: #ffc107;
 }
 
 /* z-index for cheat components - lower than overlays */

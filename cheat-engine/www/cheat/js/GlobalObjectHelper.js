@@ -436,9 +436,6 @@ const MAX_PREVIEW_LENGTH = 160;
 // 单个容器最多枚举多少个键（避免对超大数组 / 对象调用 Object.keys 时撑爆内存）
 const MAX_ENUMERATED_KEYS = 10000;
 
-// 统计子项数量时的上限（仅用于预览文案）
-const MAX_CHILD_COUNT = 10000;
-
 // 深度搜索的默认限制（避免遍历整个对象图导致卡顿），可在面板里手动调整
 const SEARCH_DEFAULT_OPTIONS = {
   maxDepth: 4,
@@ -542,19 +539,11 @@ function countChildren(value) {
       return value.length;
     }
 
-    let count = 0;
-    for (const key in value) {
-      if (!Object.prototype.hasOwnProperty.call(value, key)) {
-        continue;
-      }
-
-      count++;
-      if (count >= MAX_CHILD_COUNT) {
-        break;
-      }
-    }
-
-    return count;
+    // 只统计自有可枚举键。用 Object.keys 而不是 for...in + hasOwnProperty：
+    // 后者会把整条原型链上的可枚举方法（RPG Maker 的原型方法都是可枚举的）
+    // 全部遍历一遍再逐个丢弃，对 $gameXxx / Manager 这类深原型链对象很慢。
+    // 超大数组走上面的 length 快路径，不会为百万级元素分配键数组。
+    return Object.keys(value).length;
   } catch (error) {
     return 0;
   }
@@ -963,6 +952,12 @@ export function scanRootGlobals(root = window) {
   const otherPluginNames = [];
 
   ownNames.forEach((name) => {
+    // 先按名字过滤再读值：window 上的浏览器 / NW.js 内置属性大多是原生
+    // getter，逐个触发既没有意义也不便宜。
+    if (builtinNames.has(name)) {
+      return;
+    }
+
     if (name.startsWith("$")) {
       // $dataXxx / $gameXxx / $plugins 归入游戏内置，其余 $Xxx 视为插件全局变量
       if (RPG_GLOBAL_NAME_PATTERN.test(name)) {
@@ -993,6 +988,49 @@ export function scanRootGlobals(root = window) {
   otherPluginNames.forEach((name) => push(pluginNames, name));
 
   return { rpg: rpgNames, plugin: pluginNames };
+}
+
+// scanRootGlobals 的模块级缓存：重复打开面板（关掉再开、或 keep-alive
+// 未命中）时不必重新遍历 window。TTL 内直接复用，reloadAll 会强制失效。
+const ROOT_SCAN_CACHE_TTL = 5000;
+let rootScanCache = null;
+
+export function scanRootGlobalsCached(root = window) {
+  const now = Date.now();
+
+  if (rootScanCache && now - rootScanCache.time < ROOT_SCAN_CACHE_TTL) {
+    return rootScanCache.result;
+  }
+
+  const result = scanRootGlobals(root);
+  rootScanCache = { result, time: now };
+  return result;
+}
+
+export function invalidateRootScanCache() {
+  rootScanCache = null;
+}
+
+// 预热：把「创建隐藏 iframe 检测内置全局名」挪到空闲时段执行，
+// 避免第一次扫描全局变量时才创建 iframe 卡一下。
+export function prewarmGlobalObjectHelper() {
+  if (builtinGlobalNameCache) {
+    return;
+  }
+
+  const run = () => {
+    try {
+      getBuiltinGlobalNames();
+    } catch (error) {
+      // 预热失败不影响后续扫描（真正扫描时会再走一次兜底逻辑）
+    }
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(run, { timeout: 5000 });
+  } else {
+    window.setTimeout(run, 2000);
+  }
 }
 
 export const ROOT_FILTERS = {
@@ -1186,4 +1224,9 @@ export const SEARCH_LIMIT_REASONS = {
   nodes: "已达到遍历节点数上限",
   time: "已达到时间上限",
 };
+
+// cheat 初始化（模块加载）时预热，首次打开全局变量面板不再付 iframe 创建成本
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  prewarmGlobalObjectHelper();
+}
 

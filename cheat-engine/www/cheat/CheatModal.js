@@ -81,7 +81,10 @@ export default {
         <div
             :style="'width: calc(100% - ' + navWidth + 'px - 1px);'"
             class="fill-height d-inline pa-2 overflow-y-auto hide-scrollbar">
-            <component :is="modelValue"></component>
+            <!-- 只缓存全局变量面板：切走再切回不再销毁重建（该面板初始化要扫描 window） -->
+            <keep-alive :include="['GlobalVariablePanel']">
+                <component :is="modelValue"></component>
+            </keep-alive>
         </div>
     </div>
 </v-card>

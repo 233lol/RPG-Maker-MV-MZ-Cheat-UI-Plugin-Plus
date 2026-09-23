@@ -13,14 +13,84 @@ import {
   getChildValue,
   getContainerKeys,
   getRootNamesByFilter,
+  invalidateRootScanCache,
   isHiddenKind,
   parseValueByKind,
   resolvePathValue,
-  scanRootGlobals,
+  scanRootGlobalsCached,
   searchGlobalTree,
   setChildValue,
   toJsonText,
 } from "../js/GlobalObjectHelper.js";
+
+// 搜索上限的模块级缓存：设置文件只在第一次真正需要时同步读一次，
+// 之后重复打开面板都复用内存里的值，不再走 fs.readFileSync。
+let cachedSearchLimits = null;
+
+function nowMs() {
+  return typeof performance !== "undefined" &&
+    typeof performance.now === "function"
+    ? performance.now()
+    : 0;
+}
+
+// 轻量耗时统计：在 DevTools Performance 面板里能看到对应的 measure，
+// 用于对比优化前后的点击耗时构成。
+function measureFrom(name, startMs) {
+  if (
+    !startMs ||
+    typeof performance === "undefined" ||
+    typeof performance.measure !== "function"
+  ) {
+    return;
+  }
+
+  try {
+    performance.measure(name, startMs);
+  } catch (error) {
+    // 忽略异常，统计不影响功能
+  }
+}
+
+// 自动刷新用：两次构建结果的显示字段全部一致时复用旧数组，
+// 避免每 2 秒整体替换 entries 触发整列表 diff 与重渲染。
+function entriesShallowEqual(a, b) {
+  if (a === b) {
+    return true;
+  }
+
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+    return false;
+  }
+
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+
+    if (x === y) {
+      continue;
+    }
+
+    if (!x || !y) {
+      return false;
+    }
+
+    if (
+      x.key !== y.key ||
+      x.kind !== y.kind ||
+      x.preview !== y.preview ||
+      x.valueText !== y.valueText ||
+      x.boolValue !== y.boolValue ||
+      x.isContainer !== y.isContainer ||
+      x.isEditable !== y.isEditable ||
+      x.isPlugin !== y.isPlugin
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 export default {
   name: "GlobalVariablePanel",
@@ -170,12 +240,14 @@ export default {
             class="d-flex align-center px-1 py-1 global-var-row"
             :class="{ 'global-var-row-highlight': isHighlighted(item) }">
             <div class="d-flex align-center" style="width: 40%; min-width: 0;">
-                <v-icon
-                    size="small"
-                    class="mr-1"
-                    :color="item.isContainer ? 'amber' : 'grey-lighten-1'">
-                    {{ item.icon }}
-                </v-icon>
+                <span
+                    class="mdi global-var-row-icon"
+                    :class="[
+                        item.icon,
+                        item.isContainer
+                            ? 'global-var-icon--container'
+                            : 'global-var-icon--plain',
+                    ]"></span>
                 <span
                     class="text-body-medium text-truncate"
                     :class="{ 'global-var-name-link': item.isContainer }"
@@ -183,89 +255,68 @@ export default {
                     @click="enterEntry(item)">
                     {{ item.name }}
                 </span>
-                <v-chip
-                    v-if="item.isPlugin"
-                    size="x-small"
-                    color="indigo"
-                    label
-                    class="ml-1">
-                    插件
-                </v-chip>
+                <span v-if="item.isPlugin" class="global-var-plugin-badge">插件</span>
             </div>
             <div style="width: 14%;">
                 <span class="text-body-small text-grey-lighten-1">{{ item.typeText }}</span>
             </div>
             <div class="flex-grow-1 d-flex align-center" style="min-width: 0;">
                 <template v-if="item.kind === 'boolean'">
-                    <v-checkbox
-                        :model-value="item.boolValue"
-                        density="compact"
-                        hide-details
-                        @update:model-value="(value) => onBoolInput(item, value)"
+                    <input
+                        type="checkbox"
+                        class="global-var-bool-input"
+                        :checked="item.boolValue"
+                        @change="onBoolInput(item, $event.target.checked)"
                         @keydown.stop>
-                    </v-checkbox>
                     <span class="text-body-small text-grey-lighten-1">{{ item.preview }}</span>
                 </template>
                 <template v-else-if="item.isEditable">
-                    <v-text-field
-                        :model-value="item.valueText"
-                        density="compact"
-                        hide-details
-                        variant="solo"
-                        bg-color="grey-darken-3"
-                        class="inline-field"
-                        style="width: 150px;"
-                        @change="onValueInput(item, $event.target.value)"
-                        @focus="$event.target.select()"
-                        @keydown.stop>
-                    </v-text-field>
+                    <input
+                        v-if="editingKey !== null && String(item.key) === editingKey"
+                        ref="editInput"
+                        v-model="editingText"
+                        class="global-var-edit-input"
+                        @keydown.stop
+                        @keydown.enter.stop.prevent="commitRowEdit(item)"
+                        @keydown.esc.stop="cancelRowEdit"
+                        @blur="commitRowEdit(item)">
+                    <span
+                        v-else
+                        class="text-body-small global-var-value-editable text-truncate"
+                        :title="item.valueText + '（点击编辑）'"
+                        @click="beginRowEdit(item)">{{ item.valueText }}</span>
                 </template>
                 <template v-else>
                     <span class="text-body-small text-grey-lighten-1 text-truncate">{{ item.preview }}</span>
                 </template>
             </div>
             <div class="d-flex align-center justify-end" style="width: 96px;">
-                <v-btn
+                <span
                     v-if="item.isContainer"
+                    class="mdi mdi-arrow-right-bold global-var-action global-var-action--enter"
                     :title="'进入 ' + item.name"
-                    icon
-                    size="x-small"
-                    color="amber"
-                    @click.stop="enterEntry(item)">
-                    <v-icon size="small">mdi-arrow-right-bold</v-icon>
-                </v-btn>
-                <v-btn
+                    @click.stop="enterEntry(item)"></span>
+                <span
                     v-if="item.isContainer"
+                    class="mdi mdi-code-json global-var-action global-var-action--json"
                     title="编辑 JSON"
-                    icon
-                    size="x-small"
-                    color="light-blue"
-                    @click.stop="openJsonEditor(item)">
-                    <v-icon size="small">mdi-code-json</v-icon>
-                </v-btn>
-                <v-btn
+                    @click.stop="openJsonEditor(item)"></span>
+                <span
                     v-if="item.isContainer"
+                    class="mdi mdi-plus global-var-action global-var-action--add"
                     :title="'在 ' + item.name + ' 内新增属性 / 元素'"
-                    icon
-                    size="x-small"
-                    color="teal"
-                    @click.stop="openJsonAdd(item)">
-                    <v-icon size="small">mdi-plus</v-icon>
-                </v-btn>
-                <v-btn
+                    @click.stop="openJsonAdd(item)"></span>
+                <span
                     v-if="!item.isRoot"
+                    class="mdi mdi-delete global-var-action global-var-action--delete"
                     title="删除"
-                    icon
-                    size="x-small"
-                    color="red"
-                    @click.stop="confirmDeleteEntry(item)">
-                    <v-icon size="small">mdi-delete</v-icon>
-                </v-btn>
+                    @click.stop="confirmDeleteEntry(item)"></span>
             </div>
         </div>
 
         <div v-if="pagedEntries.length === 0" class="pa-3 text-body-small text-grey-lighten-1">
-            <div v-if="containerError">{{ containerError }}</div>
+            <div v-if="entriesLoading">正在加载全局变量...</div>
+            <div v-else-if="containerError">{{ containerError }}</div>
             <div v-else-if="search">
                 「{{ search }}」在当前层没有匹配项
                 <v-btn size="x-small" color="amber" variant="text" @click="toggleDeepSearch">深度搜索</v-btn>
@@ -282,14 +333,15 @@ export default {
             <div
                 v-for="(result, idx) in deepSearchResults"
                 :key="'deep-' + idx"
-                class="d-flex align-center px-1 py-1"
-                style="border-bottom: 1px solid rgba(255,255,255,0.08);">
-                <v-icon
-                    size="small"
-                    class="mr-1"
-                    :color="result.isContainer ? 'amber' : 'grey-lighten-1'">
-                    {{ result.icon }}
-                </v-icon>
+                class="d-flex align-center px-1 py-1 global-var-deep-row">
+                <span
+                    class="mdi global-var-row-icon"
+                    :class="[
+                        result.icon,
+                        result.isContainer
+                            ? 'global-var-icon--container'
+                            : 'global-var-icon--plain',
+                    ]"></span>
                 <div class="flex-grow-1" style="min-width: 0;">
                     <div class="text-body-small text-truncate" :title="result.pathText">
                         {{ result.pathText }}
@@ -298,9 +350,10 @@ export default {
                         {{ result.typeText }} · {{ result.preview }}
                     </div>
                 </div>
-                <v-btn icon size="x-small" color="amber" @click.stop="jumpToSearchResult(result)">
-                    <v-icon size="small">mdi-target</v-icon>
-                </v-btn>
+                <span
+                    class="mdi mdi-target global-var-action global-var-action--enter"
+                    title="跳转到该变量"
+                    @click.stop="jumpToSearchResult(result)"></span>
             </div>
             <div v-if="deepSearchResults.length === 0" class="pa-3 text-body-small text-grey-lighten-1">
                 {{ deepSearching ? '搜索中...' : '没有匹配的嵌套变量（最多搜索 ' + searchLimits.maxDepth + ' 层）' }}
@@ -504,6 +557,18 @@ export default {
       entries: [],
       highlightKey: null,
 
+      // 初始加载（设置文件读取 / window 扫描 / 构建列表）推迟到首帧之后，
+      // 点击「全局变量」时只做状态初始化与骨架渲染
+      entriesLoading: true,
+      initialLoadPending: false,
+      initialLoaded: false,
+      initialIdleHandle: null,
+      initialLoadTimer: null,
+
+      // 行内编辑：点到可编辑值时才渲染输入框（替代每行一个 v-text-field）
+      editingKey: null,
+      editingText: "",
+
       // 自动刷新
       autoRefresh: true,
       refreshIntervalMs: 2000,
@@ -536,16 +601,39 @@ export default {
     this.limitStorage = new KeyValueStorage(
       "./www/cheat-settings/global-search.json",
     );
-    this.loadSearchLimits();
     this.container = markRaw(window);
-    this.reloadRootGlobals();
-    this.navigateTo([], {});
-    this.restartAutoRefresh();
+    // 注意：设置文件读取 / window 扫描 / 构建列表都不在 created 里做，
+    // 见 scheduleInitialLoad —— 重活推迟到首帧之后的空闲任务。
+  },
+
+  mounted() {
+    // 兜底：即使没有被 keep-alive 缓存（activated 不触发）也能完成初始加载
+    this.scheduleInitialLoad();
+  },
+
+  activated() {
+    if (this.initialLoaded) {
+      // 切回本面板：同步刷新当前层并恢复自动刷新
+      this.refresh(true);
+      this.restartAutoRefresh();
+    } else {
+      // 首次挂载（mounted 已经调度过，这里是幂等兜底）或加载被取消后切回
+      this.scheduleInitialLoad();
+    }
+  },
+
+  deactivated() {
+    // 面板被缓存隐藏：暂停自动刷新，取消尚未执行的初始加载
+    this.stopAutoRefresh();
+    this.cancelInitialLoad();
   },
 
   beforeUnmount() {
     this.stopAutoRefresh();
     this.clearSearchTimer();
+    this.cancelInitialLoad();
+    this.editingKey = null;
+    this.editingText = "";
   },
 
   watch: {
@@ -683,18 +771,99 @@ export default {
   },
 
   methods: {
-    reloadRootGlobals() {
-      this.rootScan = scanRootGlobals(window);
+    // ---------- 初始加载（推迟到首帧之后） ----------
+
+    // 用空闲回调把「读设置文件 + 扫描 window + 构建列表」挪出点击关键路径：
+    // 点击「全局变量」时只同步渲染骨架，列表在首帧之后填充。
+    scheduleInitialLoad() {
+      if (this.initialLoadPending || this.initialLoaded) {
+        return;
+      }
+
+      this.initialLoadPending = true;
+
+      const run = () => {
+        this.initialIdleHandle = null;
+        this.initialLoadTimer = null;
+
+        if (!this.initialLoadPending) {
+          // 面板已切走 / 关闭，加载被取消
+          return;
+        }
+
+        this.initialLoadPending = false;
+        this.runInitialLoad();
+      };
+
+      if (typeof window.requestIdleCallback === "function") {
+        this.initialIdleHandle = window.requestIdleCallback(run, {
+          timeout: 100,
+        });
+      } else {
+        this.initialLoadTimer = window.setTimeout(run, 0);
+      }
+    },
+
+    cancelInitialLoad() {
+      if (
+        this.initialIdleHandle !== null &&
+        typeof window.cancelIdleCallback === "function"
+      ) {
+        window.cancelIdleCallback(this.initialIdleHandle);
+      }
+
+      if (this.initialLoadTimer !== null) {
+        window.clearTimeout(this.initialLoadTimer);
+      }
+
+      this.initialIdleHandle = null;
+      this.initialLoadTimer = null;
+      this.initialLoadPending = false;
+    },
+
+    runInitialLoad() {
+      const startedAt = nowMs();
+
+      try {
+        this.loadSearchLimits();
+        this.reloadRootGlobals();
+        this.initialLoaded = true;
+        this.rebuildEntries();
+        this.restartAutoRefresh();
+
+        // 加载期间用户已经在搜索框输入了内容时补一次深度搜索
+        if (this.searchActive) {
+          this.scheduleSearch();
+        }
+      } catch (error) {
+        this.containerError = `初始化失败: ${String(
+          (error && error.message) || error,
+        )}`;
+      } finally {
+        this.entriesLoading = false;
+        measureFrom("GlobalVariablePanel.initialLoad", startedAt);
+      }
+    },
+
+    reloadRootGlobals(force = false) {
+      const startedAt = nowMs();
+
+      if (force) {
+        invalidateRootScanCache();
+      }
+
+      this.rootScan = scanRootGlobalsCached(window);
 
       const map = {};
       this.rootScan.plugin.forEach((name) => {
         map[name] = true;
       });
       this.pluginNameMap = map;
+      measureFrom("GlobalVariablePanel.rootScan", startedAt);
     },
 
     reloadAll() {
-      this.reloadRootGlobals();
+      this.reloadRootGlobals(true);
       this.rebuildEntries();
       Alert.success("已重新加载游戏数据");
     },
@@ -716,11 +885,21 @@ export default {
 
     rebuildEntries() {
       if (!this.resolveContainer()) {
-        this.entries = [];
+        if (this.entries.length > 0) {
+          this.entries = [];
+        }
         return;
       }
 
-      this.entries = this.buildEntries();
+      const next = this.buildEntries();
+
+      // 值没有变化时复用旧数组：自动刷新每 2 秒跑一次，
+      // 直接整体替换会触发整列表的全量 diff 与重渲染。
+      if (entriesShallowEqual(this.entries, next)) {
+        return;
+      }
+
+      this.entries = next;
     },
 
     buildEntries() {
@@ -832,6 +1011,50 @@ export default {
         tagName === "TEXTAREA" ||
         active.isContentEditable === true
       );
+    },
+
+    // ---------- 行内编辑（点击才变输入框） ----------
+
+    beginRowEdit(entry) {
+      if (!entry || !entry.isEditable) {
+        return;
+      }
+
+      this.editingKey = String(entry.key);
+      this.editingText = entry.valueText;
+
+      this.$nextTick(() => {
+        const ref = this.$refs.editInput;
+        const input = Array.isArray(ref) ? ref[0] : ref;
+
+        if (input && typeof input.focus === "function") {
+          input.focus();
+          input.select();
+        }
+      });
+    },
+
+    commitRowEdit(entry) {
+      if (this.editingKey === null || String(entry.key) !== this.editingKey) {
+        return;
+      }
+
+      const text = this.editingText;
+      const original = entry.valueText;
+      this.editingKey = null;
+      this.editingText = "";
+
+      // 没有改动就不回写，避免触发无意义的赋值
+      if (text === original) {
+        return;
+      }
+
+      this.onValueInput(entry, text);
+    },
+
+    cancelRowEdit() {
+      this.editingKey = null;
+      this.editingText = "";
     },
 
     onValueInput(entry, text) {
@@ -1131,9 +1354,17 @@ export default {
     // ---------- 深度搜索上限设置 ----------
 
     loadSearchLimits() {
+      if (cachedSearchLimits) {
+        this.searchLimits = { ...cachedSearchLimits };
+        return;
+      }
+
       try {
         const raw = this.limitStorage.getItem("limits");
+
         if (!raw) {
+          cachedSearchLimits = { ...SEARCH_LIMITS };
+          this.searchLimits = { ...cachedSearchLimits };
           return;
         }
 
@@ -1147,9 +1378,11 @@ export default {
           }
         });
 
-        this.searchLimits = merged;
+        cachedSearchLimits = merged;
+        this.searchLimits = { ...merged };
       } catch (error) {
-        this.searchLimits = { ...SEARCH_LIMITS };
+        cachedSearchLimits = { ...SEARCH_LIMITS };
+        this.searchLimits = { ...cachedSearchLimits };
       }
     },
 
@@ -1173,6 +1406,7 @@ export default {
 
       this.searchLimits = next;
       this.limitsDialog = { show: false, ...next };
+      cachedSearchLimits = { ...next };
 
       try {
         this.limitStorage.setItem("limits", JSON.stringify(next));
