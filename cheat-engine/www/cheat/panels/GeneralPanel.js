@@ -7,8 +7,34 @@ import {
 } from "../js/CheatHelper.js";
 
 import interpretCodes from "../js/eventCodes.js";
-import { codeToHtml } from "../libs/shiki.bundle.mjs";
 import { RPGVERSION } from "../version.js";
+
+// shiki 体积较大，改为首次使用时动态加载并缓存，避免随面板启动解析
+let codeToHtmlPromise = null;
+function loadCodeToHtml() {
+  if (!codeToHtmlPromise) {
+    codeToHtmlPromise = import("../libs/shiki.bundle.mjs").then(
+      (m) => m.codeToHtml,
+    );
+  }
+  return codeToHtmlPromise;
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// 高亮半径：只对当前执行位置附近 ±20 行跑 shiki，其余行输出已转义的纯文本，
+// 避免几百条指令并发高亮把主线程卡死
+const HIGHLIGHT_RADIUS = 20;
+
+function plainParamHtml(text) {
+  return `<pre style="margin:0; white-space:pre-wrap; word-break:break-word;">${escapeHtml(text)}</pre>`;
+}
 
 export default {
   name: "GeneralPanel",
@@ -467,6 +493,13 @@ export default {
         return [];
       }
 
+      const anchor = Math.max(
+        0,
+        Number.isInteger(this.inspectedEventCurrentIndex)
+          ? this.inspectedEventCurrentIndex
+          : 0,
+      );
+
       return Promise.all(
         list.map(async (entry, index) => {
           const safeEntry = entry || {};
@@ -479,12 +512,15 @@ export default {
             code === null ? "unknown" : interpretCodes.interpretCodes(code);
           const paramValue = safeEntry.parameters;
           const paramText = JSON.stringify(paramValue);
+          const nearAnchor = Math.abs(index - anchor) <= HIGHLIGHT_RADIUS;
           return {
             index,
             codeText: code === null ? "n/a" : String(code),
             commandName: codeName,
             indentPx: Math.max(0, indent) * 16,
-            paramHtml: await this.highlightParamText(paramText),
+            paramHtml: nearAnchor
+              ? await this.highlightParamText(paramText)
+              : plainParamHtml(paramText),
           };
         }),
       );
@@ -492,6 +528,7 @@ export default {
 
     async highlightParamText(text) {
       try {
+        const codeToHtml = await loadCodeToHtml();
         return await codeToHtml(text, {
           lang: "json",
           theme: "dark-plus",
@@ -499,12 +536,7 @@ export default {
       } catch (error) {
         // 异常消息可能回显输入片段，直接拼进 v-html 等于开注入口，
         // NW.js 下 XSS 即 RCE，必须先做 HTML 实体转义
-        const message = String((error && error.message) || error)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;");
-        return `<pre style="margin:0; white-space:pre-wrap; word-break:break-word;">${message}</pre>`;
+        return plainParamHtml((error && error.message) || error);
       }
     },
 

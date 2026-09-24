@@ -438,9 +438,6 @@ export default {
           }
         }
 
-        console.log(
-          `Events processed: ${this.enemies.length} enemies, ${this.treasureBoxes.length} treasures, ${this.regularEvents.length} regular events`,
-        );
       } catch (error) {
         console.warn("Could not get map events:", error);
       }

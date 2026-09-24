@@ -1,3 +1,8 @@
+// 模块级内存缓存（按文件路径共享）：消除定时器/高频调用的同步读盘。
+// 注意：缓存生效期间外部手工修改同一 JSON 文件不会被感知；
+// 写入始终直写磁盘并同步更新缓存，崩溃时最多丢最后一次写。
+const fileCache = new Map();
+
 export class KeyValueStorage {
   constructor(filePath) {
     if (Utils.isNwjs()) {
@@ -26,17 +31,28 @@ export class KeyValueStorage {
   }
 
   __readFile() {
-    if (!this.fileSystem.existsSync(this.filePath)) {
-      return {};
+    const cached = fileCache.get(this.filePath);
+    if (cached !== undefined) {
+      return cached;
     }
 
-    try {
-      return JSON.parse(
-        this.fileSystem.readFileSync(this.filePath, this.fileEncoding),
-      );
-    } catch (e) {
-      return {};
+    let data = {};
+    if (this.fileSystem.existsSync(this.filePath)) {
+      try {
+        const parsed = JSON.parse(
+          this.fileSystem.readFileSync(this.filePath, this.fileEncoding),
+        );
+        // 只接受普通对象；数组/字符串等损坏内容按空数据处理
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          data = parsed;
+        }
+      } catch (e) {
+        data = {};
+      }
     }
+
+    fileCache.set(this.filePath, data);
+    return data;
   }
 
   __getItemFromFile(key) {
@@ -49,6 +65,7 @@ export class KeyValueStorage {
       this.fileSystem.mkdirSync(parentDir, { recursive: true });
     }
 
+    // __readFile 返回的即是缓存对象，修改后写盘，缓存自动保持最新
     const data = this.__readFile();
 
     data[key] = value;

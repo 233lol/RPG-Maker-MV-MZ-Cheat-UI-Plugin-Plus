@@ -1,4 +1,10 @@
 import PageJump from "../components/PageJump.js";
+import { markRaw } from "../libs/vue.js";
+
+// 模块级缓存：getFilteredSkills 每轮渲染被调用 5 次（表格 items + 4 个分页方法），
+// 缓存过滤结果避免重复全量 map+filter；搜索/过滤开关/已学技能/刷新数据任一变化即失效。
+// 按 actor.id 存储，entry 内校验 actor 引用，重建 actors 后自动重算，不会堆积泄漏。
+const filteredSkillsCache = new Map();
 
 export default {
   name: "SkillSettingPanel",
@@ -202,10 +208,13 @@ export default {
     },
 
     initializeVariables() {
-      // Load all skills from game data
-      this.allSkills = ($dataSkills || [])
-        .filter((skill) => !!skill && skill.name)
-        .map((skill) => this.extractSkillData(skill));
+      // Load all skills from game data.
+      // markRaw：技能表只读展示且结构静态，无需 deep Proxy 响应式化
+      this.allSkills = markRaw(
+        ($dataSkills || [])
+          .filter((skill) => !!skill && skill.name)
+          .map((skill) => this.extractSkillData(skill)),
+      );
 
       // Load actors
       this.actors = $gameParty
@@ -215,8 +224,25 @@ export default {
 
     getFilteredSkills(actor) {
       const search = (actor.skillSearch || "").toLowerCase().trim();
+      const onlyLearned = !!actor.onlyLearned;
+      const learnedKey = Array.isArray(actor.learnedSkillIds)
+        ? actor.learnedSkillIds.join(",")
+        : "";
+      const allSkills = this.allSkills;
 
-      return this.allSkills
+      const cached = filteredSkillsCache.get(actor.id);
+      if (
+        cached &&
+        cached.actor === actor &&
+        cached.allSkills === allSkills &&
+        cached.search === search &&
+        cached.onlyLearned === onlyLearned &&
+        cached.learnedKey === learnedKey
+      ) {
+        return cached.result;
+      }
+
+      const result = allSkills
         .map((skill) => {
           const isLearned = actor.learnedSkillIds.includes(skill.id);
           return {
@@ -226,7 +252,7 @@ export default {
         })
         .filter((skill) => {
           // Only learned filter
-          if (actor.onlyLearned && !skill.isLearned) {
+          if (onlyLearned && !skill.isLearned) {
             return false;
           }
           // Search filter
@@ -239,6 +265,17 @@ export default {
           }
           return true;
         });
+
+      filteredSkillsCache.set(actor.id, {
+        actor,
+        allSkills,
+        search,
+        onlyLearned,
+        learnedKey,
+        result,
+      });
+
+      return result;
     },
 
     jumpToPage(actor, page) {
