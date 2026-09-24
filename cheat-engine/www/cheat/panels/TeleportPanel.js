@@ -246,7 +246,6 @@ export default {
     },
 
     async initializeVariables() {
-      const rawDataMapInfos = $dataMapInfos.filter((mapInfo) => !!mapInfo);
       const mapNames = await this.getMapNames($dataMapInfos);
 
       this.maps = $dataMapInfos
@@ -272,13 +271,18 @@ export default {
     },
 
     getMapAncestors(id, path) {
-      path.push(id);
-      if ($dataMapInfos[id].parentId === 0) {
-        path.reverse();
-        return;
+      // 迭代实现：父链可能指向已删除的地图（$dataMapInfos[id] 为 undefined），
+      // 或在异常数据下成环，两者都会让递归版本崩溃 / 栈溢出
+      const visited = new Set();
+      let current = id;
+
+      while (current && !visited.has(current) && $dataMapInfos[current]) {
+        visited.add(current);
+        path.push(current);
+        current = $dataMapInfos[current].parentId;
       }
 
-      this.getMapAncestors($dataMapInfos[id].parentId, path);
+      path.reverse();
     },
 
     teleportLocation(mapId, x, y) {

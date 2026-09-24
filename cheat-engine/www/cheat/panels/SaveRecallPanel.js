@@ -67,8 +67,8 @@ export default {
             {{ item.coord.x }}, {{ item.coord.y }}
         </template>
         <template
-            #item.actions="{ item, index }">
-            
+            #item.actions="{ item }">
+             
             <v-tooltip
                 location="bottom">
                 <template #activator="{ props }">
@@ -94,7 +94,7 @@ export default {
                         size="x-small"
                         icon
                         v-bind="props"
-                        @click="removeLocation(index)">
+                        @click="removeLocation(item.locationIndex)">
                         <v-icon size="small">mdi-delete</v-icon>
                     </v-btn>
                 </template>
@@ -185,6 +185,9 @@ export default {
     tableItems() {
       return this.locations.map((location, idx) => {
         return {
+          // 保留原始下标：删除必须按原始数组位置，
+          // 而 #item.actions 里的 index 是过滤后 / 当前页的下标
+          locationIndex: idx,
           name: location.name,
           mapName: $dataMapInfos[location.mapId]
             ? $dataMapInfos[location.mapId].name
@@ -204,8 +207,7 @@ export default {
         const s = this.search.toLowerCase();
         items = items.filter((item) =>
           item.name.toLowerCase().includes(s) ||
-          item.mapName.toLowerCase().includes(s) ||
-          String(item.value).toLowerCase().includes(s)
+          item.mapName.toLowerCase().includes(s)
         );
       }
       return items;
@@ -251,13 +253,18 @@ export default {
     },
 
     getMapAncestors(id, path) {
-      path.push(id);
-      if ($dataMapInfos[id].parentId === 0) {
-        path.reverse();
-        return;
+      // 迭代实现：父链可能指向已删除的地图（$dataMapInfos[id] 为 undefined），
+      // 或在异常数据下成环，两者都会让递归版本崩溃 / 栈溢出
+      const visited = new Set();
+      let current = id;
+
+      while (current && !visited.has(current) && $dataMapInfos[current]) {
+        visited.add(current);
+        path.push(current);
+        current = $dataMapInfos[current].parentId;
       }
 
-      this.getMapAncestors($dataMapInfos[id].parentId, path);
+      path.reverse();
     },
 
     saveLocations() {
@@ -275,7 +282,31 @@ export default {
         return;
       }
 
-      this.locations = JSON.parse(data);
+      try {
+        const parsed = JSON.parse(data);
+        // 结构校验：损坏 / 被改写的文件不应让面板崩溃
+        //（否则 computed 里的 item.name.toLowerCase() 会抛 TypeError）
+        if (
+          Array.isArray(parsed) &&
+          parsed.every(
+            (it) =>
+              it &&
+              typeof it === "object" &&
+              typeof it.name === "string" &&
+              Number.isFinite(it.mapId) &&
+              Number.isFinite(it.x) &&
+              Number.isFinite(it.y),
+          )
+        ) {
+          this.locations = parsed;
+        } else {
+          console.warn("[cheat plugin] cheat.locations has unexpected structure, ignored");
+          this.locations = [];
+        }
+      } catch (error) {
+        console.warn("[cheat plugin] Can't parse cheat.locations, reset to empty", error);
+        this.locations = [];
+      }
     },
 
     onLocationAliasKeyDown(e) {
@@ -306,6 +337,9 @@ export default {
     },
 
     teleportLocation(mapId, x, y) {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return;
+      }
       $gamePlayer.reserveTransfer(mapId, x, y, $gamePlayer.direction(), 0);
       $gamePlayer.setPosition(x, y);
     },

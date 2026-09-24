@@ -6,6 +6,11 @@ function validateNwjsVersion() {
   const nwjsVersion = process.versions["node-webkit"];
   const minRequiredNwjsVersion = "0.44.0";
 
+  if (!nwjsVersion) {
+    // 拿不到版本号时不做判断，避免 undefined.localeCompare 抛错
+    return true;
+  }
+
   const lowVersion = nwjsVersion.localeCompare(minRequiredNwjsVersion, undefined, { numeric: true }) < 0;
 
   if (lowVersion) {
@@ -90,5 +95,6 @@ function applyCheat() {
   __addScript("module", "cheat/init/setup.js");
 }
 
+// 版本过低只弹提示、不阻断：无论校验结果如何都继续加载 cheat（保持原有行为）
 validateNwjsVersion();
 applyCheat();

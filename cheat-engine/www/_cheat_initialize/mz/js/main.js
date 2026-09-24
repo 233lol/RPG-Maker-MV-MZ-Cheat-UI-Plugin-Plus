@@ -106,8 +106,10 @@ class Main {
     const messageDiv = document.createElement("div");
     nameDiv.id = "errorName";
     messageDiv.id = "errorMessage";
-    nameDiv.innerHTML = name;
-    messageDiv.innerHTML = message;
+    // 用 textContent：error.name/message 可能被游戏数据影响，
+    // 赋给 innerHTML 是注入面（序列化到 outerHTML 时会自动转义）
+    nameDiv.textContent = String(name);
+    messageDiv.textContent = String(message);
     return nameDiv.outerHTML + messageDiv.outerHTML;
   }
 

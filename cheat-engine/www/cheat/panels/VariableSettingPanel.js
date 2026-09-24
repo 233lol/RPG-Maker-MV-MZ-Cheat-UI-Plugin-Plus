@@ -243,6 +243,7 @@ export default {
         const data = JSON.parse(raw);
         this.persistedLockMap = data && typeof data === "object" ? data : {};
       } catch (error) {
+        console.warn("[cheat plugin] Can't read persisted variable locks, reset to empty", error);
         this.persistedLockMap = {};
       }
     },

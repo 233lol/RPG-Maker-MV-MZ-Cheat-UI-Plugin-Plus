@@ -255,7 +255,6 @@ export default {
 
   data() {
     return {
-      godMode: false,
       noClip: false,
       gold: 0,
       speed: 0,
@@ -498,7 +497,14 @@ export default {
           theme: "dark-plus",
         });
       } catch (error) {
-        return `<pre style="margin:0; white-space:pre-wrap; word-break:break-word;">${error}</pre>`;
+        // 异常消息可能回显输入片段，直接拼进 v-html 等于开注入口，
+        // NW.js 下 XSS 即 RCE，必须先做 HTML 实体转义
+        const message = String((error && error.message) || error)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+        return `<pre style="margin:0; white-space:pre-wrap; word-break:break-word;">${message}</pre>`;
       }
     },
 
@@ -703,7 +709,7 @@ export default {
     },
 
     setGameSpeed(amount) {
-      this.gameSpeed = 1;
+      this.gameSpeed = amount;
       this.onGameSpeedChange();
     },
 
@@ -729,7 +735,11 @@ export default {
 
     openVersionLink(e) {
       e.preventDefault();
-      nw.Shell.openExternal(this.versionUrl);
+      if (typeof nw === "object") {
+        nw.Shell.openExternal(this.versionUrl);
+      } else {
+        window.open(this.versionUrl, "_blank");
+      }
     },
   },
 

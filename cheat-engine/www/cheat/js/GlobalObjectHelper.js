@@ -768,7 +768,23 @@ export function getChildValue(container, key) {
   }
 }
 
+// 写入 / 删除这些键名会改变对象的原型链（而非普通属性），
+// 可能直接破坏游戏对象的逻辑，一律拒绝
+const PROTOTYPE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function checkPrototypeKey(key) {
+  if (PROTOTYPE_KEYS.has(key)) {
+    return { ok: false, message: `禁止操作键名 ${key}（会改变对象原型）` };
+  }
+  return null;
+}
+
 export function setChildValue(container, key, value) {
+  const rejected = checkPrototypeKey(key);
+  if (rejected) {
+    return rejected;
+  }
+
   try {
     container[key] = value;
     return { ok: true };
@@ -778,6 +794,11 @@ export function setChildValue(container, key, value) {
 }
 
 export function deleteChildValue(container, key) {
+  const rejected = checkPrototypeKey(key);
+  if (rejected) {
+    return rejected;
+  }
+
   try {
     if (Array.isArray(container)) {
       const index = Number(key);

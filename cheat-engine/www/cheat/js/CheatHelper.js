@@ -2,47 +2,6 @@ import { Alert } from "./AlertHelper.js";
 import { KeyValueStorage } from "./KeyValueStorage.js";
 
 export class GeneralCheat {
-  // static saveCheatSettings () {
-  //     const saveData = {
-  //         godMode: {
-  //             actorIds: this.getGodModeOnActorIds()
-  //         },
-  //     }
-  //
-  //     localStorage.setItem('cheat.settings.general', JSON.stringify(saveData))
-  // }
-  //
-  // static initializeCheatSettings () {
-  //     if (this.initialized) {
-  //         return
-  //     }
-  //
-  //     // load save data from localStorage
-  //     let saveData = localStorage.getItem('cheat.settings.general')
-  //
-  //     if (!saveData) {
-  //         this.initialized = true
-  //         return
-  //     }
-  //
-  //     saveData = JSON.parse(saveData)
-  //     console.log(saveData)
-  //
-  //     // godMode
-  //     if (saveData.godMode) {
-  //         const godModeData = saveData.godMode
-  //         // actors
-  //         if (godModeData.actorIds) {
-  //             for (const actorId of godModeData.actorIds) {
-  //                 console.log('god mode on', actorId, $gameActors.actor(actorId))
-  //                 this.godModeOn($gameActors.actor(actorId))
-  //             }
-  //         }
-  //     }
-  //
-  //     this.initialized = true
-  // }
-
   // will be replaced from main component
   static toggleCheatModal(componentName = null) { }
 
@@ -316,7 +275,23 @@ export class GameSpeedCheat {
       return;
     }
 
-    const data = JSON.parse(json);
+    let data;
+    try {
+      data = JSON.parse(json);
+    } catch (e) {
+      return;
+    }
+
+    // rate 未校验会让损坏的配置直接进 setGameSpeed：
+    // 超大值使 SceneManager.updateScene 每帧进入巨量循环（游戏卡死且每次启动自动重试），
+    // 非数值则变 NaN 静默失效。范围与 GeneralPanel.maxGameSpeed 保持一致。
+    if (typeof data.rate !== "number" || !Number.isFinite(data.rate)) {
+      return;
+    }
+
+    if (data.rate <= 0 || data.rate > 10) {
+      return;
+    }
 
     GameSpeedCheat.setGameSpeed(
       data.rate,

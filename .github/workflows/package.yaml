@@ -7,30 +7,46 @@ on:
       - vue-3
     paths:
       - "cheat-engine/**"
+      - "tools/**"
+      - "Makefile"
+      - ".github/workflows/**"
       - "package.json"
       - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  pull_request:
+    paths:
+      - "cheat-engine/**"
+      - "tools/**"
+      - "Makefile"
+      - ".github/workflows/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
   workflow_dispatch:
+
+# 最小权限：本 workflow 只需读代码并上传 artifact，无需写权限
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      # action 均固定到完整 commit SHA（防 tag 被移动的供应链风险），行尾注释保留对应版本号
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: get short SHA
         run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         name: Install pnpm
-        with:
-          cache: true
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
       - name: build and package
         run: make
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ${{ env.SHORT_SHA }}.zip
           path: |

@@ -130,6 +130,7 @@ export default {
     },
     headers: {
       type: Array,
+      default: () => [],
     },
     asTableData: {
       type: Function,
@@ -168,7 +169,9 @@ export default {
         const s = this.search.toLowerCase();
         items = items.filter((item) => {
           for (const attr of this.searchableAttrs) {
-            if (item[attr].toLowerCase().includes(s)) return true;
+            // 改版游戏数据里 description 等字段可能为 undefined/null，
+            // 直接调 .toLowerCase() 会让整个面板崩溃
+            if (String(item[attr] ?? "").toLowerCase().includes(s)) return true;
           }
           return false;
         });

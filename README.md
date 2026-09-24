@@ -17,6 +17,9 @@ Vue 2 + Vuetify 2 迁移至 Vue 3，UI 框架已升级至 Vuetify 4。
 
 - [Node.js](https://nodejs.org/) >= 18
 - [pnpm](https://pnpm.io/)
+- GNU Make（Windows 可通过 `winget install GnuWin32.Make`、`choco install make` 或 `scoop install make` 安装）
+
+构建脚本不依赖任何 POSIX shell 工具（`find` / `ln` / `printf` / `rm` 已由 `tools/*.mjs` 等替代），Windows / macOS / Linux 上均可直接运行 `make`，无需 Git Bash 或 WSL。
 
 ### 构建命令
 
@@ -43,8 +46,8 @@ make clean
 `make` / `make mv` / `make mz` 每次构建都会强制使用 Vue 生产构建，即使之前执行过 `make dev`，也不会把开发版误打包进产物；`make dev` 仅在本次打包使用开发构建。
 
 构建产物位于项目根目录：
-- `mv-<commit-hash>.zip` / `mv-latest.zip`
-- `mz-<commit-hash>.zip` / `mz-latest.zip`
+- `mv-<commit-hash>.zip` / `mz-<commit-hash>.zip`
+- `mv-latest.zip` / `mz-latest.zip`（指向最新构建的符号链接；Windows 上无符号链接权限时自动退化为复制）
 
 ### 压缩包结构
 
@@ -98,7 +101,7 @@ Vendor 构建由 Makefile 依赖自动触发，无需手动执行。
 
 ## Git 仓库说明
 
-`libs/`、`css/`、`fonts/` 中的 vendor 文件已纳入 git 跟踪，也可通过 `pnpm run vendor:*` 重新生成：
+`libs/`、`css/`、`fonts/` 中的 vendor 文件**未纳入 git 跟踪**（见 `.gitignore`），clone 后需通过以下命令生成：
 
 ```shell
 pnpm run vendor:libs   # 生成 vue.js + vuetify.js + CSS + fonts
@@ -106,7 +109,7 @@ pnpm run vendor:shiki  # 生成 shiki.bundle.mjs
 make vendor            # 生成全部 vendor 文件
 ```
 
-如果要从 git 中取消跟踪这些文件，可在 `.gitignore` 中添加规则后用 `git rm --cached` 解除跟踪，并确保 clone 后执行 `pnpm i && make vendor` 补齐文件。
+最简单的方式是直接 `pnpm i && make`，构建时会按依赖自动补齐全部 vendor 文件。
 
 ## CI
 
