@@ -36,8 +36,7 @@ export default {
                             v-model="excludeNameless"
                             density="compact"
                             hide-details
-                            label="隐藏无名物品"
-                            @change="onTableFilterChange">
+                            label="隐藏无名物品">
                         
                         </v-checkbox>
                     </v-col>
@@ -48,8 +47,7 @@ export default {
                             v-model="onlyOwnedItems"
                             density="compact"
                             hide-details
-                            label="只显示拥有的物品"
-                            @change="onTableFilterChange">
+                            label="只显示拥有的物品">
                         
                         </v-checkbox>
                     </v-col>
@@ -141,8 +139,6 @@ export default {
     },
   },
 
-  created() {},
-
   watch: {
     items: {
       immediate: true,
@@ -229,8 +225,6 @@ export default {
 
       item.amount = $gameParty.numItems(rawItem);
     },
-
-    onTableFilterChange() {},
 
     jumpToPage(page) {
       this.pagination.page = page;

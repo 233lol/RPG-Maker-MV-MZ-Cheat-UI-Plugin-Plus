@@ -300,7 +300,6 @@ export default {
       showEventInspectDialog: false,
       inspectedEventId: null,
       inspectedEventCurrentIndex: -1,
-      inspectedEventRaw: "",
       inspectedEventRows: [],
       inspectedEventMessage: "",
 

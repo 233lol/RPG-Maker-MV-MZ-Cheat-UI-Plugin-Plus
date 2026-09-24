@@ -1,5 +1,5 @@
 import * as esbuild from 'esbuild';
-import { copyFileSync, rmSync, existsSync } from 'fs';
+import { rmSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 

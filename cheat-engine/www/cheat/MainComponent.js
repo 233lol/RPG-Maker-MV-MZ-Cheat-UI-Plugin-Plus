@@ -5,8 +5,6 @@ import AlertSnackbar from "./components/AlertSnackbar.js";
 import ConfirmDialog from "./components/ConfirmDialog.js";
 import { customizeRPGMakerFunctions } from "./init/customize_functions.js";
 import { Key } from "./js/KeyCodes.js";
-import { Alert } from "./js/AlertHelper.js";
-import { RPGVERSION } from "./version.js";
 
 export default {
   name: "MainComponent",
@@ -51,8 +49,6 @@ export default {
     window.addEventListener("keyup", this.onGlobalKeyUp);
   },
 
-  mounted() {},
-
   beforeUnmount() {
     window.removeEventListener("keydown", this.onGlobalKeyDown);
     window.removeEventListener("keyup", this.onGlobalKeyUp);
@@ -61,7 +57,6 @@ export default {
   watch: {
     show: {
       immediate: true,
-      handler(value) {},
     },
   },
 
@@ -106,18 +101,6 @@ export default {
       }
 
       this.show = true;
-    },
-
-    checkVersion() {
-      Alert.info(
-        `Cheat ${this.getCurrentCheatVersion()} loaded. Toggle with ${GLOBAL_SHORTCUT.getShortcut("toggleCheatModal").asString()}, F12 to access devconsole`,
-        null,
-        3000,
-      );
-    },
-
-    getCurrentCheatVersion() {
-      return RPGVERSION;
     },
   },
 };

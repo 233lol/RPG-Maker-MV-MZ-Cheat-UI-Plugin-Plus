@@ -651,7 +651,8 @@ async function multiRetryAction(action, intervalTimeout, maxTryCount) {
       action();
       finished = true;
     } catch (e) {
-      console.log(e);
+      // 初始化读取失败按次重试，失败过程需要留痕（最后一次成功即不再输出）
+      console.warn(e);
       if (tryCount < maxTryCount) {
         // try again
         return;

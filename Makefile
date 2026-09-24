@@ -13,6 +13,8 @@ mdifonts := cheat-engine/www/cheat/fonts/materialdesignicons-webfont.woff2
 # 完全不同的文本搜索工具，且 `2>/dev/null` 不是 cmd 语法。
 # 与 find 的唯一差异：不匹配点开头文件（如 libs/.gitkeep，占位文件、内容不变，
 # 不影响重建触发）。注意文件名不能含空格（make 以空白分词，find 版本同样如此）。
+# 打包侧（tools/pack.mjs）只排除 .gitkeep、Thumbs.db 等明确的垃圾文件，
+# 其余点文件照常打进 zip。
 rwildcard = $(foreach e,$(wildcard $(1)*),$(call rwildcard,$(e)/,$2) $(filter $(subst *,%,$2),$e))
 src := $(call rwildcard,cheat-engine/www/cheat/,*) $(call rwildcard,cheat-engine/www/_cheat_initialize/,*)
 
@@ -55,8 +57,12 @@ clean:
 	node tools/pack.mjs $* $@
 	node tools/link-latest.mjs $@ $*-latest.zip
 
+# Windows 的 mingw make 对不含 shell 元字符的配方行会绕过 shell 直接 CreateProcess，
+# 而 `echo` 只是 shell 内建命令（系统里没有 echo.exe），会报
+# `process_begin: CreateProcess(NULL, echo ...) failed` 导致构建以 Error 2 收尾。
+# $(info) 是 make 自带函数，不经过任何 shell，cmd.exe 与 POSIX 下输出完全一致。
 $(type):%:%-$(hash).zip
-	@echo finished packing $@
+	@$(info finished packing $@)
 
 # version.js 必须始终反映当前 commit：切换 commit 后若不重新生成，
 # zip 文件名用新 hash 而包内显示旧 hash，版本链接会指向错误的 commit。

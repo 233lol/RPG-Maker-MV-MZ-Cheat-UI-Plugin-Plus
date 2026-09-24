@@ -86,8 +86,6 @@ export default {
       treasureBoxes: [], // Track treasure box positions
 
       // Map rendering properties
-      viewOffsetX: 0,
-      viewOffsetY: 0,
       maxViewSize: 25, // For 25x25 limited view
 
       // Track last known map ID to detect map changes
@@ -581,9 +579,6 @@ export default {
         const currentMapId = $gameMap.mapId();
 
         if (currentMapId !== this.lastKnownMapId) {
-          console.log(
-            `Map changed from ${this.lastKnownMapId} to ${currentMapId}`,
-          );
           this.updateCurrentMapData();
           this.updateMapEvents();
           this.lastKnownMapId = currentMapId;
@@ -1043,8 +1038,6 @@ export default {
           $gamePlayer.setPosition(targetX, targetY);
           $gamePlayer.center(targetX, targetY);
           $gamePlayer.makeEncounterCount();
-
-          console.log(`Teleported player to (${targetX}, ${targetY})`);
         }
       } catch (error) {
         console.warn("Could not teleport player:", error);

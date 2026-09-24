@@ -414,8 +414,6 @@ class GlobalShortcut {
     // initialize shortcut map
     this.shortcutMap = new ShortcutMap();
     this.initializeShortcutMap();
-    
-    console.log("__global shortcut initialized");
   }
 
   initializeShortcutConfig() {

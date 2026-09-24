@@ -39,8 +39,7 @@ export default {
                         v-model="actor.onlyLearned"
                         density="compact"
                         hide-details
-                        label="只显示已学习技能"
-                        @change="onFilterChange">
+                        label="只显示已学习技能">
                     </v-checkbox>
                     <v-spacer></v-spacer>
                     <v-tooltip
@@ -299,10 +298,6 @@ export default {
 
     pageCountFor(actor) {
       return Math.ceil(this.getFilteredSkills(actor).length / actor.pagination.itemsPerPage) || 1;
-    },
-
-    onFilterChange() {
-      // no-op, reactivity handles it
     },
 
     addSkill(actor, skillItem) {

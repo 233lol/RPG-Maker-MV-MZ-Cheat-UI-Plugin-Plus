@@ -16,8 +16,22 @@ if (type !== "mv" && type !== "mz") {
 const prefix = type === "mv" ? "www/" : "";
 const entries = {};
 
+// Files that must never ship: the git placeholder, Finder/Explorer junk and VCS
+// metadata. Everything else — including other dotfiles — is packed on purpose.
+const JUNK = new Set([
+  ".gitkeep", // placeholder keeping an empty dir in git
+  ".ds_store", // macOS Finder metadata
+  "thumbs.db", // Windows Explorer thumbnail cache
+  "desktop.ini", // Windows folder config
+  ".git", // VCS metadata, should never be inside the game dir anyway
+  ".svn",
+  ".hg",
+]);
+const isJunk = (name) => JUNK.has(name.toLowerCase());
+
 function addDir(dir, archiveDir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (isJunk(entry.name)) continue;
     const fullPath = path.join(dir, entry.name);
     const archivePath = archiveDir + entry.name;
     if (entry.isDirectory()) {
