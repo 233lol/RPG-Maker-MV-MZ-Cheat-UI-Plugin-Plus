@@ -240,14 +240,12 @@ export default {
             class="d-flex align-center px-1 py-1 global-var-row"
             :class="{ 'global-var-row-highlight': isHighlighted(item) }">
             <div class="d-flex align-center" style="width: 40%; min-width: 0;">
-                <span
-                    class="mdi global-var-row-icon"
-                    :class="[
-                        item.icon,
-                        item.isContainer
-                            ? 'global-var-icon--container'
-                            : 'global-var-icon--plain',
-                    ]"></span>
+                <v-icon
+                    size="small"
+                    class="mr-1"
+                    :color="item.isContainer ? 'amber' : 'grey-lighten-1'">
+                    {{ item.icon }}
+                </v-icon>
                 <span
                     class="text-body-medium text-truncate"
                     :class="{ 'global-var-name-link': item.isContainer }"
@@ -255,62 +253,84 @@ export default {
                     @click="enterEntry(item)">
                     {{ item.name }}
                 </span>
-                <span v-if="item.isPlugin" class="global-var-plugin-badge">插件</span>
+                <v-chip
+                    v-if="item.isPlugin"
+                    size="x-small"
+                    color="indigo"
+                    label
+                    class="ml-1">
+                    插件
+                </v-chip>
             </div>
             <div style="width: 14%;">
                 <span class="text-body-small text-grey-lighten-1">{{ item.typeText }}</span>
             </div>
             <div class="flex-grow-1 d-flex align-center" style="min-width: 0;">
                 <template v-if="item.kind === 'boolean'">
-                    <input
-                        type="checkbox"
-                        class="global-var-bool-input"
-                        :checked="item.boolValue"
-                        @change="onBoolInput(item, $event.target.checked)"
+                    <v-checkbox
+                        :model-value="item.boolValue"
+                        density="compact"
+                        hide-details
+                        @update:model-value="(value) => onBoolInput(item, value)"
                         @keydown.stop>
+                    </v-checkbox>
                     <span class="text-body-small text-grey-lighten-1">{{ item.preview }}</span>
                 </template>
                 <template v-else-if="item.isEditable">
-                    <input
-                        v-if="editingKey !== null && String(item.key) === editingKey"
-                        ref="editInput"
-                        v-model="editingText"
-                        class="global-var-edit-input"
-                        @keydown.stop
-                        @keydown.enter.stop.prevent="commitRowEdit(item)"
-                        @keydown.esc.stop="cancelRowEdit"
-                        @blur="commitRowEdit(item)">
-                    <span
-                        v-else
-                        class="text-body-small global-var-value-editable text-truncate"
-                        :title="item.valueText + '（点击编辑）'"
-                        @click="beginRowEdit(item)">{{ item.valueText }}</span>
+                    <v-text-field
+                        :model-value="item.valueText"
+                        density="compact"
+                        hide-details
+                        variant="solo"
+                        bg-color="grey-darken-3"
+                        class="inline-field"
+                        style="width: 150px;"
+                        @change="onValueInput(item, $event.target.value)"
+                        @focus="$event.target.select()"
+                        @keydown.stop>
+                    </v-text-field>
                 </template>
                 <template v-else>
                     <span class="text-body-small text-grey-lighten-1 text-truncate">{{ item.preview }}</span>
                 </template>
             </div>
             <div class="d-flex align-center justify-end" style="width: 96px;">
-                <span
+                <v-btn
                     v-if="item.isContainer"
-                    class="mdi mdi-arrow-right-bold global-var-action global-var-action--enter"
                     :title="'进入 ' + item.name"
-                    @click.stop="enterEntry(item)"></span>
-                <span
+                    icon
+                    size="x-small"
+                    color="amber"
+                    @click.stop="enterEntry(item)">
+                    <v-icon size="small">mdi-arrow-right-bold</v-icon>
+                </v-btn>
+                <v-btn
                     v-if="item.isContainer"
-                    class="mdi mdi-code-json global-var-action global-var-action--json"
                     title="编辑 JSON"
-                    @click.stop="openJsonEditor(item)"></span>
-                <span
+                    icon
+                    size="x-small"
+                    color="light-blue"
+                    @click.stop="openJsonEditor(item)">
+                    <v-icon size="small">mdi-code-json</v-icon>
+                </v-btn>
+                <v-btn
                     v-if="item.isContainer"
-                    class="mdi mdi-plus global-var-action global-var-action--add"
                     :title="'在 ' + item.name + ' 内新增属性 / 元素'"
-                    @click.stop="openJsonAdd(item)"></span>
-                <span
+                    icon
+                    size="x-small"
+                    color="teal"
+                    @click.stop="openJsonAdd(item)">
+                    <v-icon size="small">mdi-plus</v-icon>
+                </v-btn>
+                <v-btn
                     v-if="!item.isRoot"
-                    class="mdi mdi-delete global-var-action global-var-action--delete"
                     title="删除"
-                    @click.stop="confirmDeleteEntry(item)"></span>
+                    icon
+                    size="x-small"
+                    color="red"
+                    @click.stop="confirmDeleteEntry(item)">
+                    <v-icon size="small">mdi-delete</v-icon>
+                </v-btn>
             </div>
         </div>
 
@@ -334,14 +354,12 @@ export default {
                 v-for="(result, idx) in deepSearchResults"
                 :key="'deep-' + idx"
                 class="d-flex align-center px-1 py-1 global-var-deep-row">
-                <span
-                    class="mdi global-var-row-icon"
-                    :class="[
-                        result.icon,
-                        result.isContainer
-                            ? 'global-var-icon--container'
-                            : 'global-var-icon--plain',
-                    ]"></span>
+                <v-icon
+                    size="small"
+                    class="mr-1"
+                    :color="result.isContainer ? 'amber' : 'grey-lighten-1'">
+                    {{ result.icon }}
+                </v-icon>
                 <div class="flex-grow-1" style="min-width: 0;">
                     <div class="text-body-small text-truncate" :title="result.pathText">
                         {{ result.pathText }}
@@ -350,10 +368,14 @@ export default {
                         {{ result.typeText }} · {{ result.preview }}
                     </div>
                 </div>
-                <span
-                    class="mdi mdi-target global-var-action global-var-action--enter"
+                <v-btn
+                    icon
+                    size="x-small"
+                    color="amber"
                     title="跳转到该变量"
-                    @click.stop="jumpToSearchResult(result)"></span>
+                    @click.stop="jumpToSearchResult(result)">
+                    <v-icon size="small">mdi-target</v-icon>
+                </v-btn>
             </div>
             <div v-if="deepSearchResults.length === 0" class="pa-3 text-body-small text-grey-lighten-1">
                 {{ deepSearching ? '搜索中...' : '没有匹配的嵌套变量（最多搜索 ' + searchLimits.maxDepth + ' 层）' }}
@@ -565,10 +587,6 @@ export default {
       initialIdleHandle: null,
       initialLoadTimer: null,
 
-      // 行内编辑：点到可编辑值时才渲染输入框（替代每行一个 v-text-field）
-      editingKey: null,
-      editingText: "",
-
       // 自动刷新
       autoRefresh: true,
       refreshIntervalMs: 2000,
@@ -632,8 +650,6 @@ export default {
     this.stopAutoRefresh();
     this.clearSearchTimer();
     this.cancelInitialLoad();
-    this.editingKey = null;
-    this.editingText = "";
   },
 
   watch: {
@@ -1011,50 +1027,6 @@ export default {
         tagName === "TEXTAREA" ||
         active.isContentEditable === true
       );
-    },
-
-    // ---------- 行内编辑（点击才变输入框） ----------
-
-    beginRowEdit(entry) {
-      if (!entry || !entry.isEditable) {
-        return;
-      }
-
-      this.editingKey = String(entry.key);
-      this.editingText = entry.valueText;
-
-      this.$nextTick(() => {
-        const ref = this.$refs.editInput;
-        const input = Array.isArray(ref) ? ref[0] : ref;
-
-        if (input && typeof input.focus === "function") {
-          input.focus();
-          input.select();
-        }
-      });
-    },
-
-    commitRowEdit(entry) {
-      if (this.editingKey === null || String(entry.key) !== this.editingKey) {
-        return;
-      }
-
-      const text = this.editingText;
-      const original = entry.valueText;
-      this.editingKey = null;
-      this.editingText = "";
-
-      // 没有改动就不回写，避免触发无意义的赋值
-      if (text === original) {
-        return;
-      }
-
-      this.onValueInput(entry, text);
-    },
-
-    cancelRowEdit() {
-      this.editingKey = null;
-      this.editingText = "";
     },
 
     onValueInput(entry, text) {
