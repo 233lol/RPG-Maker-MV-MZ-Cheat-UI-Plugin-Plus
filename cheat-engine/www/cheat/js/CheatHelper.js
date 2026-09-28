@@ -8,6 +8,13 @@ export class GeneralCheat {
   static openCheatModal(componentName = null) { }
 
   static toggleNoClip(notify = false) {
+    // 键盘监听在 app 挂载时就绑定了，读档 / 加载转圈（MZ 还要初始化 effekseer
+    // WASM）这段窗口里 $gamePlayer 还不存在，直接取属性会抛错。
+    if (!$gamePlayer) {
+      Alert.warn("玩家数据尚未初始化，无法切换穿墙状态");
+      return;
+    }
+
     $gamePlayer._through = !$gamePlayer._through;
 
     if (notify) {
@@ -15,125 +22,174 @@ export class GeneralCheat {
     }
   }
 
-  static getGodModeOnActorIds() {
+  // 无敌状态存在静态 Map 上，用 actorId 做 key，并额外记录「打补丁时的那个实例」。
+  //
+  // 原来用 Game_Actor 实例做 key 有两个问题：
+  //  1. 泄漏：DataManager.setupNewGame() / 读档都会重建 Game_Actor，旧实例被
+  //     Map 强引用、永远不释放，getGodModeOnActorIds() 还会遍历到僵尸条目。
+  //  2. 状态说谎：实例换掉后 Map 里的 godMode 仍是 true，但猴补丁打在旧实例上，
+  //     新实例并没有被保护 —— UI 显示「无敌」而实际不生效。
+  //
+  // 改用 actorId 做 key 后条目数有上界（不会无界增长），取用时校验实例是否还是
+  // 同一个，不是就丢弃重建。
+  // 注意：无敌本来就不跨存档 —— 猴补丁挂在实例上，读档后实例重建就没了。
+  // 这里显式重置为「未开启」，而不是留着骗人的 flag。
+  static getGodModeMap() {
     if (!this.godModeMap) {
-      return [];
+      this.godModeMap = new Map();
     }
 
+    return this.godModeMap;
+  }
+
+  static getGodModeData(actor) {
+    if (!(actor instanceof Game_Actor)) {
+      return null;
+    }
+
+    const actorId = actor._actorId;
+    const map = this.getGodModeMap();
+    const cached = map.get(actorId);
+
+    if (cached && cached.actor === actor) {
+      return cached;
+    }
+
+    const data = {
+      actor: actor,
+      actorId: actorId,
+      godMode: false,
+    };
+
+    map.set(actorId, data);
+
+    return data;
+  }
+
+  // 当前真正开启了无敌的角色实例（过期条目已被 getGodModeData 重置掉）
+  static getGodModeActors() {
     const ret = [];
 
-    for (const actor of this.godModeMap.keys()) {
-      const data = this.godModeMap.get(actor);
-
-      if (data.godMode) {
-        ret.push(actor._actorId);
+    for (const data of this.getGodModeMap().values()) {
+      if (data.godMode && data.actor) {
+        ret.push(data.actor);
       }
     }
 
     return ret;
   }
 
-  static getGodModeData(actor) {
-    if (!this.godModeMap) {
-      this.godModeMap = new Map();
-    }
-
-    if (this.godModeMap.has(actor)) {
-      return this.godModeMap.get(actor);
-    }
-
-    const defaultData = {
-      godMode: false,
-      gainHp: null,
-      setHp: null,
-      gainMp: null,
-      setMp: null,
-      gainTp: null,
-      setTp: null,
-      paySkillCost: null,
-      godModeInterval: null,
-    };
-
-    this.godModeMap.set(actor, defaultData);
-
-    return defaultData;
+  static getGodModeOnActorIds() {
+    return this.getGodModeActors().map((actor) => actor._actorId);
   }
 
-  static godModeOn(actor) {
-    if (actor instanceof Game_Actor && !this.isGodMode(actor)) {
-      const godModeData = this.getGodModeData(actor);
-      godModeData.godMode = true;
+  // 共享的 1s 回血 / 回蓝 / 回 TP 定时器。
+  // 原来每个开启无敌的角色各起一个 setInterval，N 个角色就是 N 个定时器，
+  // 各自调用 gainHp() → refresh()。改为单个定时器遍历所有开启的角色，
+  // 全员关闭时自动停掉。
+  static syncGodModeInterval() {
+    if (this.getGodModeActors().length === 0) {
+      if (this.godModeInterval) {
+        clearInterval(this.godModeInterval);
+        this.godModeInterval = undefined;
+      }
+      return;
+    }
 
-      actor.gainHP_bkup = actor.gainHp;
-      actor.gainHp = function (value) {
-        value = actor.mhp;
-        actor.gainHP_bkup(value);
-      };
+    if (this.godModeInterval) {
+      return;
+    }
 
-      actor.setHp_bkup = actor.setHp;
-      actor.setHp = function (hp) {
-        hp = actor.mhp;
-        actor.setHp_bkup(hp);
-      };
-
-      actor.gainMp_bkup = actor.gainMp;
-      actor.gainMp = function (value) {
-        value = actor.mmp;
-        actor.gainMp_bkup(value);
-      };
-
-      actor.setMp_bkup = actor.setMp;
-      actor.setMp = function (mp) {
-        mp = actor.mmp;
-        actor.setMp_bkup(mp);
-      };
-
-      actor.gainTp_bkup = actor.gainTp;
-      actor.gainTp = function (value) {
-        value = actor.maxTp();
-        actor.gainTp_bkup(value);
-      };
-
-      actor.setTp_bkup = actor.setTp;
-      actor.setTp = function (tp) {
-        tp = actor.maxTp();
-        actor.setTp_bkup(tp);
-      };
-
-      actor.paySkillCost_bkup = actor.paySkillCost;
-      actor.paySkillCost = function (skill) {
-        // do nothing
-      };
-
-      godModeData.godModeInterval = setInterval(function () {
+    this.godModeInterval = setInterval(() => {
+      for (const actor of GeneralCheat.getGodModeActors()) {
         actor.gainHp(actor.mhp);
         actor.gainMp(actor.mmp);
         actor.gainTp(actor.maxTp());
-      }, 1000);
+      }
+    }, 1000);
+  }
 
+  static godModeOn(actor) {
+    if (!(actor instanceof Game_Actor) || this.isGodMode(actor)) {
+      return;
     }
+
+    const godModeData = this.getGodModeData(actor);
+    godModeData.godMode = true;
+
+    actor.gainHP_bkup = actor.gainHp;
+    actor.gainHp = function (value) {
+      value = actor.mhp;
+      actor.gainHP_bkup(value);
+    };
+
+    actor.setHp_bkup = actor.setHp;
+    actor.setHp = function (hp) {
+      hp = actor.mhp;
+      actor.setHp_bkup(hp);
+    };
+
+    actor.gainMp_bkup = actor.gainMp;
+    actor.gainMp = function (value) {
+      value = actor.mmp;
+      actor.gainMp_bkup(value);
+    };
+
+    actor.setMp_bkup = actor.setMp;
+    actor.setMp = function (mp) {
+      mp = actor.mmp;
+      actor.setMp_bkup(mp);
+    };
+
+    actor.gainTp_bkup = actor.gainTp;
+    actor.gainTp = function (value) {
+      value = actor.maxTp();
+      actor.gainTp_bkup(value);
+    };
+
+    actor.setTp_bkup = actor.setTp;
+    actor.setTp = function (tp) {
+      tp = actor.maxTp();
+      actor.setTp_bkup(tp);
+    };
+
+    actor.paySkillCost_bkup = actor.paySkillCost;
+    actor.paySkillCost = function (skill) {
+      // do nothing
+    };
+
+    this.syncGodModeInterval();
   }
 
   static godModeOff(actor) {
-    if (actor instanceof Game_Actor && this.isGodMode(actor)) {
-      const godModeData = this.getGodModeData(actor);
-      godModeData.godMode = false;
-
-      clearInterval(godModeData.godModeInterval);
-      godModeData.godModeInterval = null;
-
-      // actor.godMode field remains in save file, but backup methods aren't
-      //
-      if (actor.gainHP_bkup) {
-        actor.gainHp = actor.gainHP_bkup;
-        actor.setHp = actor.setHp_bkup;
-        actor.gainMp = actor.gainMp_bkup;
-        actor.setMp = actor.setMp_bkup;
-        actor.gainTp = actor.gainTp_bkup;
-        actor.setTp = actor.setTp_bkup;
-        actor.paySkillCost = actor.paySkillCost_bkup;
-      }
+    if (!(actor instanceof Game_Actor) || !this.isGodMode(actor)) {
+      return;
     }
+
+    const godModeData = this.getGodModeData(actor);
+    godModeData.godMode = false;
+
+    if (actor.gainHP_bkup) {
+      actor.gainHp = actor.gainHP_bkup;
+      actor.setHp = actor.setHp_bkup;
+      actor.gainMp = actor.gainMp_bkup;
+      actor.setMp = actor.setMp_bkup;
+      actor.gainTp = actor.gainTp_bkup;
+      actor.setTp = actor.setTp_bkup;
+      actor.paySkillCost = actor.paySkillCost_bkup;
+
+      // 备份字段必须清掉：Game_Actor 会被 JsonEx 逐字段写进存档，
+      // 不清的话存档里会残留这些函数字段（读档后变成 undefined）。
+      delete actor.gainHP_bkup;
+      delete actor.setHp_bkup;
+      delete actor.gainMp_bkup;
+      delete actor.setMp_bkup;
+      delete actor.gainTp_bkup;
+      delete actor.setTp_bkup;
+      delete actor.paySkillCost_bkup;
+    }
+
+    this.syncGodModeInterval();
   }
 
   static toggleGodMode(actor) {
@@ -145,7 +201,8 @@ export class GeneralCheat {
   }
 
   static isGodMode(actor) {
-    return this.getGodModeData(actor).godMode;
+    const godModeData = this.getGodModeData(actor);
+    return godModeData ? godModeData.godMode : false;
   }
 }
 

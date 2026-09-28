@@ -338,10 +338,15 @@ export default {
 
   methods: {
     initializeVariables() {
-      this.noClip = $gamePlayer._through;
-      this.speed = $gamePlayer.moveSpeed();
+      // 键盘监听在 app 挂载时就绑定了，读档 / 加载转圈（MZ 还要初始化 effekseer
+      // WASM）这段窗口里 $gamePlayer、$gameParty 还不存在。这里用默认值兜底 ——
+      // 否则 created() 抛错会让整个「常用」面板挂掉、整块空白，而用户很难
+      // 联想到是作弊面板的问题。
+      // 4 是引擎自己的默认移动速度（Game_CharacterBase.initialize）。
+      this.noClip = $gamePlayer ? $gamePlayer._through : false;
+      this.speed = $gamePlayer ? $gamePlayer.moveSpeed() : 4;
       this.fixSpeed = SpeedCheat.isFixed();
-      this.gold = $gameParty._gold;
+      this.gold = $gameParty ? $gameParty._gold : 0;
 
       this.gameSpeed = GameSpeedCheat.getRate();
       const gameSpeedSceneOption = GameSpeedCheat.getSceneOption();
@@ -379,6 +384,12 @@ export default {
         !Number.isInteger(Number(this.gold)) ||
         this.gold < 0
       ) {
+        return;
+      }
+
+      if (!$gameParty) {
+        Alert.warn("队伍数据尚未初始化，无法修改金钱");
+        this.initializeVariables();
         return;
       }
 
