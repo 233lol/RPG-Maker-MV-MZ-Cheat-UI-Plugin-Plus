@@ -57,6 +57,7 @@ export default {
             #item.amount="{ item }">
             <v-text-field
                 style="width: 60px;"
+                class="inline-field"
                 hide-details
                 variant="solo"
                 bg-color="grey-darken-3"

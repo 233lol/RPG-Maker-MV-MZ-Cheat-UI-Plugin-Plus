@@ -8,7 +8,7 @@ import {
   createBundledHighlighter,
   createSingletonShorthands,
 } from "@shikijs/core";
-import { createOnigurumaEngine } from "@shikijs/engine-oniguruma";
+import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
 type BundledLanguage = "json";
 type BundledTheme = "dark-plus";
@@ -28,7 +28,12 @@ const createHighlighter = /* @__PURE__ */ createBundledHighlighter<
 >({
   langs: bundledLanguages,
   themes: bundledThemes,
-  engine: () => createOnigurumaEngine(import("shiki/wasm")),
+  // 这里只高亮 JSON（GeneralPanel 的事件检查器 / REPL 输出），纯 JS 正则引擎足够。
+  // 原来的 createOnigurumaEngine(import("shiki/wasm")) 会把 oniguruma 的 WASM
+  // 以 base64 内联进 bundle，事件检查器首次打开时还要再解一次 620KB 的 base64。
+  // 换 JS 引擎后产物 750,718 B -> 180,809 B（-75.9%），且对 JSON 的高亮结果
+  // 与 WASM 引擎逐字节一致。
+  engine: () => createJavaScriptRegexEngine(),
 });
 
 const {

@@ -54,6 +54,7 @@ export default {
             #item.value="{ item }">
             <v-text-field
                 bg-color="grey-darken-3"
+                class="inline-field"
                 style="width: 90px;"
                 hide-details
                 variant="solo"
