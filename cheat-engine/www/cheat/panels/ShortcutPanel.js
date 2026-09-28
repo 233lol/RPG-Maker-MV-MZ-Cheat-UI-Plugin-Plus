@@ -271,10 +271,19 @@ export default {
     },
 
     changeExpanded(item) {
-      if (this.tableExpanded.length === 1 && this.tableExpanded[0] === item) {
+      // v-data-table 的 v-model:expanded 存的是「行的 item-value」，不是行对象本身。
+      // Vuetify 的 useExpanded 里 isExpanded 是这样比的：
+      //     [...expanded].some(c => toRaw(c) === toRaw(item.value))
+      // 而 item.value 由 itemValue 决定，本表未设置 itemValue，默认取 item.id。
+      //
+      // 之前这里塞的是 [item]（整个对象），toRaw(对象) 永远 !== "quickSave"
+      // 这种 id 字符串，于是没有任何行能匹配上 —— 表现就是点设置按钮没反应。
+      const id = item.id;
+
+      if (this.tableExpanded.length === 1 && this.tableExpanded[0] === id) {
         this.tableExpanded = [];
       } else {
-        this.tableExpanded = [item];
+        this.tableExpanded = [id];
       }
     },
 

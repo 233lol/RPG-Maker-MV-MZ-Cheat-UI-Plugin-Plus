@@ -14,11 +14,10 @@ export default {
     @keydown.stop.prevent="onShortcutInput"
     @focus="$event.target.select()">
     <template #append>
-        <v-btn 
-            v-if="deletable"
-            :disabled="modelValue.isEmpty()"
-            size="small"
-            :style="deleteBtnStyle"
+        <v-btn
+            :style="{ visibility: canDelete ? 'visible' : 'hidden' }"
+            :disabled="!canDelete"
+            size="x-small"
             icon
             @click="onDeleteClick">
             <v-icon size="small">mdi-close-circle</v-icon>
@@ -77,8 +76,15 @@ export default {
       return undefined;
     },
 
-    deleteBtnStyle() {
-      return `opacity: ${this.modelValue.isEmpty() ? 0 : 0.7}`;
+    // 清除按钮是否可用。
+    //
+    // 注意：按钮不用 v-if 隐藏，而是 visibility: hidden —— 因为它在字段的
+    // #append 槽里，一旦真的不渲染，Vuetify 就不会给字段加 v-field--appended
+    // 类，该行灰色区域会比其它行宽一截（"框突起"）。常驻渲染 + 隐藏可以保证
+    // 每一行的字段宽度完全一致。visibility 相比原先的 opacity: 0 还能顺带
+    // 去掉不可见但仍可点击的问题。
+    canDelete() {
+      return this.deletable && !this.modelValue.isEmpty();
     },
 
     showingText() {
@@ -88,6 +94,12 @@ export default {
 
   methods: {
     onDeleteClick() {
+      // canDelete 已经把「不可删除 / 无内容」两种情况都挡住了，这里再挡一次，
+      // 避免以后有人改了 canDelete 就静默失效。
+      if (!this.canDelete) {
+        return;
+      }
+
       const eventKey = Key.createEmpty();
       this.$emit("update:modelValue", eventKey);
       this.$emit("change", eventKey);
