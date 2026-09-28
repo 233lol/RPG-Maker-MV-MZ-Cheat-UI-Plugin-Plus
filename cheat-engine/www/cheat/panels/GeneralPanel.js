@@ -47,6 +47,8 @@ export default {
         class="py-0">
         <v-checkbox
             v-model="noClip"
+            density="compact"
+            hide-details
             label="穿墙"
             @change="onNoClipChange">
         </v-checkbox>

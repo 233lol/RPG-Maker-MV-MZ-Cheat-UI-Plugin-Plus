@@ -50,6 +50,8 @@ export default {
         <v-checkbox
             class="d-inline-flex"
             v-model="hideDesc"
+            density="compact"
+            hide-details
             label="隐藏描述">
         </v-checkbox>
         <v-tooltip
@@ -80,7 +82,7 @@ export default {
         <template
             #item.shortcut="{ item }">
             <key-input-field
-                style="width: 170px;"
+                style="width: 220px;"
                 v-model="item.shortcut"
                 :deletable="!item.necessary"
                 :label="item.shortcut.isEmpty() ? '未分配快捷键' : '快捷键'"

@@ -9,8 +9,8 @@ import { Alert } from "../js/AlertHelper.js";
 // snack 一闪而过来不及读、也复制不了。同一份信息同时打到 console，
 // 保证 toast 消失后仍可追溯。
 const LEVEL_TIMEOUT = {
-  warn: 5000,
-  error: 8000,
+  warn: 3000,
+  error: 5000,
 };
 
 export default {

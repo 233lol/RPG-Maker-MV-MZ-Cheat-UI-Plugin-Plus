@@ -9,7 +9,7 @@ export default {
 <v-card flat class="ma-0 pa-0">
     <v-row>
         <v-col cols="12">
-            <v-card variant="outlined" color="primary" class="pa-2 mb-2">
+            <v-card variant="outlined" color="primary" class="pa-2">
                 <v-row density="compact">
                     <v-col cols="4" class="text-center">
                         <div class="text-body-small text-grey">当前地图</div>
@@ -27,7 +27,7 @@ export default {
             </v-card>
         </v-col>
     </v-row>
-    <v-row>
+    <v-row class="mt-2">
         <v-col
             cols="4"
             md="4">
@@ -96,6 +96,8 @@ export default {
             </v-text-field>
             <v-checkbox
                 v-model="excludeFullPath"
+                density="compact"
+                hide-details
                 label="隐藏完整路径">
             </v-checkbox>
         </template>

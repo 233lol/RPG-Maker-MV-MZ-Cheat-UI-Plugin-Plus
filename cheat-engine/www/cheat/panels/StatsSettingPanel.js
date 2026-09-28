@@ -30,6 +30,8 @@ export default {
                     class="pa-0">
                     <v-checkbox
                         v-model="actor.godMode"
+                        density="compact"
+                        hide-details
                         label="无敌模式"
                         @change="onGodModeChange(actor)">
                     </v-checkbox>
