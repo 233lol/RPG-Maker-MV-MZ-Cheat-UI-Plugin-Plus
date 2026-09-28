@@ -312,8 +312,10 @@ const shortcutConfig = {
     name: "打开开发者工具",
     desc: "打开 Chromium 开发者工具",
     enterAction(param) {
-      if (Utils.isNwjs()) {
-        require("nw.gui").Window.get().showDevTools();
+      // `require("nw.gui")` 是 nwjs 0.12 时代的 API，0.13 起已被 `nw.Window` 取代；
+      // 本项目 init/import.js 要求 nwjs >= 0.44.0，走新 API（与 mz/main.js 一致）。
+      if (typeof nw === "object" && nw.Window) {
+        nw.Window.get().showDevTools();
       }
     },
   },

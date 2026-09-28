@@ -54,12 +54,6 @@ export default {
     window.removeEventListener("keyup", this.onGlobalKeyUp);
   },
 
-  watch: {
-    show: {
-      immediate: true,
-    },
-  },
-
   methods: {
     onGlobalKeyDown(e) {
       if (e.repeat) {

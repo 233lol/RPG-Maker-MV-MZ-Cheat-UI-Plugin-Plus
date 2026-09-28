@@ -1,5 +1,18 @@
 import { Alert } from "../js/AlertHelper.js";
 
+// AlertSnackbar 会覆盖 AlertHelper 里的原生 alert() 实现，而原生实现是会把 err
+// 拼进提示文本的。覆盖后必须自己补上，否则调用方传的 err 会被静默丢弃 ——
+// 而现有传 err 的几处（GlobalShortcut 读快捷键设置失败）都是启动期分支，
+// 用户看到的只有一句无信息量的通用提示。
+//
+// 错误类信息还需要更长的阅读时间：调用方默认传的 1500ms 是按 success 调的，
+// snack 一闪而过来不及读、也复制不了。同一份信息同时打到 console，
+// 保证 toast 消失后仍可追溯。
+const LEVEL_TIMEOUT = {
+  warn: 5000,
+  error: 8000,
+};
+
 export default {
   name: "AlertSnackbar",
 
@@ -59,10 +72,14 @@ export default {
       }
 
       this.show({
-        text: msg,
+        text: err ? `${msg}\n[cause] ${err}` : msg,
         color: color,
-        timeout: timeout,
+        timeout: Math.max(timeout, LEVEL_TIMEOUT[level] || 0),
       });
+
+      if (err) {
+        console.error(`[cheat plugin ${level}] ${msg}`, err);
+      }
     };
   },
 

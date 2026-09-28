@@ -784,7 +784,7 @@ export default {
     },
 
     versionUrl() {
-      return `https://github.com/233lol/RPG-Maker-MV-MZ-Cheat-UI-Plugin/commit/${RPGVERSION}`;
+      return `https://github.com/233lol/RPG-Maker-MV-MZ-Cheat-UI-Plugin-Plus/commit/${RPGVERSION}`;
     },
   },
 };

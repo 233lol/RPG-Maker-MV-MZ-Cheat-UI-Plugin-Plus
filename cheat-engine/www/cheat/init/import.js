@@ -44,15 +44,6 @@ function applyCheat() {
     document.body.appendChild(cheatScript);
   }
 
-  function __loadJavaScript(src) {
-    var script = document.createElement("script");
-    script.type = "text/javascript";
-    script.src = src;
-    script.async = false;
-    script._url = src;
-    document.body.appendChild(script);
-  }
-
   // add <div id='app'> node for vue
   const appDiv = document.createElement("div");
 
