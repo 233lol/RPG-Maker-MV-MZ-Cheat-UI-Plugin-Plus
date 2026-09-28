@@ -51,7 +51,7 @@ export default {
                     </v-tooltip>
                 </v-card-actions>
                 <v-card-subtitle class="pa-0">等级 / 经验</v-card-subtitle>
-                <v-row class="mt-0">
+                <v-row class="mt-0 pt-3">
                     <v-col>
                         <v-text-field
                             label="Lv"
@@ -77,7 +77,7 @@ export default {
                 </v-row>
 
                 <v-card-subtitle class="pa-0 mt-4">属性</v-card-subtitle>
-                <v-row class="mt-0">
+                <v-row class="mt-0 pt-3">
                     <v-col
                         v-for="(_, paramIdx) in actor.param.length"
                         :key="paramIdx"
