@@ -17,16 +17,34 @@ export default {
          v-model:items-per-page="pagination.itemsPerPage"
          :items-per-page-options="[5, 10, 15, { title: 'All', value: -1 }]">
         <template #top>
-            <v-text-field
-                label="搜索..."
-                variant="solo"
-                bg-color="grey-darken-3"
-                v-model="search"
-                density="compact"
-                hide-details
-                @focus="$event.target.select()"
-                @keydown.stop>
-            </v-text-field>
+            <div class="d-flex align-center">
+                <v-text-field
+                    label="搜索..."
+                    variant="solo"
+                    bg-color="grey-darken-3"
+                    v-model="search"
+                    density="compact"
+                    hide-details
+                    class="flex-grow-1"
+                    @focus="$event.target.select()"
+                    @keydown.stop>
+                </v-text-field>
+                <v-tooltip
+                    location="bottom">
+                    <template #activator="{ props }">
+                        <v-btn
+                            color="pink"
+                            size="small"
+                            icon
+                            class="ml-2"
+                            v-bind="props"
+                            @click="initializeVariables">
+                            <v-icon>mdi-refresh</v-icon>
+                        </v-btn>
+                    </template>
+                    <span>重新加载游戏数据</span>
+                </v-tooltip>
+            </div>
             <v-row
                     class="ma-0 pa-0">
                     <v-col
@@ -93,21 +111,6 @@ export default {
              </div>
          </template>
     </v-data-table>
-    <v-tooltip
-        location="bottom">
-        <template #activator="{ props }">
-            <v-btn
-                color="pink"
-                size="small"
-                icon
-                style="position: absolute; top: 0px; right: 0px;"
-                v-bind="props"
-                @click="initializeVariables">
-                <v-icon>mdi-refresh</v-icon>
-            </v-btn>
-        </template>
-        <span>重新加载游戏数据</span>
-    </v-tooltip>
 </v-card>
     `,
 
