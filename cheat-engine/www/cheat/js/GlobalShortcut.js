@@ -20,6 +20,10 @@ const defaultShortcutSettings = {
     shortcut: "ctrl m",
   },
 
+  toggleCheatModalToSaveBackupComponent: {
+    shortcut: "ctrl b",
+  },
+
   quickSave: {
     shortcut: "ctrl s",
     param: {
@@ -131,6 +135,14 @@ const shortcutConfig = {
     desc: "",
     enterAction(param) {
       GeneralCheat.toggleCheatModal("save-recall-panel");
+    },
+  },
+
+  toggleCheatModalToSaveBackupComponent: {
+    name: "切换“存档时间机器”窗口",
+    desc: "快速打开存档快照面板",
+    enterAction(param) {
+      GeneralCheat.toggleCheatModal("save-backup-panel");
     },
   },
 

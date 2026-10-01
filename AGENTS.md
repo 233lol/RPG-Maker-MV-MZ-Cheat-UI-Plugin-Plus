@@ -29,7 +29,6 @@ Vendor scripts (all available via `pnpm run vendor:*`):
 
 `vendor:shiki` is auto-triggered by Makefile dependency. `make vendor` runs all four.
 
-No tests, linter, typechecker, or tsconfig (all source is plain JS except `tools/shiki.bundle.ts`).
 
 ## Structure
 
@@ -38,9 +37,11 @@ No tests, linter, typechecker, or tsconfig (all source is plain JS except `tools
 | `cheat-engine/www/cheat/` | Cheat UI source. Vue 3 + Vuetify 4, ES module JS files. |
 | `cheat-engine/www/_cheat_initialize/mv/` | MV-specific `main.js` replacement |
 | `cheat-engine/www/_cheat_initialize/mz/` | MZ-specific `main.js` replacement |
-| `tools/` | Vendor build scripts (`build-shiki.mjs`, `copy-vue.mjs`, ...), `pack.mjs` (zip packaging), and Makefile helpers (`gen-version.mjs`, `link-latest.mjs`, `clean.mjs`) |
+| `tools/` | Vendor build scripts (`build-shiki.mjs`, `copy-vue.mjs`, ...), `pack.mjs` (zip packaging), `Makefile` helpers (`gen-version.mjs`, `link-latest.mjs`, `clean.mjs`)|
 
 The cheat replaces the game's `main.js` with a version that loads `cheat/init/import.js` → `cheat/init/setup.js` (ES module) → mounts Vue 3 `MainComponent`.
+
+Cheat-owned persistent settings live under `www/cheat-settings/` (`shortcuts.json`, `gameSpeed.json`, `speed.json`, `kv-storage.json`, `switch-locks.json`, `variable-locks.json`, `save-backups/`). New features that need on-disk state should follow the same layout.
 
 ## CI
 

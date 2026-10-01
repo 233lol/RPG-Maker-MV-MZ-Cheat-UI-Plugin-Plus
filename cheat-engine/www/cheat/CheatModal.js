@@ -9,6 +9,7 @@ import VariableSettingPanel from "./panels/VariableSettingPanel.js";
 import GlobalVariablePanel from "./panels/GlobalVariablePanel.js";
 import SwitchSettingPanel from "./panels/SwitchSettingPanel.js";
 import SaveRecallPanel from "./panels/SaveRecallPanel.js";
+import SaveBackupPanel from "./panels/SaveBackupPanel.js";
 import TeleportPanel from "./panels/TeleportPanel.js";
 import MapEventPanel from "./panels/MapEventPanel.js";
 import ShortcutPanel from "./panels/ShortcutPanel.js";
@@ -28,6 +29,7 @@ export default {
     GlobalVariablePanel,
     SwitchSettingPanel,
     SaveRecallPanel,
+    SaveBackupPanel,
     TeleportPanel,
     MapEventPanel,
     ShortcutPanel,
@@ -164,6 +166,11 @@ export default {
           name: "存读位置",
           icon: "mdi-map-marker-plus",
           component: "save-recall-panel",
+        },
+        {
+          name: "存档时间机器",
+          icon: "mdi-backup-restore",
+          component: "save-backup-panel",
         },
         {
           name: "传送",

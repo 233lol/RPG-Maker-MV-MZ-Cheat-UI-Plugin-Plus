@@ -113,6 +113,81 @@ body::-webkit-scrollbar {
   background-color: rgba(255, 183, 77, 0.16);
 }
 
+/* 存档时间机器面板的紧凑表格。
+   模态最大只有 775px 宽，列一多 Vuetify 就会把表头文字逐字换行竖排
+   （"游戏时间" 变成竖着的四个字），所以这里强制表头不换行，
+   并让单元格用省略号兜住超长备注，避免撑出横向滚动条。 */
+.cheat-save-backup-table table {
+  table-layout: fixed;
+}
+
+.cheat-save-backup-table th,
+.cheat-save-backup-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cheat-save-backup-table th .v-data-table-header__content {
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+
+.cheat-save-backup-table .v-data-table__td {
+  padding-inline: 8px !important;
+}
+
+.cheat-save-backup-table .v-data-table__th {
+  padding-inline: 8px !important;
+}
+
+/* 状态区三行文字宽度有限，长地图名允许省略 */
+.cheat-save-backup-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cheat-save-backup-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 存档时间机器里的内联数字输入（「每 [3] 次存档留一份」）。
+   三个坑都记在这：
+     1. Vuetify 的 .v-input 默认 flex: 1 1 auto，在弹性行里会被撑满整行 —— 必须收成固定宽度；
+     2. type=number 会渲染出上下微调箭头，1~100 这种范围直接打字更方便，
+        箭头还白占掉框右侧约 20px，所以隐藏掉（键入 + 滚轮仍可用）；
+     3. outlined 变体的 .v-field__input 左右内边距各 16px，而 compact 密度只收窄上下、
+        不动左右 —— 46px 的框里只剩 14px 放字，于是「56」被切成「5」。
+        这里把内边距收到 8px；宽度不再写死，由组件里的 numFieldStyle() 按位数精算
+        （2 位 41px、3 位 51px，右边只留一个光标位；1 位数走 36px 下限，避免变成竖条）。
+        下面这个 width 只是拿不到内联样式时的兜底（按 1 位数）。
+   除了宽度，不要再覆盖 .v-field__input / input 的 flex、text-align —— 那会让数字不显示。 */
+.cheat-save-backup-num.v-input {
+  flex: 0 0 auto;
+  width: 36px;
+}
+
+.cheat-save-backup-num .v-field {
+  --v-field-padding-start: 8px;
+  --v-field-padding-end: 8px;
+}
+
+.cheat-save-backup-num input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.cheat-save-backup-num input[type="number"]::-webkit-outer-spin-button,
+.cheat-save-backup-num input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
 /* z-index for cheat components - lower than overlays */
 .z-index-cheat-0 {
   z-index: 1000 !important;
