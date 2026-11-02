@@ -15,15 +15,15 @@
   },
   "devDependencies": {
     "@mdi/font": "^7.4.47",
-    "@shikijs/core": "^4.5.0",
-    "@shikijs/engine-oniguruma": "^4.5.0",
-    "@shikijs/langs": "^4.5.0",
-    "@shikijs/themes": "^4.5.0",
+    "@shikijs/core": "^4.6.0",
+    "@shikijs/engine-oniguruma": "^4.6.0",
+    "@shikijs/langs": "^4.6.0",
+    "@shikijs/themes": "^4.6.0",
     "esbuild": "^0.28.2",
     "fflate": "^0.8.3",
-    "shiki": "^4.5.0",
+    "shiki": "^4.6.0",
     "vue": "^3.5.44",
-    "vuetify": "^4.2.6"
+    "vuetify": "^4.3.1"
   },
-  "packageManager": "pnpm@12.14.0"
+  "packageManager": "pnpm@12.16.1"
 }
