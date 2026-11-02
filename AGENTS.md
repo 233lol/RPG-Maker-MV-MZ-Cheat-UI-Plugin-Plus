@@ -30,6 +30,17 @@ Vendor scripts (all available via `pnpm run vendor:*`):
 `vendor:shiki` is auto-triggered by Makefile dependency. `make vendor` runs all four.
 
 
+## Test
+
+```shell
+pnpm test      # headless MV + MZ + packaging
+pnpm test:mv   # MV only
+pnpm test:mz   # MZ only
+```
+
+The suite expects test games at `mv/` (with `www/index.html`) and `mz/` (with `index.html`) in the repo root, and `nwjs-sdk` installed (`NWJS_PATH` overrides discovery). It runs nw.js with `show: false` and SwiftShader WebGL by default, drives the game through CDP, and restores `www/cheat-settings/` plus `save/global.*` afterwards. Node.js >= 22 is required for the built-in `WebSocket`.
+
+
 ## Structure
 
 | Path | Purpose |

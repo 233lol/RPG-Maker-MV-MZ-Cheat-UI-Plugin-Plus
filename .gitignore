@@ -1,5 +1,7 @@
 .idea/
 venv/
+mv/
+mz/
 .history
 .vscode
 deploy/output

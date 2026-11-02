@@ -11,6 +11,8 @@ import { ConfirmDialog } from "./DialogHelper.js";
 //         本模块不需要认识；
 //       - 游戏插件覆写了 StorageManager 时依然正确。
 //     唯一直接接触引擎存档路径的地方，是「复制存档文件」这个便利功能。
+//     MZ 的存档是 pako 压缩的 .rmmzsave、saveName 也和 MV 不同，编码 / 文件名
+//     都在这里做引擎分支，快照内部格式（LZString/base64）保持统一。
 //  2. 快照索引（元数据）统一存在 ./www/cheat-settings/save-backups/index.json，
 //     与 shortcuts.json / variable-locks.json 同一套路。
 //  3. 每次还原前自动为「被覆盖的那一份」留一个 auto 快照并保留最近 N 份，
@@ -40,6 +42,48 @@ export class SaveBackupCheat {
     } catch (error) {
       return false;
     }
+  }
+
+  // MZ 与 MV 的存档 API 不同：
+  //   MV：savefileId -> fileN.rpgsave，StorageManager.saveToLocalFile(id, json) 内部 LZString
+  //   MZ：saveName  -> fileN.rmmzsave，StorageManager.saveToLocalFile(name, zip) 要求 pako 压缩后的数据
+  // 这里只做能力探测，不依赖 Utils 是否已经加载。
+  static isMZ() {
+    try {
+      if (typeof Utils !== "undefined" && Utils.RPGMAKER_NAME) {
+        return Utils.RPGMAKER_NAME === "MZ";
+      }
+    } catch (error) {
+      // 继续按 API 探测
+    }
+
+    try {
+      return (
+        typeof DataManager !== "undefined" &&
+        typeof DataManager.makeSavename === "function"
+      );
+    } catch (error) {
+      return false;
+    }
+  }
+
+  static getSaveName(slot) {
+    slot = Number(slot);
+
+    try {
+      if (typeof DataManager !== "undefined") {
+        if (typeof DataManager.makeSavename === "function") {
+          return DataManager.makeSavename(slot);
+        }
+        if (typeof DataManager.makeSaveName === "function") {
+          return DataManager.makeSaveName(slot);
+        }
+      }
+    } catch (error) {
+      // 退回引擎默认命名
+    }
+
+    return `file${slot}`;
   }
 
   static maxSavefiles() {
@@ -98,22 +142,33 @@ export class SaveBackupCheat {
     }
 
     try {
-      if (typeof DataManager.loadSavefileInfo !== "function") {
-        return null;
-      }
+      // MV: loadSavefileInfo(savefileId)；MZ: savefileInfo(savefileId)
+      // 两者都直接读 global 存档头，不需要解压整份存档。
+      let info = null;
 
-      const info = DataManager.loadSavefileInfo(Number(slot));
+      if (typeof DataManager.loadSavefileInfo === "function") {
+        info = DataManager.loadSavefileInfo(Number(slot));
+      } else if (typeof DataManager.savefileInfo === "function") {
+        info = DataManager.savefileInfo(Number(slot));
+      }
 
       if (!info || typeof info !== "object") {
         return null;
       }
 
-      const playtime = Number(info.playtime);
+      // MZ 的存档头里 playtime 已经是 "HH:MM:SS" 字符串；MV 是帧数。
+      const playtimeValue = info.playtime;
+      const playtime = Number(playtimeValue);
       const timestamp = Number(info.timestamp);
 
       return {
         playtimeFrames: Number.isFinite(playtime) ? playtime : 0,
-        playtimeText: Number.isFinite(playtime) ? this.formatFrames(playtime) : "",
+        playtimeText:
+          typeof playtimeValue === "string"
+            ? playtimeValue
+            : Number.isFinite(playtime)
+              ? this.formatFrames(playtime)
+              : "",
         timestamp: Number.isFinite(timestamp) ? timestamp : 0,
         timestampText: Number.isFinite(timestamp)
           ? this.formatDateTime(timestamp)
@@ -146,6 +201,16 @@ export class SaveBackupCheat {
     }
 
     try {
+      // MZ 的 DataManager.savefileExists / MV 的 StorageManager.localFileExists
+      // 对参数语义不同（MZ 用 saveName，MV 用 savefileId），优先用引擎自己的
+      // DataManager 接口，避免把槽号当成文件名。
+      if (
+        typeof DataManager !== "undefined" &&
+        typeof DataManager.savefileExists === "function"
+      ) {
+        return !!DataManager.savefileExists(slot);
+      }
+
       if (this.isLocalMode()) {
         if (typeof StorageManager.localFileExists === "function") {
           return !!StorageManager.localFileExists(slot);
@@ -183,18 +248,81 @@ export class SaveBackupCheat {
           return null;
         }
 
-        return this.decodeSaveText(
+        return this.decodeEngineSaveText(
           fs.readFileSync(filePath, { encoding: "utf8" }),
-          "存档数据",
         );
       }
 
-      // 浏览器 / 手机：引擎已经把 web storage 里的数据解压成字符串了
+      // 浏览器 / 手机：MV 的 web storage 返回已解压的 JSON；MZ 没有同步 API，
+      // 且快照功能本来就依赖文件系统，这里直接返回 null。
+      if (this.isMZ()) {
+        return null;
+      }
+
       return StorageManager.loadFromWebStorage(slot);
     } catch (error) {
       console.warn("[cheat plugin] 读取存档数据失败", error);
       return null;
     }
+  }
+
+  // 把引擎存档文件内容解成明文 JSON：
+  //   MV  ：LZString base64（个别游戏 / 旧版本是裸 base64 或明文）
+  //   MZ  ：pako 压缩后的二进制字符串
+  // 只有解出来确实像 JSON 才认，避免把乱码当成存档。
+  static decodeEngineSaveText(raw) {
+    if (raw === null || raw === undefined || raw === "") {
+      return null;
+    }
+
+    const looksLikeJson = (text) => {
+      if (typeof text !== "string") {
+        return false;
+      }
+      const trimmed = text.trimStart();
+      return trimmed.startsWith("{") || trimmed.startsWith("[");
+    };
+
+    if (looksLikeJson(raw)) {
+      return raw;
+    }
+
+    const lz = this.getLZString();
+    if (lz && typeof lz.decompressFromBase64 === "function") {
+      try {
+        const text = lz.decompressFromBase64(raw);
+        if (looksLikeJson(text)) {
+          return text;
+        }
+      } catch (error) {
+        // 不是 LZString 压缩的，继续试下一种
+      }
+    }
+
+    try {
+      if (typeof pako !== "undefined" && typeof pako.inflate === "function") {
+        const text = pako.inflate(raw, { to: "string" });
+        if (looksLikeJson(text)) {
+          return text;
+        }
+      }
+    } catch (error) {
+      // 不是 pako 压缩的，继续试下一种
+    }
+
+    try {
+      const text = new TextDecoder().decode(
+        Uint8Array.from(atob(raw), (c) => c.charCodeAt(0)),
+      );
+      if (looksLikeJson(text)) {
+        return text;
+      }
+    } catch (error) {
+      // 也不是裸 base64
+    }
+
+    console.warn("[cheat plugin] 无法识别的存档压缩格式，快照元数据将不完整");
+    return null;
   }
 
   // jsonText 必须是 readSaveText / readPayload 得到的明文 JSON 文本
@@ -208,10 +336,25 @@ export class SaveBackupCheat {
       throw new Error("存档数据为空");
     }
 
-    // 交给引擎自己的 API 写，压缩方式与 .bak 维护都由引擎负责
+    // 交给引擎自己的 API 写，压缩方式与 .bak 维护都由引擎负责。
+    // MZ 的 saveToLocalFile 要求传入 pako 压缩后的 zip，MV 则要求明文 JSON。
     if (this.isLocalMode()) {
+      if (this.isMZ()) {
+        if (typeof pako === "undefined" || typeof pako.deflate !== "function") {
+          throw new Error("当前游戏未提供 pako，无法写入 MZ 存档");
+        }
+
+        const zip = pako.deflate(jsonText, { to: "string", level: 1 });
+        StorageManager.saveToLocalFile(this.getSaveName(slot), zip);
+        return;
+      }
+
       StorageManager.saveToLocalFile(slot, jsonText);
       return;
+    }
+
+    if (this.isMZ()) {
+      throw new Error("MZ 浏览器模式暂不支持写入存档");
     }
 
     StorageManager.saveToWebStorage(slot, jsonText);
@@ -237,6 +380,7 @@ export class SaveBackupCheat {
       return null;
     }
 
+    // MV：localFilePath(savefileId) 直接给出 fileN.rpgsave 的绝对路径
     try {
       if (typeof StorageManager.localFilePath === "function") {
         const filePath = StorageManager.localFilePath(slot);
@@ -248,13 +392,32 @@ export class SaveBackupCheat {
       console.warn("[cheat plugin] StorageManager.localFilePath 调用失败", error);
     }
 
-    // 兜底：MV/MZ 默认都是 <游戏根>/save/file%1.rpgsave。
+    // MZ：只有 filePath(saveName)，传入 "fileN" 才会得到 fileN.rmmzsave
+    try {
+      if (typeof StorageManager.filePath === "function") {
+        const filePath = StorageManager.filePath(this.getSaveName(slot));
+        if (typeof filePath === "string" && filePath.length > 0) {
+          return filePath;
+        }
+      }
+    } catch (error) {
+      console.warn("[cheat plugin] StorageManager.filePath 调用失败", error);
+    }
+
+    // 兜底：MV 是 <游戏根>/www/save/fileN.rpgsave，
+    //       MZ 是 <游戏根>/save/fileN.rmmzsave。
     // localFileDirectoryPath 内部用 process.mainModule（新版 nw.js 已移除该字段），
     // 部分游戏在这里会抛错，所以必须留这条路径。
     try {
       const path = require("path");
       const base = process.cwd();
-      return path.join(base, "www", "save", `file${slot}.rpgsave`);
+      const saveName = this.getSaveName(slot);
+
+      if (this.isMZ()) {
+        return path.join(base, "save", `${saveName}.rmmzsave`);
+      }
+
+      return path.join(base, "www", "save", `${saveName}.rpgsave`);
     } catch (error) {
       return null;
     }
@@ -312,8 +475,8 @@ export class SaveBackupCheat {
     return null;
   }
 
-  // 快照文件的编码格式刻意与 .rpgsave 保持一致（LZString base64），
-  // 这样快照既能被本插件读写，也能直接改名成 fileN.rpgsave 放回存档目录。
+  // 快照文件的内部编码：MV 用 LZString base64（与 .rpgsave 一致，可直接改名使用）；
+  // MZ 没有 lz-string，退化成 UTF-8 base64（仅供本插件读写，不能直接当 .rmmzsave）。
   static encodeSaveText(jsonText) {
     const lz = this.getLZString();
 
@@ -356,18 +519,14 @@ export class SaveBackupCheat {
       }
     }
 
-    // 没有 LZString（或解不出来）时退化成裸 base64：只有游戏本身存的就是
-    // 未压缩 base64 才能成功，否则后面 JSON.parse 会失败并留下警告
+    // 没有 LZString（或解不出来）时退化成裸 base64：MZ 的快照就是这种格式，
+    // MV 游戏存档若本身是未压缩 base64 也能成功。是否有效由上层 JSON.parse 判断。
     try {
       const fallback = new TextDecoder().decode(
         Uint8Array.from(atob(base64Text), (c) => c.charCodeAt(0)),
       );
 
       if (typeof fallback === "string" && fallback.length > 0) {
-        console.warn(
-          `[cheat plugin] ${label} 未经 LZString 解码（游戏未提供 LZString），` +
-            "若存档是 LZString 压缩的，元数据会读不出来（快照与还原不受影响）",
-        );
         return fallback;
       }
     } catch (error) {
@@ -668,11 +827,8 @@ export class SaveBackupCheat {
         const fs = this.requireFs();
 
         if (filePath && fs.existsSync(filePath)) {
-          const raw = fs.readFileSync(filePath, "utf-8");
-          meta.dataSize = raw.length;
-          saveObject = this.parseAnySaveData(
-            this.decodeSaveText(raw, "存档数据"),
-          );
+          meta.dataSize = fs.statSync(filePath).size;
+          saveObject = this.parseAnySaveData(this.readSaveText(slot));
         }
       } catch (error) {
         // 存档损坏 / 压缩方式不认识（如 pako）都只影响展示，不影响快照本身
@@ -709,12 +865,20 @@ export class SaveBackupCheat {
         meta.mapName = mapInfo ? mapInfo.name : "";
       }
 
-      // 有些存档的 Game_System 根本没有 _playtime（老版本 MV），此时
-      // 只有 global.rpgsave 的存档头里有值，那份由 backfill 用存档头补
+      // 有些存档的 Game_System 根本没有 _playtime（老版本 MV / MZ），
+      // 此时退回引擎自己的 _framesOnSave（存档那刻的帧数）计算时长。
       const system = saveObject.system;
-      if (!meta.playtime && system && Number.isFinite(system._playtime)) {
-        meta.playtimeFrames = Number(system._playtime);
-        meta.playtime = this.formatFrames(system._playtime);
+      if (!meta.playtime && system) {
+        const frames = Number.isFinite(system._playtime)
+          ? Number(system._playtime)
+          : Number.isFinite(system._framesOnSave)
+            ? Number(system._framesOnSave)
+            : null;
+
+        if (frames !== null) {
+          meta.playtimeFrames = frames;
+          meta.playtime = this.formatFrames(frames);
+        }
       }
     } catch (error) {
       console.warn("[cheat plugin] 读取存档字段失败", error);
@@ -1414,9 +1578,10 @@ export class SaveBackupCheat {
     }
 
     const stamp = this.formatTime(Date.now()).replace(/[: ]/g, "-");
+    const extension = this.isMZ() ? ".rmmzsave" : ".rpgsave";
     const target = path.join(
       this.ensureBackupDir(),
-      `save${slot}-${stamp}.rpgsave`,
+      `save${slot}-${stamp}${extension}`,
     );
 
     fs.copyFileSync(source, target);

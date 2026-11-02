@@ -78,6 +78,39 @@ MV 游戏的可执行文件所在目录下是 `www/`，而 MZ 游戏直接以 `j
 
 Vendor 构建由 Makefile 依赖自动触发，无需手动执行。
 
+## 无头测试
+
+在仓库根目录放置两个测试游戏（已被 `.gitignore` 忽略）：
+
+```
+mv/   # MV 游戏，需包含 www/index.html
+mz/   # MZ 游戏，需包含 index.html
+```
+
+测试使用 `nwjs-sdk` 无头运行（窗口 `show: false`，不弹窗），自动找到 `nw`：
+
+```shell
+pnpm test           # MV + MZ + 压缩包结构
+pnpm test:mv        # 只测 MV
+pnpm test:mz        # 只测 MZ
+```
+
+| 环境变量 | 说明 |
+|---|---|
+| `NWJS_PATH` | 指定 `nw` 可执行文件；默认自动查找 scoop / PATH 中的 `nwjs-sdk` |
+| `NW_TEST_GPU=1` | 使用真实 GPU；默认用 SwiftShader 软件 WebGL，保证无显示器环境也能跑 MZ |
+| `NWJS_ARGS` | 追加传给 nw.js 的参数 |
+| `NW_TEST_KEEP_PROFILE=1` | 测试结束后保留临时用户目录 |
+
+每轮测试会：
+
+- 把当前 `cheat-engine/www/cheat` 同步到测试游戏（MV 为 `www/cheat`，MZ 为 `cheat`），并替换 `main.js`；
+- 备份并在结束后还原 `www/cheat-settings/` 与 `save/global.*`，测试只用空闲存档槽，不覆盖现有存档；
+- 覆盖启动、UI 挂载、15 个面板、键盘快捷键、穿墙 / 速度 / 游戏速度 / 随机遇敌 / 无敌、金币 / 等级 / 变量 / 开关 / 传送 / 地图事件、快捷键与设置在磁盘上的持久化，以及存档时间机器的保存 / 快照 / 还原 / 复制到其他槽 / 导入导出；
+- 校验 `tools/pack.mjs` 生成的 MV / MZ 压缩包目录结构与 `main.js` 内容。
+
+要求 Node.js >= 22（测试脚本使用内置 `WebSocket` 连接 nw.js 的 CDP）。
+
 ## 项目结构
 
 | 路径 | 说明 |

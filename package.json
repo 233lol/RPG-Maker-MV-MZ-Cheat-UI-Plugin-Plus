@@ -11,7 +11,10 @@
     "vendor:vue:dev": "node tools/copy-vue.mjs dev",
     "vendor:assets": "node tools/copy-vendor-assets.mjs",
     "vendor:assets:dev": "node tools/copy-vendor-assets.mjs dev",
-    "vendor:libs": "node tools/build-vuetify.mjs && node tools/copy-vue.mjs && node tools/copy-vendor-assets.mjs"
+    "vendor:libs": "node tools/build-vuetify.mjs && node tools/copy-vue.mjs && node tools/copy-vendor-assets.mjs",
+    "test": "node tests/run.mjs",
+    "test:mv": "node tests/run.mjs mv",
+    "test:mz": "node tests/run.mjs mz"
   },
   "devDependencies": {
     "@mdi/font": "^7.4.47",
