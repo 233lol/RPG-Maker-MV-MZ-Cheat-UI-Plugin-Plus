@@ -1,5 +1,6 @@
 import { Alert } from "./AlertHelper.js";
 import { KeyValueStorage } from "./KeyValueStorage.js";
+import { getCheatSettingsPath } from "./SettingsPath.js";
 
 export class GeneralCheat {
   // will be replaced from main component
@@ -315,7 +316,7 @@ export class GameSpeedCheat {
       (key) => options[key] === sceneOption,
     );
 
-    const storage = new KeyValueStorage("./www/cheat-settings/gameSpeed.json");
+    const storage = new KeyValueStorage(getCheatSettingsPath("gameSpeed.json"));
 
     storage.setItem(
       "data",
@@ -324,7 +325,7 @@ export class GameSpeedCheat {
   }
 
   static __readSettings() {
-    const storage = new KeyValueStorage("./www/cheat-settings/gameSpeed.json");
+    const storage = new KeyValueStorage(getCheatSettingsPath("gameSpeed.json"));
 
     const json = storage.getItem("data");
 
@@ -398,13 +399,13 @@ export class SpeedCheat {
   }
 
   static __writeSettings(speed, fixed) {
-    const storage = new KeyValueStorage("./www/cheat-settings/speed.json");
+    const storage = new KeyValueStorage(getCheatSettingsPath("speed.json"));
 
     storage.setItem("data", JSON.stringify({ speed: speed, fixed: fixed }));
   }
 
   static __readSettings() {
-    const storage = new KeyValueStorage("./www/cheat-settings/speed.json");
+    const storage = new KeyValueStorage(getCheatSettingsPath("speed.json"));
 
     const json = storage.getItem("data");
 
@@ -454,18 +455,40 @@ export class SceneCheat {
     }
   }
 
-  static quickSave(slot = 1) {
-    $gameSystem.onBeforeSave();
-    DataManager.saveGame(slot);
+  static async quickSave(slot = 1) {
+    try {
+      $gameSystem.onBeforeSave();
+      const result = await DataManager.saveGame(slot);
 
-    Alert.success(`保存进度到存档 ${slot}`);
+      if (result === false) {
+        throw new Error("游戏拒绝了本次存档");
+      }
+
+      Alert.success(`保存进度到存档 ${slot}`);
+      return true;
+    } catch (error) {
+      console.warn("[cheat plugin] 快速保存失败", error);
+      Alert.error(`保存到存档 ${slot} 失败`, error);
+      return false;
+    }
   }
 
-  static quickLoad(slot = 1) {
-    DataManager.loadGame(slot);
-    SceneManager.goto(Scene_Map);
+  static async quickLoad(slot = 1) {
+    try {
+      const result = await DataManager.loadGame(slot);
 
-    Alert.success(`从存档 ${slot} 加载游戏`);
+      if (result === false) {
+        throw new Error("游戏拒绝了本次读档");
+      }
+
+      SceneManager.goto(Scene_Map);
+      Alert.success(`从存档 ${slot} 加载游戏`);
+      return true;
+    } catch (error) {
+      console.warn("[cheat plugin] 快速加载失败", error);
+      Alert.error(`从存档 ${slot} 加载失败`, error);
+      return false;
+    }
   }
 }
 

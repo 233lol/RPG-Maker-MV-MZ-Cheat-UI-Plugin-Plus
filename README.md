@@ -105,9 +105,9 @@ pnpm test:mz        # 只测 MZ
 每轮测试会：
 
 - 把当前 `cheat-engine/www/cheat` 同步到测试游戏（MV 为 `www/cheat`，MZ 为 `cheat`），并替换 `main.js`；
-- 备份并在结束后还原 `www/cheat-settings/` 与 `save/global.*`，测试只用空闲存档槽，不覆盖现有存档；
-- 覆盖启动、UI 挂载、15 个面板、键盘快捷键、穿墙 / 速度 / 游戏速度 / 随机遇敌 / 无敌、金币 / 等级 / 变量 / 开关 / 传送 / 地图事件、快捷键与设置在磁盘上的持久化，以及存档时间机器的保存 / 快照 / 还原 / 复制到其他槽 / 导入导出；
-- 校验 `tools/pack.mjs` 生成的 MV / MZ 压缩包目录结构与 `main.js` 内容。
+- 备份并在结束后还原设置目录（MV 为 `www/cheat-settings/`，MZ 为 `cheat-settings/`）与 `save/global.*`，测试只用空闲存档槽，不覆盖现有存档；
+- 覆盖启动、UI 挂载、15 个面板、键盘快捷键、穿墙 / 速度 / 游戏速度 / 随机遇敌 / 无敌、金币 / 等级 / 变量 / 开关 / 传送 / 地图事件、快捷键与设置在磁盘上的持久化，以及存档时间机器的保存 / 快照 / 还原 / 复制到其他槽 / 快速读取 / 导入导出；
+- 校验 `tools/pack.mjs` 生成的 MV / MZ 压缩包目录结构、`main.js` 内容，以及 `main.js` 引用的入口路径确实存在于压缩包内。
 
 要求 Node.js >= 22（测试脚本使用内置 `WebSocket` 连接 nw.js 的 CDP）。
 
@@ -119,6 +119,7 @@ pnpm test:mz        # 只测 MZ
 | `cheat-engine/www/cheat/panels/` | 各功能面板组件 |
 | `cheat-engine/www/cheat/components/` | 通用 UI 组件 |
 | `cheat-engine/www/cheat/js/` | 工具函数 / Cheat API |
+| `cheat-engine/www/cheat/js/SettingsPath.js` | MV/MZ 设置目录与旧目录迁移 |
 | `cheat-engine/www/cheat/init/` | 插件入口 & 初始化 |
 | `cheat-engine/www/cheat/libs/` | 第三方库 (Vue, Vuetify, Shiki) |
 | `cheat-engine/www/cheat/css/` | 样式文件 |
@@ -163,7 +164,7 @@ pnpm test:mz        # 只测 MZ
 「还原前快照」也按存档次数精确判定：当前存档已经留过档就不再重复留，没留过（例如插件关闭期间存的档）就一定补一份，保证任何一次还原都有退路。
 还原到**空槽位**时不会去备份那个空槽位（否则会凭空多出一份空快照）。
 
-自动快照设置存在 `www/cheat-settings/save-backups/config.json`（默认值即下面这份）：
+自动快照设置存在 `<设置目录>/save-backups/config.json`（MV 为 `www/cheat-settings`，MZ 为游戏根目录的 `cheat-settings`；默认值即下面这份）：
 
 ```json
 { "autoOnSave": false, "autoSaveInterval": 1, "autoKeep": 5 }
@@ -171,11 +172,11 @@ pnpm test:mz        # 只测 MZ
 
 存档内进度（地图 / 时长 / 存档时间）：
 
-- 时长 / 存档时间优先取引擎自己的存档头 `DataManager.loadSavefileInfo`（就是 `global.rpgsave` 里那份摘要），
+- 时长 / 存档时间优先取引擎自己的存档头：MV 用 `DataManager.loadSavefileInfo`，MZ 用 `DataManager.savefileInfo`，
   与游戏内「读取」列表显示的值一致；
-- 地图信息靠解压整份存档，MV/MZ 的 `.rpgsave` 都是 LZString base64。注意 `www/js/libs/lz-string.js`
-  是 UMD 包装，**在 nw.js 下只挂 `module.exports`、不会设置 `window.LZString`**，
-  所以本插件按「全局 → 模块 → require 两个备选路径」依次取用；
+- 地图信息靠解压整份存档：MV 是 LZString base64（`.rpgsave`），MZ 是 pako（`.rmmzsave`）。
+  注意 `www/js/libs/lz-string.js` 是 UMD 包装，**在 nw.js 下只挂 `module.exports`、不会设置 `window.LZString`**，
+  所以本插件按「全局 → 模块 → require 备选路径」依次取用；MZ 的 pako 同理；
 - 部分老版本 MV 的存档里根本没有 `_playtime`，这种情况时长显示「未记录」，不会瞎编；
 - 地图 ID 的位置因版本而异，`player.map._mapId` 与顶层 `map._mapId` 都会尝试；
 - 打开面板时会用存档头给**旧版本建的快照**补上缺失的时长 / 存档时间（只改元数据，不动快照数据）；
@@ -185,19 +186,24 @@ pnpm test:mz        # 只测 MZ
   但仅当「快照之后该槽位被重新存过档」时才补（否则快照拍的进度比磁盘更靠后，回填会写错）；
 - 快照自己没记时长时，表格会实时借用该槽位存档头的值来显示（不写回，避免把近似值固化成事实）。
 
-数据位置：`www/cheat-settings/save-backups/`
+数据位置：`<设置目录>/save-backups/`（MZ 旧版本的 `www/cheat-settings/` 会在首次加载时自动迁移到游戏根目录的 `cheat-settings/`）。
 
 ```
 index.json                    # 快照索引（元数据）
 <id>.json                     # 单份快照的元数据
-<id>.rpgsave                  # 快照数据（与 .rpgsave 同格式：JSON + LZString 压缩）
+<id>.rpgsave                  # MV：快照数据（JSON + LZString，可直接改名回存档）
+<id>.rmmzsave                 # MZ：快照数据（pako，可直接改名回存档）
 ```
 
-快照文件刻意与 `.rpgsave` 保持一致，所以也可以直接改名成 `fileN.rpgsave` 丢回 `www/save/` 使用。
+快照文件编码与当前引擎的存档一致，所以也可以直接改名成 `fileN.rpgsave` / `fileN.rmmzsave`
+放回对应的 `save/` 目录使用。
+
+还原时会同步更新 MV 的 `global.rpgsave` / MZ 的 `global.rmmzsave` 存档索引，因此「还原到其他槽位」后
+游戏内读档列表能立即看到该存档，不会出现文件存在但列表里找不到的情况。
 
 两点注意：
 
-- 读写全部走引擎自身的 `StorageManager` API，因此 nw.js（`file://`）与浏览器（`http://`）部署都能用；但快照文件本身依赖文件系统，浏览器环境下该面板不可用。
+- 快照读写走文件系统；实际存档的读取 / 还原按引擎格式处理（MV LZString、MZ pako），因此 nw.js 下可用；浏览器环境没有文件系统，快照面板不可用。
 - 还原的是**磁盘上的存档**。如果你正在游玩的就是那个槽位，游戏内存里仍是旧进度，需要先在游戏内存一次档（或切到别的槽读档）再读取，改动才会生效 —— 面板会弹窗明确提示这一点。
 
 ## Git 仓库说明

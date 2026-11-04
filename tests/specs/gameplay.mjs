@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-export function registerGameplay({ test, page, state }) {
+export function registerGameplay({ test, page, type, state }) {
   test("穿墙 / 移动速度 / 游戏速度 / 随机遇敌 / 无敌模式全部生效", async () => {
     const during = await page.evaluate(async () => {
       const { GeneralCheat, SpeedCheat, GameSpeedCheat, BattleCheat } =
@@ -271,9 +271,16 @@ export function registerGameplay({ test, page, state }) {
       const { GameSpeedCheat } = await import(
         new URL("cheat/js/CheatHelper.js", base).href
       );
+      const { getCheatSettingsPath } = await import(
+        new URL("cheat/js/SettingsPath.js", base).href
+      );
       const fs = require("fs");
 
-      const shortcutFile = "./www/cheat-settings/shortcuts.json";
+      const shortcutFile = getCheatSettingsPath("shortcuts.json");
+      const settingsDir = getCheatSettingsPath("__probe__").replace(
+        /\/__probe__$/,
+        "",
+      );
       const shortcutFileExists = fs.existsSync(shortcutFile);
       const defaults = JSON.parse(fs.readFileSync(shortcutFile, "utf-8"));
 
@@ -286,7 +293,7 @@ export function registerGameplay({ test, page, state }) {
       GLOBAL_SHORTCUT.writeShortcutSettings();
       const restored = JSON.parse(fs.readFileSync(shortcutFile, "utf-8"));
 
-      const kvPath = "./www/cheat-settings/test-kv.json";
+      const kvPath = getCheatSettingsPath("test-kv.json");
       const storage = new KeyValueStorage(kvPath);
       storage.setItem("hello", "世界");
       const kvFile = JSON.parse(fs.readFileSync(kvPath, "utf-8"));
@@ -296,13 +303,14 @@ export function registerGameplay({ test, page, state }) {
       GameSpeedCheat.setGameSpeed(3, GameSpeedCheat.sceneOptions().all);
       GameSpeedCheat.__writeSettings(3, GameSpeedCheat.sceneOptions().all);
       const gameSpeedFile = JSON.parse(
-        fs.readFileSync("./www/cheat-settings/gameSpeed.json", "utf-8"),
+        fs.readFileSync(getCheatSettingsPath("gameSpeed.json"), "utf-8"),
       );
       GameSpeedCheat.setGameSpeed(1, GameSpeedCheat.sceneOptions().all);
-      fs.unlinkSync("./www/cheat-settings/gameSpeed.json");
+      fs.unlinkSync(getCheatSettingsPath("gameSpeed.json"));
 
       return {
         shortcutFileExists,
+        settingsDir,
         defaultShortcut: defaults.toggleCheatModal?.shortcut,
         changedShortcut: changed.toggleNoClip?.shortcut,
         restoredShortcut: restored.toggleNoClip?.shortcut,
@@ -313,6 +321,12 @@ export function registerGameplay({ test, page, state }) {
     });
 
     assert.equal(result.shortcutFileExists, true, "快捷键设置文件没有生成");
+    assert.ok(
+      result.settingsDir.endsWith(
+        type === "mv" ? "/www/cheat-settings" : "/cheat-settings",
+      ),
+      `设置目录不符合引擎布局: ${result.settingsDir}`,
+    );
     assert.equal(result.defaultShortcut, "ctrl c");
     assert.equal(result.changedShortcut, "alt q", "快捷键修改没有落盘");
     assert.equal(result.restoredShortcut, "alt w", "快捷键没有还原");

@@ -1,5 +1,6 @@
 import { Alert } from "./AlertHelper.js";
 import { ConfirmDialog } from "./DialogHelper.js";
+import { getCheatSettingsPath } from "./SettingsPath.js";
 
 // 存档时间机器：把存档快照另存到 cheat 自己的目录，随时回滚。
 //
@@ -12,17 +13,24 @@ import { ConfirmDialog } from "./DialogHelper.js";
 //       - 游戏插件覆写了 StorageManager 时依然正确。
 //     唯一直接接触引擎存档路径的地方，是「复制存档文件」这个便利功能。
 //     MZ 的存档是 pako 压缩的 .rmmzsave、saveName 也和 MV 不同，编码 / 文件名
-//     都在这里做引擎分支，快照内部格式（LZString/base64）保持统一。
-//  2. 快照索引（元数据）统一存在 ./www/cheat-settings/save-backups/index.json，
-//     与 shortcuts.json / variable-locks.json 同一套路。
+//     都在这里做引擎分支；快照内部格式也随引擎（MV LZString / MZ pako），
+//     这样快照文件可以直接改名回对应存档。
+//  2. 快照索引（元数据）统一存在 <设置目录>/save-backups/index.json，
+//     与 shortcuts.json / variable-locks.json 同一套路。设置目录由
+//     SettingsPath.js 按 MV/MZ 解析（MV: www/cheat-settings，MZ: cheat-settings）。
 //  3. 每次还原前自动为「被覆盖的那一份」留一个 auto 快照并保留最近 N 份，
 //     所以还原本身也不会把存档玩坏（可以再还原回去）。
 
 const BACKUP_KIND_AUTO = "auto";
 const BACKUP_KIND_MANUAL = "manual";
 
-const BACKUP_DIR = "./www/cheat-settings/save-backups";
-const INDEX_FILE = `${BACKUP_DIR}/index.json`;
+function getBackupDir() {
+  return getCheatSettingsPath("save-backups");
+}
+
+function getIndexFile() {
+  return `${getBackupDir()}/index.json`;
+}
 
 // 同一个存档槽默认保留的自动快照份数（可在面板里改，见 getSettings）
 const DEFAULT_AUTO_KEEP = 5;
@@ -300,8 +308,9 @@ export class SaveBackupCheat {
     }
 
     try {
-      if (typeof pako !== "undefined" && typeof pako.inflate === "function") {
-        const text = pako.inflate(raw, { to: "string" });
+      const pakoLib = this.getPako();
+      if (pakoLib && typeof pakoLib.inflate === "function") {
+        const text = pakoLib.inflate(raw, { to: "string" });
         if (looksLikeJson(text)) {
           return text;
         }
@@ -340,11 +349,12 @@ export class SaveBackupCheat {
     // MZ 的 saveToLocalFile 要求传入 pako 压缩后的 zip，MV 则要求明文 JSON。
     if (this.isLocalMode()) {
       if (this.isMZ()) {
-        if (typeof pako === "undefined" || typeof pako.deflate !== "function") {
+        const pakoLib = this.getPako();
+        if (!pakoLib || typeof pakoLib.deflate !== "function") {
           throw new Error("当前游戏未提供 pako，无法写入 MZ 存档");
         }
 
-        const zip = pako.deflate(jsonText, { to: "string", level: 1 });
+        const zip = pakoLib.deflate(jsonText, { to: "string", level: 1 });
         StorageManager.saveToLocalFile(this.getSaveName(slot), zip);
         return;
       }
@@ -368,7 +378,7 @@ export class SaveBackupCheat {
 
     try {
       const fs = this.requireFs();
-      const payloadFile = entry.payloadFile || this.getPayloadPath(entry.id);
+      const payloadFile = this.findPayloadPath(entry);
       return !!(payloadFile && fs.existsSync(payloadFile));
     } catch (error) {
       return false;
@@ -441,6 +451,63 @@ export class SaveBackupCheat {
     return this.lzStringCache;
   }
 
+  // 找 pako。MZ 的 pako 在 nw.js 下可能只走 module.exports 分支，
+  // 不能假设全局一定存在；优先全局，再按游戏目录探测模块。
+  static getPako() {
+    if (this.pakoCache !== undefined) {
+      return this.pakoCache;
+    }
+
+    this.pakoCache = this.resolvePako();
+    return this.pakoCache;
+  }
+
+  static resolvePako() {
+    try {
+      if (typeof globalThis !== "undefined" && globalThis.pako) {
+        return globalThis.pako;
+      }
+    } catch (error) {
+      // 继续
+    }
+
+    try {
+      if (typeof pako !== "undefined" && pako) {
+        return pako;
+      }
+    } catch (error) {
+      // 继续
+    }
+
+    try {
+      if (typeof require !== "function" || typeof process === "undefined") {
+        return null;
+      }
+
+      const fs = require("fs");
+      const path = require("path");
+      const candidates = [
+        path.resolve(process.cwd(), "js", "libs", "pako.min.js"),
+        path.resolve(process.cwd(), "www", "js", "libs", "pako.min.js"),
+      ];
+
+      for (const candidate of candidates) {
+        if (!fs.existsSync(candidate)) {
+          continue;
+        }
+
+        const loaded = require(candidate);
+        if (loaded && typeof loaded.inflate === "function") {
+          return loaded;
+        }
+      }
+    } catch (error) {
+      // 路径因游戏而异，失败就返回 null
+    }
+
+    return null;
+  }
+
   static resolveLZString() {
     try {
       if (typeof globalThis !== "undefined" && globalThis.LZString) {
@@ -459,7 +526,34 @@ export class SaveBackupCheat {
     }
 
     // nw.js：lz-string.js 是 UMD，只挂了 module.exports；不同游戏放在
-    // www/js/libs/（MV）或 js/libs/（MZ），两个都试一下
+    // www/js/libs/（MV）或 js/libs/（MZ），两个都试一下。
+    // 先按模块相对路径试，再按游戏根目录绝对路径试，兼容 nw.js 把
+    // require 解析到虚拟根目录的情况。
+    try {
+      if (typeof require === "function" && typeof process !== "undefined") {
+        const fs = require("fs");
+        const path = require("path");
+
+        for (const relative of [
+          "js/libs/lz-string.js",
+          "www/js/libs/lz-string.js",
+        ]) {
+          const candidate = path.resolve(process.cwd(), relative);
+
+          if (!fs.existsSync(candidate)) {
+            continue;
+          }
+
+          const loaded = require(candidate);
+          if (loaded && typeof loaded.decompressFromBase64 === "function") {
+            return loaded;
+          }
+        }
+      }
+    } catch (error) {
+      // 继续尝试相对路径
+    }
+
     for (const candidate of ["./js/libs/lz-string.js", "./www/js/libs/lz-string.js"]) {
       try {
         const loaded = require(candidate);
@@ -475,18 +569,32 @@ export class SaveBackupCheat {
     return null;
   }
 
-  // 快照文件的内部编码：MV 用 LZString base64（与 .rpgsave 一致，可直接改名使用）；
-  // MZ 没有 lz-string，退化成 UTF-8 base64（仅供本插件读写，不能直接当 .rmmzsave）。
-  static encodeSaveText(jsonText) {
-    const lz = this.getLZString();
+  // 快照文件的内部编码与引擎存档保持一致：
+  //   MV：LZString base64，扩展名 .rpgsave，可直接改名回存档
+  //   MZ：pako 压缩，扩展名 .rmmzsave，可直接改名回存档
+  static encodePayloadText(jsonText, codec = this.getSnapshotCodec()) {
+    const text = String(jsonText);
 
     try {
-      if (lz && typeof lz.compressToBase64 === "function") {
-        return lz.compressToBase64(jsonText);
+      if (codec === "pako") {
+        const pakoLib = this.getPako();
+        if (!pakoLib || typeof pakoLib.deflate !== "function") {
+          throw new Error("当前游戏未提供 pako");
+        }
+
+        return pakoLib.deflate(text, { to: "string", level: 1 });
       }
 
-      // 拿不到 LZString 的极端情况：用 UTF-8 安全的 base64 包一层
-      const bytes = new TextEncoder().encode(String(jsonText));
+      if (codec === "lzstring") {
+        const lz = this.getLZString();
+        if (lz && typeof lz.compressToBase64 === "function") {
+          return lz.compressToBase64(text);
+        }
+        throw new Error("当前游戏未提供 LZString");
+      }
+
+      // 极端兜底：UTF-8 安全的 base64（仅供本插件读写）
+      const bytes = new TextEncoder().encode(text);
       let binary = "";
 
       for (let i = 0; i < bytes.length; i++) {
@@ -495,45 +603,80 @@ export class SaveBackupCheat {
 
       return btoa(binary);
     } catch (error) {
-      console.warn("[cheat plugin] 压缩存档数据失败", error);
+      console.warn("[cheat plugin] 压缩快照数据失败", error);
       return null;
     }
   }
 
-  static decodeSaveText(base64Text, label = "存档数据") {
-    if (base64Text === null || base64Text === undefined || base64Text === "") {
+  // 兼容旧调用：按当前引擎编码
+  static encodeSaveText(jsonText) {
+    return this.encodePayloadText(jsonText);
+  }
+
+  static decodePayloadText(raw, codec = null, label = "快照数据") {
+    if (raw === null || raw === undefined || raw === "") {
       return null;
     }
 
-    const lz = this.getLZString();
+    const text = String(raw);
+    const looksLikeJson = (value) => {
+      if (typeof value !== "string") {
+        return false;
+      }
+      const trimmed = value.trimStart();
+      return trimmed.startsWith("{") || trimmed.startsWith("[");
+    };
 
-    if (lz && typeof lz.decompressFromBase64 === "function") {
+    if (looksLikeJson(text)) {
+      return text;
+    }
+
+    if (codec === "pako" || !codec) {
       try {
-        const text = lz.decompressFromBase64(base64Text);
-
-        if (typeof text === "string" && text.length > 0) {
-          return text;
+        const pakoLib = this.getPako();
+        if (pakoLib && typeof pakoLib.inflate === "function") {
+          const decoded = pakoLib.inflate(text, { to: "string" });
+          if (looksLikeJson(decoded)) {
+            return decoded;
+          }
         }
       } catch (error) {
-        console.warn(`[cheat plugin] ${label} LZString 解码异常`, error);
+        // 不是 pako，继续尝试其它格式
       }
     }
 
-    // 没有 LZString（或解不出来）时退化成裸 base64：MZ 的快照就是这种格式，
-    // MV 游戏存档若本身是未压缩 base64 也能成功。是否有效由上层 JSON.parse 判断。
+    if (codec === "lzstring" || !codec || codec === "base64") {
+      try {
+        const lz = this.getLZString();
+        if (lz && typeof lz.decompressFromBase64 === "function") {
+          const decoded = lz.decompressFromBase64(text);
+          if (looksLikeJson(decoded)) {
+            return decoded;
+          }
+        }
+      } catch (error) {
+        // 不是 LZString，继续
+      }
+    }
+
     try {
-      const fallback = new TextDecoder().decode(
-        Uint8Array.from(atob(base64Text), (c) => c.charCodeAt(0)),
+      const decoded = new TextDecoder().decode(
+        Uint8Array.from(atob(text), (c) => c.charCodeAt(0)),
       );
 
-      if (typeof fallback === "string" && fallback.length > 0) {
-        return fallback;
+      if (looksLikeJson(decoded)) {
+        return decoded;
       }
     } catch (error) {
-      console.warn(`[cheat plugin] ${label} base64 解码失败`, error);
+      console.warn(`[cheat plugin] ${label} 解码失败`, error);
     }
 
     return null;
+  }
+
+  // 兼容旧调用：自动探测编码
+  static decodeSaveText(text, label = "存档数据") {
+    return this.decodePayloadText(text, null, label);
   }
 
   static requireFs() {
@@ -634,8 +777,8 @@ export class SaveBackupCheat {
     let data = [];
 
     try {
-      if (fs.existsSync(INDEX_FILE)) {
-        const parsed = JSON.parse(fs.readFileSync(INDEX_FILE, "utf-8"));
+      if (fs.existsSync(getIndexFile())) {
+        const parsed = JSON.parse(fs.readFileSync(getIndexFile(), "utf-8"));
         if (Array.isArray(parsed)) {
           data = parsed;
         } else {
@@ -665,16 +808,16 @@ export class SaveBackupCheat {
 
     if (!Array.isArray(entries) || entries.length === 0) {
       // 没有条目时直接重建空索引，避免留下上一位玩家的残留
-      fs.writeFileSync(INDEX_FILE, "[]", "utf-8");
+      fs.writeFileSync(getIndexFile(), "[]", "utf-8");
       return;
     }
 
     // 先写临时文件再改名：写一半崩掉也不会毁掉整个索引
-    const tmpFile = `${INDEX_FILE}.tmp`;
+    const tmpFile = `${getIndexFile()}.tmp`;
 
     try {
       fs.writeFileSync(tmpFile, JSON.stringify(entries, null, 2), "utf-8");
-      fs.renameSync(tmpFile, INDEX_FILE);
+      fs.renameSync(tmpFile, getIndexFile());
     } catch (error) {
       try {
         if (fs.existsSync(tmpFile)) {
@@ -688,17 +831,65 @@ export class SaveBackupCheat {
   }
 
   static getMetaPath(id) {
-    return `${BACKUP_DIR}/${id}.json`;
+    return `${getBackupDir()}/${id}.json`;
   }
 
-  static getPayloadPath(id) {
-    return `${BACKUP_DIR}/${id}.rpgsave`;
+  static getSnapshotCodec() {
+    if (this.isMZ()) {
+      return this.getPako() ? "pako" : "base64";
+    }
+
+    return this.getLZString() ? "lzstring" : "base64";
+  }
+
+  static getPayloadExtension(codec = this.getSnapshotCodec()) {
+    return codec === "pako" ? ".rmmzsave" : ".rpgsave";
+  }
+
+  static getPayloadPath(id, meta = null) {
+    const codec =
+      (meta && meta.codec) ||
+      (meta && meta.saveExt === ".rmmzsave" ? "pako" : null) ||
+      this.getSnapshotCodec();
+    const extension = (meta && meta.saveExt) || this.getPayloadExtension(codec);
+
+    return `${getBackupDir()}/${id}${extension}`;
+  }
+
+  // 旧索引可能没有 payloadFile（或者扩展名与当前引擎不同），读取时按候选顺序探测。
+  static findPayloadPath(meta) {
+    const fs = this.requireFs();
+
+    if (!meta) {
+      return null;
+    }
+
+    if (meta.payloadFile && fs.existsSync(meta.payloadFile)) {
+      return meta.payloadFile;
+    }
+
+    const candidates = [];
+    const add = (file) => {
+      if (file && !candidates.includes(file)) candidates.push(file);
+    };
+
+    add(this.getPayloadPath(meta.id, meta));
+    add(this.getPayloadPath(meta.id, { codec: "pako", saveExt: ".rmmzsave" }));
+    add(this.getPayloadPath(meta.id, { codec: "lzstring", saveExt: ".rpgsave" }));
+
+    for (const file of candidates) {
+      if (fs.existsSync(file)) {
+        return file;
+      }
+    }
+
+    return candidates[0] || null;
   }
 
   static ensureBackupDir() {
     const fs = this.requireFs();
     const path = require("path");
-    const dir = path.dirname(INDEX_FILE);
+    const dir = path.dirname(getIndexFile());
 
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -721,12 +912,11 @@ export class SaveBackupCheat {
 
   static readMeta(id) {
     const fs = this.requireFs();
-    const path = require("path");
     const file = this.getMetaPath(id);
     let meta = null;
 
     try {
-      if (path.isAbsolute(file) && fs.existsSync(file)) {
+      if (fs.existsSync(file)) {
         meta = JSON.parse(fs.readFileSync(file, "utf-8"));
       }
     } catch (error) {
@@ -749,41 +939,50 @@ export class SaveBackupCheat {
   static writePayload(meta, jsonText) {
     const fs = this.requireFs();
     const path = require("path");
-    const payloadFile = this.getPayloadPath(meta.id);
+
+    if (!meta.codec) {
+      meta.codec = this.getSnapshotCodec();
+    }
+    if (!meta.saveExt) {
+      meta.saveExt = this.getPayloadExtension(meta.codec);
+    }
+
+    const payloadFile = this.getPayloadPath(meta.id, meta);
 
     if (!fs.existsSync(path.dirname(payloadFile))) {
       fs.mkdirSync(path.dirname(payloadFile), { recursive: true });
     }
 
-    const encoded = this.encodeSaveText(jsonText);
+    const encoded = this.encodePayloadText(jsonText, meta.codec);
     if (!encoded) {
       throw new Error("压缩存档数据失败，无法写入快照");
     }
 
     fs.writeFileSync(payloadFile, encoded, "utf-8");
 
-    if (meta.payloadFile !== payloadFile) {
-      meta.payloadFile = payloadFile;
-      meta.payloadSize = encoded.length;
-      this.writeMeta(meta);
-    }
+    meta.payloadFile = payloadFile;
+    meta.payloadSize = encoded.length;
+    this.writeMeta(meta);
   }
 
   // 返回快照里存的明文 JSON 文本，直接可以交给 writeSaveText
   static readPayload(meta) {
     const fs = this.requireFs();
-    const payloadFile = meta.payloadFile || this.getPayloadPath(meta.id);
+    const payloadFile = this.findPayloadPath(meta);
 
     if (!payloadFile || !fs.existsSync(payloadFile)) {
       throw new Error("快照数据文件已被删除或移动");
     }
 
-    const jsonText = this.decodeSaveText(
-      fs.readFileSync(payloadFile, "utf-8"),
-    );
+    const raw = fs.readFileSync(payloadFile, "utf-8");
+    const codec =
+      meta.codec ||
+      (payloadFile.endsWith(".rmmzsave") ? "pako" : null);
+
+    const jsonText = this.decodePayloadText(raw, codec, "快照数据");
 
     if (typeof jsonText !== "string" || jsonText.length === 0) {
-      throw new Error("快照数据解压失败（可能是 LZString 不兼容）");
+      throw new Error("快照数据解压失败（编码格式不兼容）");
     }
 
     return jsonText;
@@ -973,7 +1172,7 @@ export class SaveBackupCheat {
     try {
       return this.readIndex()
         .map((entry) => {
-          const payloadFile = entry.payloadFile || this.getPayloadPath(entry.id);
+          const payloadFile = this.findPayloadPath(entry);
           // 统一用记录里的快照大小，避免把磁盘上可能残留的孤儿文件算进来
           const size = Number(entry.sizeBytes) || 0;
           const playtimeFrames = Number(entry.playtimeFrames) || 0;
@@ -1107,7 +1306,7 @@ export class SaveBackupCheat {
       }
 
       const slot = Number(entry.slot);
-      const payloadFile = entry.payloadFile || this.getPayloadPath(entry.id);
+      const payloadFile = this.findPayloadPath(entry);
       if (!Number.isInteger(slot) || slot < 1 || !payloadFile) {
         continue;
       }
@@ -1129,10 +1328,7 @@ export class SaveBackupCheat {
           continue;
         }
 
-        const jsonText = this.decodeSaveText(
-          fs.readFileSync(payloadFile, "utf-8"),
-          "快照数据",
-        );
+        const jsonText = this.readPayload(entry);
         const saveObject = this.parseAnySaveData(jsonText);
 
         if (!saveObject || typeof saveObject !== "object") {
@@ -1262,6 +1458,7 @@ export class SaveBackupCheat {
 
     const saveMeta = this.parseSaveMeta(slot);
     const entries = this.readIndex();
+    const codec = this.getSnapshotCodec();
     const meta = {
       id: this.generateId(kind, slot, new Set(entries.map((e) => e.id))),
       slot: slot,
@@ -1269,6 +1466,9 @@ export class SaveBackupCheat {
       createdAt: Date.now(),
       label: String(label || "").slice(0, MAX_NAME_LENGTH),
       sizeBytes: text.length,
+      // 快照载荷使用与当前引擎一致的编码，方便直接改名为存档文件
+      codec: codec,
+      saveExt: this.getPayloadExtension(codec),
       // 快照对应的存档信息：地图 / 时长 / 存档时间，来源见 parseSaveMeta
       mapId: saveMeta.mapId,
       mapName: saveMeta.mapName,
@@ -1293,6 +1493,8 @@ export class SaveBackupCheat {
       createdAt: meta.createdAt,
       label: meta.label,
       sizeBytes: meta.sizeBytes,
+      codec: meta.codec,
+      saveExt: meta.saveExt,
       mapId: meta.mapId,
       mapName: meta.mapName,
       savefileTime: meta.savefileTime,
@@ -1349,8 +1551,9 @@ export class SaveBackupCheat {
 
   static removeSnapshotFiles(entry) {
     const fs = this.requireFs();
+    const payloadFile = this.findPayloadPath(entry);
     const files = [
-      entry.payloadFile || this.getPayloadPath(entry.id),
+      payloadFile,
       this.getMetaPath(entry.id),
     ];
 
@@ -1467,6 +1670,74 @@ export class SaveBackupCheat {
     return autos.length > 0 ? autos[0] : null;
   }
 
+  // 还原只是替换了磁盘上的 fileN 存档，游戏的读档列表读的是 global 索引。
+  // 不更新索引会出现两种问题：
+  //   1. 还原到空槽位后，读档列表里看不到这个新存档；
+  //   2. 还原到已有槽位后，列表里的时长 / 头像 / 时间还是旧存档的。
+  static updateGlobalInfoAfterRestore(slot, sourceSlot, jsonText) {
+    try {
+      const saveObject = this.parseAnySaveData(jsonText) || {};
+      const system = saveObject.system || {};
+      const rawFrames =
+        system._framesOnSave !== undefined
+          ? Number(system._framesOnSave)
+          : system._playtime !== undefined
+            ? Number(system._playtime)
+            : NaN;
+      const playtimeText = this.formatFrames(rawFrames) || "";
+      const now = Date.now();
+
+      // MZ：DataManager._globalInfo 是数组，savefileInfo(slot) 取条目
+      if (this.isMZ()) {
+        const all = DataManager._globalInfo;
+
+        if (!Array.isArray(all)) {
+          return;
+        }
+
+        const source = all[sourceSlot] || all[slot] || {};
+        const next = { ...source };
+
+        next.title = next.title || $dataSystem?.gameTitle || "";
+        next.characters = next.characters || [];
+        next.faces = next.faces || [];
+        next.playtime = playtimeText || next.playtime || "";
+        next.timestamp = now;
+        all[slot] = next;
+
+        const result = DataManager.saveGlobalInfo();
+        if (result && typeof result.catch === "function") {
+          result.catch((error) => {
+            console.warn("[cheat plugin] 更新 MZ global 存档索引失败", error);
+          });
+        }
+
+        return;
+      }
+
+      // MV：loadGlobalInfo / saveGlobalInfo 同步读写 global.rpgsave
+      if (typeof DataManager.loadGlobalInfo !== "function") {
+        return;
+      }
+
+      const all = DataManager.loadGlobalInfo() || [];
+      const source = all[sourceSlot] || all[slot] || {};
+      const next = { ...source };
+
+      next.globalId = next.globalId ?? DataManager._globalId;
+      next.title = next.title || $dataSystem?.gameTitle || "";
+      next.characters = next.characters || [];
+      next.faces = next.faces || [];
+      next.playtime = playtimeText || next.playtime || "";
+      next.timestamp = now;
+      all[slot] = next;
+      DataManager.saveGlobalInfo(all);
+    } catch (error) {
+      // 更新索引失败不能影响已经写好的存档
+      console.warn("[cheat plugin] 更新 global 存档索引失败", error);
+    }
+  }
+
   // 还原快照。
   //
   // targetSlot 省略时写回快照自己的槽位（默认行为）；传入别的槽位就是
@@ -1507,6 +1778,7 @@ export class SaveBackupCheat {
     }
 
     this.writeSaveText(slot, jsonText);
+    this.updateGlobalInfoAfterRestore(slot, sourceSlot, jsonText);
     this.touchBackup(id);
 
     // 覆盖的是内存里正在玩的那一份时，现在游玩的进度还没写盘，
@@ -1680,6 +1952,8 @@ export class SaveBackupCheat {
         createdAt: Number(item.meta.createdAt) || Date.now(),
         label: String(item.meta.label || "").slice(0, MAX_NAME_LENGTH),
         sizeBytes: item.data.length,
+        codec: this.getSnapshotCodec(),
+        saveExt: this.getPayloadExtension(this.getSnapshotCodec()),
         mapId: Number(item.meta.mapId) || 0,
         mapName: String(item.meta.mapName || ""),
         // 兼容旧版本导出的文件（只有 saveTime 字符串）
@@ -1711,7 +1985,7 @@ export class SaveBackupCheat {
   /* --------------------------------------------------------- 设置 + 自动快照 */
 
   static getSettingsPath() {
-    return `${BACKUP_DIR}/config.json`;
+    return `${getBackupDir()}/config.json`;
   }
 
   static getDefaultSettings() {
@@ -1751,7 +2025,7 @@ export class SaveBackupCheat {
       const interval = Number(parsed.autoSaveInterval);
 
       return {
-        autoOnSave: parsed.autoOnSave !== false,
+        autoOnSave: parsed.autoOnSave === true,
         autoSaveInterval:
           Number.isInteger(interval) && interval >= 1 && interval <= 100
             ? interval
@@ -1885,10 +2159,23 @@ export class SaveBackupCheat {
     DataManager.saveGame = function (savefileId) {
       const result = original.apply(this, arguments);
 
-      try {
-        // result 为 false 表示存档失败，此时不该留快照
-        if (result !== false) {
+      const afterSave = () => {
+        try {
           SaveBackupCheat.onGameSave(savefileId);
+        } catch (error) {
+          console.warn("[cheat plugin] 存档后自动快照异常（不影响游戏存档）", error);
+        }
+      };
+
+      try {
+        if (result && typeof result.then === "function") {
+          // MZ：DataManager.saveGame 返回 Promise，必须等文件真正写完再快照
+          result.then(afterSave, (error) => {
+            console.warn("[cheat plugin] MZ 存档失败，跳过自动快照", error);
+          });
+        } else if (result !== false) {
+          // MV：同步返回 true / false
+          afterSave();
         }
       } catch (error) {
         console.warn("[cheat plugin] 存档后自动快照异常（不影响游戏存档）", error);

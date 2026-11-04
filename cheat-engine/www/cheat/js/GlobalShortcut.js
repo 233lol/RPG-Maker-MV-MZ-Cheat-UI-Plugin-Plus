@@ -1,6 +1,7 @@
 import { Key } from "./KeyCodes.js";
 import { Alert } from "./AlertHelper.js";
 import { cloneObject } from "./Tools.js";
+import { getCheatSettingsPath } from "./SettingsPath.js";
 import {
   SpeedCheat,
   SceneCheat,
@@ -412,7 +413,7 @@ class GlobalShortcut {
 
   initialize() {
 
-    this.shortcutSettingsFile = "./www/cheat-settings/shortcuts.json";
+    this.shortcutSettingsFile = getCheatSettingsPath("shortcuts.json");
 
     // initialize shortcut settings
     this.shortcutSettings = {};

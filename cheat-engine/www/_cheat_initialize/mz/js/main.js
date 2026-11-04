@@ -3,7 +3,6 @@
 //=============================================================================
 
 const scriptUrls = [
-  "../../cheat/init/import.js",
   "js/libs/pixi.js",
   "js/libs/pako.min.js",
   "js/libs/localforage.min.js",
@@ -16,6 +15,8 @@ const scriptUrls = [
   "js/rmmz_sprites.js",
   "js/rmmz_windows.js",
   "js/plugins.js",
+  // 放在最后：确保 rmmz_* 与 plugins.js 已经执行，作弊模块再挂载
+  "cheat/init/import.js",
 ];
 const effekseerWasmUrl = "js/libs/effekseer.wasm";
 
@@ -138,7 +139,7 @@ class Main {
     //   Randomization is in effect.
     return (
       typeof process === "object" &&
-      process.mainModule.filename.startsWith("/private/var")
+      process.mainModule?.filename?.startsWith("/private/var")
     );
   }
 

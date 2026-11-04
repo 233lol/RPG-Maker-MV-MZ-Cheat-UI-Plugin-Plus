@@ -19,6 +19,7 @@ export function registerSaveBackup({ test, page, type }) {
       }
 
       const [slotA, slotB] = slots;
+      const defaultAutoOnSave = Backups.getSettings().autoOnSave;
       const originalGold = $gameParty.gold();
       const savedFiles = [];
       let exportPath = null;
@@ -101,11 +102,21 @@ export function registerSaveBackup({ test, page, type }) {
 
         Backups.renameBackup(meta.id, "renamed");
         const renamed = Backups.listBackups().find((item) => item.id === meta.id);
+        const renamedMeta = Backups.readMeta(meta.id);
+
+        const globalInfo = DataManager.savefileInfo
+          ? DataManager.savefileInfo(slotB)
+          : DataManager.loadSavefileInfo(slotB);
 
         const listBeforeExport = Backups.listBackups().length;
         const payloadPresent = Backups.listBackups().every((item) =>
           Backups.isSnapshotPresent(item),
         );
+
+        // 快照载荷必须能被引擎直接当作存档文件读取（MZ .rmmzsave / MV .rpgsave）。
+        // 放在 clearBackups / import 之前，此时原始载荷还在。
+        fs.copyFileSync(meta.payloadFile, Backups.getSaveFilePath(slotB));
+        const nativeSnapshotGold = readGold(slotB);
 
         exportPath = Backups.exportAll();
         const exportText = fs.readFileSync(exportPath, "utf-8");
@@ -116,9 +127,40 @@ export function registerSaveBackup({ test, page, type }) {
         copiedPath = Backups.copySaveFileToLocal(slotA);
         const copiedExists = fs.existsSync(copiedPath);
 
+        const quickLoadStarted = Date.now();
+        const quickLoadOk = await SceneCheat.quickLoad(slotA);
+        const quickLoadGold = await api.waitFor(
+          () => ($gameParty.gold() === 111 ? $gameParty.gold() : null),
+          15000,
+          100,
+        );
+
+        // 自动快照钩子：MZ 的 saveGame 返回 Promise，必须等真正写盘后再快照
+        Backups.writeSettings({
+          autoOnSave: true,
+          autoSaveInterval: 1,
+          autoKeep: 5,
+        });
+        const autoBefore = Backups.listBackups().filter(
+          (item) => item.kind === "auto" && item.slot === slotB,
+        ).length;
+        const autoSaveOk = await SceneCheat.quickSave(slotB);
+        const autoAfter = await api.waitFor(() => {
+          const count = Backups.listBackups().filter(
+            (item) => item.kind === "auto" && item.slot === slotB,
+          ).length;
+          return count > autoBefore ? count : null;
+        }, 15000, 100);
+        Backups.writeSettings({
+          autoOnSave: false,
+          autoSaveInterval: 1,
+          autoKeep: 5,
+        });
+
         return {
           slotA,
           slotB,
+          defaultAutoOnSave,
           goldAfterFirstSave,
           snapshotGold,
           goldBeforeRestore,
@@ -127,13 +169,28 @@ export function registerSaveBackup({ test, page, type }) {
           snapshotId: meta.id,
           snapshotSize: meta.sizeBytes,
           snapshotMapName: meta.mapName,
+          snapshotCodec: meta.codec,
+          snapshotExt: meta.saveExt,
+          snapshotPayloadExt: meta.payloadFile?.endsWith(".rmmzsave")
+            ? ".rmmzsave"
+            : meta.payloadFile?.endsWith(".rpgsave")
+              ? ".rpgsave"
+              : "",
+          nativeSnapshotGold,
           renamedLabel: renamed?.label,
+          renamedMetaLabel: renamedMeta?.label,
+          globalInfoPresent: !!globalInfo,
           payloadPresent,
           listBeforeExport,
           imported,
           listAfterImport: listAfterImport.length,
           copiedPath,
           copiedExists,
+          quickLoadOk,
+          quickLoadGold,
+          quickLoadMs: Date.now() - quickLoadStarted,
+          autoSaveOk,
+          autoSnapshotAdded: autoAfter > autoBefore,
         };
       } finally {
         cleanup();
@@ -141,6 +198,7 @@ export function registerSaveBackup({ test, page, type }) {
     });
 
     assert.equal(result.goldAfterFirstSave, 111, "第一次存档内容不正确");
+    assert.equal(result.defaultAutoOnSave, false, "自动快照默认应关闭");
     assert.equal(result.snapshotGold, 111, "快照里保存的金币不正确");
     assert.ok(result.snapshotId, "快照没有生成 ID");
     assert.ok(result.snapshotSize > 0, "快照文件大小为空");
@@ -149,7 +207,41 @@ export function registerSaveBackup({ test, page, type }) {
     assert.equal(result.goldAfterRestore, 111, "还原到原槽位失败");
     assert.equal(result.goldAfterCopy, 111, "还原到其他槽位失败");
     assert.equal(result.renamedLabel, "renamed", "快照重命名失败");
+    assert.equal(
+      result.renamedMetaLabel,
+      "renamed",
+      "快照单份元数据没有更新（readMeta 读不到 <id>.json）",
+    );
+    assert.equal(result.globalInfoPresent, true, "还原后没有更新 global 存档索引");
+    assert.equal(
+      result.snapshotCodec,
+      type === "mv" ? "lzstring" : "pako",
+      "快照编码与引擎不匹配",
+    );
+    assert.equal(
+      result.snapshotExt,
+      type === "mv" ? ".rpgsave" : ".rmmzsave",
+      "快照扩展名与引擎不匹配",
+    );
+    assert.equal(
+      result.snapshotPayloadExt,
+      type === "mv" ? ".rpgsave" : ".rmmzsave",
+      "快照载荷文件扩展名与引擎不匹配",
+    );
+    assert.equal(
+      result.nativeSnapshotGold,
+      111,
+      "快照载荷不能直接作为引擎存档读取",
+    );
     assert.equal(result.payloadPresent, true, "快照数据文件丢失");
+    assert.equal(result.quickLoadOk, true, "快速读档失败");
+    assert.equal(result.quickLoadGold, 111, "快速读档后没有加载快照内容");
+    assert.equal(result.autoSaveOk, true, "自动快照测试的存档失败");
+    assert.equal(
+      result.autoSnapshotAdded,
+      true,
+      "存档后没有生成自动快照（MZ Promise 钩子可能未等待写盘）",
+    );
     assert.ok(result.listBeforeExport >= 2, "还原前自动快照没有生成");
     assert.equal(
       result.imported.added,

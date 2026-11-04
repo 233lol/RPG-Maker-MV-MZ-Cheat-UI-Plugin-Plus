@@ -1,6 +1,7 @@
 import PageJump from "../components/PageJump.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
+import { getCheatSettingsPath } from "../js/SettingsPath.js";
 
 export default {
   name: "SwitchSettingPanel",
@@ -165,7 +166,7 @@ export default {
 
   created() {
     this.lockStorage = new KeyValueStorage(
-      "./www/cheat-settings/switch-locks.json",
+      getCheatSettingsPath("switch-locks.json"),
     );
     this.readPersistedLocks();
     this.initializeVariables();

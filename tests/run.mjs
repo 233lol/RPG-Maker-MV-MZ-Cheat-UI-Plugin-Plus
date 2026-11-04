@@ -99,7 +99,7 @@ async function main() {
     console.log(`\n准备测试 ${type.toUpperCase()}: ${gameDir}`);
 
     installCheat(repoRoot, gameDir, type);
-    const settingsBackup = backupCheatSettings(gameDir);
+    const settingsBackup = backupCheatSettings(gameDir, type);
     const globalsBackup = backupSaveGlobals(gameDir, type);
     const game = new NwGame({ repoRoot, gameDir, type, nwPath });
     const runner = createRunner(`${type.toUpperCase()} 无头测试`);

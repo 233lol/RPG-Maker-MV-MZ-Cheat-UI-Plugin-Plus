@@ -38,7 +38,7 @@ pnpm test:mv   # MV only
 pnpm test:mz   # MZ only
 ```
 
-The suite expects test games at `mv/` (with `www/index.html`) and `mz/` (with `index.html`) in the repo root, and `nwjs-sdk` installed (`NWJS_PATH` overrides discovery). It runs nw.js with `show: false` and SwiftShader WebGL by default, drives the game through CDP, and restores `www/cheat-settings/` plus `save/global.*` afterwards. Node.js >= 22 is required for the built-in `WebSocket`.
+The suite expects test games at `mv/` (with `www/index.html`) and `mz/` (with `index.html`) in the repo root, and `nwjs-sdk` installed (`NWJS_PATH` overrides discovery). It runs nw.js with `show: false` and SwiftShader WebGL by default, drives the game through CDP, and restores the settings directory (`www/cheat-settings/` for MV, `cheat-settings/` for MZ) plus `save/global.*` afterwards. Node.js >= 22 is required for the built-in `WebSocket`.
 
 
 ## Structure
@@ -49,10 +49,14 @@ The suite expects test games at `mv/` (with `www/index.html`) and `mz/` (with `i
 | `cheat-engine/www/_cheat_initialize/mv/` | MV-specific `main.js` replacement |
 | `cheat-engine/www/_cheat_initialize/mz/` | MZ-specific `main.js` replacement |
 | `tools/` | Vendor build scripts (`build-shiki.mjs`, `copy-vue.mjs`, ...), `pack.mjs` (zip packaging), `Makefile` helpers (`gen-version.mjs`, `link-latest.mjs`, `clean.mjs`)|
+| `tests/` | Headless MV/MZ tests (`tests/run.mjs`, `tests/lib/nw.mjs`, `tests/specs/*`) |
 
 The cheat replaces the game's `main.js` with a version that loads `cheat/init/import.js` → `cheat/init/setup.js` (ES module) → mounts Vue 3 `MainComponent`.
 
-Cheat-owned persistent settings live under `www/cheat-settings/` (`shortcuts.json`, `gameSpeed.json`, `speed.json`, `kv-storage.json`, `switch-locks.json`, `variable-locks.json`, `save-backups/`). New features that need on-disk state should follow the same layout.
+Cheat-owned persistent settings live under the game's web root:
+- MV: `www/cheat-settings/` (`shortcuts.json`, `gameSpeed.json`, `speed.json`, `kv-storage.json`, `switch-locks.json`, `variable-locks.json`, `save-backups/`).
+- MZ: `cheat-settings/` at the game root (same files). An existing legacy `www/cheat-settings/` is migrated once on load.
+New features that need on-disk state should use `cheat/js/SettingsPath.js` instead of hardcoding a path.
 
 ## CI
 

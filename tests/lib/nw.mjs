@@ -132,34 +132,51 @@ export function installCheat(repoRoot, gameDir, type) {
   return { gameRoot, destination };
 }
 
-export function backupCheatSettings(gameDir) {
-  const settingsDir = path.join(gameDir, "www", "cheat-settings");
-  const backupDir = path.join(os.tmpdir(), "opencode-cheat-test-settings", `${path.basename(gameDir)}-${Date.now()}`);
+export function backupCheatSettings(gameDir, type) {
+  // MV 在 www/ 下；MZ 在游戏根目录下。同时兼容旧版 MZ 的 www/cheat-settings，
+  // 避免测试结束后把历史目录留在测试游戏里。
+  const candidates =
+    type === "mv"
+      ? [path.join(gameDir, "www", "cheat-settings")]
+      : [
+          path.join(gameDir, "cheat-settings"),
+          path.join(gameDir, "www", "cheat-settings"),
+        ];
 
-  const existed = existsSync(settingsDir);
+  const backups = candidates.map((dir, index) => {
+    const exists = existsSync(dir);
+    const backupDir = path.join(
+      os.tmpdir(),
+      "opencode-cheat-test-settings",
+      `${path.basename(gameDir)}-${index}-${Date.now()}`,
+    );
 
-  if (existed) {
-    mkdirSync(path.dirname(backupDir), { recursive: true });
-    cpSync(settingsDir, backupDir, { recursive: true });
-    rmSync(settingsDir, { recursive: true, force: true });
-  }
+    if (exists) {
+      mkdirSync(path.dirname(backupDir), { recursive: true });
+      cpSync(dir, backupDir, { recursive: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+
+    return { dir, backupDir, exists };
+  });
 
   return {
     restore() {
-      rmSync(settingsDir, { recursive: true, force: true });
+      for (const { dir, backupDir, exists } of backups) {
+        rmSync(dir, { recursive: true, force: true });
 
-      if (existed && existsSync(backupDir)) {
-        cpSync(backupDir, settingsDir, { recursive: true });
+        if (exists && existsSync(backupDir)) {
+          cpSync(backupDir, dir, { recursive: true });
+        }
+
+        rmSync(backupDir, { recursive: true, force: true });
       }
 
-      rmSync(backupDir, { recursive: true, force: true });
-
-      // 如果原本没有 www/ 目录，测试过程中创建的 www/ 也一并清掉，
-      // 避免在 MZ 游戏里留下一个空目录。
-      const wwwDir = path.dirname(settingsDir);
-      if (!existed) {
+      // 旧版 MZ 可能在游戏根目录留下一个只有 cheat-settings 的 www/，一并清掉。
+      if (type === "mz") {
+        const wwwDir = path.join(gameDir, "www");
         try {
-          if (readdirSync(wwwDir).length === 0) {
+          if (existsSync(wwwDir) && readdirSync(wwwDir).length === 0) {
             rmSync(wwwDir, { recursive: true, force: true });
           }
         } catch (error) {

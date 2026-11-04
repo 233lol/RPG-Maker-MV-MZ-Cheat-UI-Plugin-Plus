@@ -1,5 +1,6 @@
 import PageJump from "../components/PageJump.js";
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
+import { getCheatSettingsPath } from "../js/SettingsPath.js";
 
 export default {
   name: "VariableSettingPanel",
@@ -154,7 +155,7 @@ export default {
 
   created() {
     this.lockStorage = new KeyValueStorage(
-      "./www/cheat-settings/variable-locks.json",
+      getCheatSettingsPath("variable-locks.json"),
     );
     this.readPersistedLocks();
     this.initializeVariables();

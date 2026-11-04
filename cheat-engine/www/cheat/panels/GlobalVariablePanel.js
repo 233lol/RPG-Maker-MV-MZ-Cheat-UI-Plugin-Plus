@@ -2,6 +2,7 @@ import PageJump from "../components/PageJump.js";
 import { Alert } from "../js/AlertHelper.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
+import { getCheatSettingsPath } from "../js/SettingsPath.js";
 import { markRaw } from "../libs/vue.js";
 import {
   ROOT_FILTERS,
@@ -617,7 +618,7 @@ export default {
 
   created() {
     this.limitStorage = new KeyValueStorage(
-      "./www/cheat-settings/global-search.json",
+      getCheatSettingsPath("global-search.json"),
     );
     this.container = markRaw(window);
     // 注意：设置文件读取 / window 扫描 / 构建列表都不在 created 里做，

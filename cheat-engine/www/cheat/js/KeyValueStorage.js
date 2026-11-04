@@ -1,6 +1,8 @@
 // 模块级内存缓存（按文件路径共享）：消除定时器/高频调用的同步读盘。
 // 注意：缓存生效期间外部手工修改同一 JSON 文件不会被感知；
 // 写入始终直写磁盘并同步更新缓存，崩溃时最多丢最后一次写。
+import { getCheatSettingsPath } from "./SettingsPath.js";
+
 const fileCache = new Map();
 
 export class KeyValueStorage {
@@ -75,5 +77,5 @@ export class KeyValueStorage {
 }
 
 export const KEY_VALUE_STORAGE = new KeyValueStorage(
-  "./www/cheat-settings/kv-storage.json",
+  getCheatSettingsPath("kv-storage.json"),
 );
