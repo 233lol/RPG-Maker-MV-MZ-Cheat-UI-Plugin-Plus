@@ -1,6 +1,7 @@
 import CheatModal from "./CheatModal.js";
 import { GLOBAL_SHORTCUT } from "./js/GlobalShortcut.js";
 import { GeneralCheat } from "./js/CheatHelper.js";
+import { LockService } from "./js/LockService.js";
 import AlertSnackbar from "./components/AlertSnackbar.js";
 import ConfirmDialog from "./components/ConfirmDialog.js";
 import { customizeRPGMakerFunctions } from "./init/customize_functions.js";
@@ -36,6 +37,7 @@ export default {
 
   created() {
     customizeRPGMakerFunctions(this);
+    LockService.ensureLoaded();
 
     GeneralCheat.toggleCheatModal = (componentName = null) => {
       this.toggleCheatModal(componentName);
@@ -47,11 +49,13 @@ export default {
 
     window.addEventListener("keydown", this.onGlobalKeyDown);
     window.addEventListener("keyup", this.onGlobalKeyUp);
+    window.addEventListener("blur", this.onWindowBlur);
   },
 
   beforeUnmount() {
     window.removeEventListener("keydown", this.onGlobalKeyDown);
     window.removeEventListener("keyup", this.onGlobalKeyUp);
+    window.removeEventListener("blur", this.onWindowBlur);
   },
 
   methods: {
@@ -69,7 +73,14 @@ export default {
     onGlobalKeyUp(e) {
       GLOBAL_SHORTCUT.runKeyLeaveEvent(e, Key.fromKey(this.currentKey));
       this.currentKey.remove(e.keyCode);
-      GLOBAL_SHORTCUT.runKeyEnterEvent(e, Key.fromKey(this.currentKey));
+      // 不要在 keyup 时再跑一次 enter：按住 Ctrl 再松开 C 会拿「剩下的
+      // Ctrl」重新匹配一遍，可能误触发单键快捷键。
+    },
+
+    // 窗口失焦时收不到 keyup，按键状态会卡住（例如切出去再回来，
+    // Ctrl 仍被当成按下）。直接清空当前组合键。
+    onWindowBlur() {
+      this.currentKey = Key.createEmpty();
     },
 
     openCheatModal(componentName) {

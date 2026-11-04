@@ -1,6 +1,5 @@
 import PageJump from "../components/PageJump.js";
-import { KeyValueStorage } from "../js/KeyValueStorage.js";
-import { getCheatSettingsPath } from "../js/SettingsPath.js";
+import { LockService } from "../js/LockService.js";
 
 export default {
   name: "VariableSettingPanel",
@@ -146,24 +145,14 @@ export default {
       ],
       tableItems: [],
       pagination: { page: 1, itemsPerPage: 5 },
-      lockUpdateTimer: null,
-      lockUpdateIntervalMs: 2500,
-      lockStorage: null,
       persistedLockMap: {},
     };
   },
 
   created() {
-    this.lockStorage = new KeyValueStorage(
-      getCheatSettingsPath("variable-locks.json"),
-    );
+    LockService.ensureLoaded();
     this.readPersistedLocks();
     this.initializeVariables();
-    this.startLockUpdater();
-  },
-
-  beforeUnmount() {
-    this.stopLockUpdater();
   },
 
   computed: {
@@ -238,19 +227,7 @@ export default {
     },
 
     readPersistedLocks() {
-      try {
-        const raw = this.lockStorage.getItem("data");
-        if (!raw) {
-          this.persistedLockMap = {};
-          return;
-        }
-
-        const data = JSON.parse(raw);
-        this.persistedLockMap = data && typeof data === "object" ? data : {};
-      } catch (error) {
-        console.warn("[cheat plugin] Can't read persisted variable locks, reset to empty", error);
-        this.persistedLockMap = {};
-      }
+      this.persistedLockMap = LockService.getVariableLocks();
     },
 
     writePersistedLocks() {
@@ -267,7 +244,7 @@ export default {
       });
 
       this.persistedLockMap = payload;
-      this.lockStorage.setItem("data", JSON.stringify(payload));
+      LockService.setVariableLocks(payload);
     },
 
     onItemChange(item, newValue) {
@@ -323,39 +300,12 @@ export default {
         return;
       }
 
-      const currentValue = $gameVariables.value(item.id);
-      const lockValue = item.lockValue;
-      if (currentValue !== lockValue) {
-        $gameVariables.setValue(item.id, lockValue);
-      }
+      LockService.applyVariableLock(item.id);
       item.value = $gameVariables.value(item.id);
     },
 
     applyAllVariableLocks() {
-      this.tableItems.forEach((item) => {
-        if (item.id > 0 && item.lockEnabled) {
-          this.applyVariableLock(item);
-        }
-      });
-    },
-
-    startLockUpdater() {
-      if (this.lockUpdateTimer) {
-        return;
-      }
-
-      this.lockUpdateTimer = window.setInterval(() => {
-        this.applyAllVariableLocks();
-      }, this.lockUpdateIntervalMs);
-    },
-
-    stopLockUpdater() {
-      if (!this.lockUpdateTimer) {
-        return;
-      }
-
-      window.clearInterval(this.lockUpdateTimer);
-      this.lockUpdateTimer = null;
+      LockService.applyVariableLocks();
     },
 
     jumpToPage(page) {

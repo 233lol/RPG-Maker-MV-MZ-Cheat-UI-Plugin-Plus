@@ -46,6 +46,8 @@ The suite expects test games at `mv/` (with `www/index.html`) and `mz/` (with `i
 | Path | Purpose |
 |---|---|
 | `cheat-engine/www/cheat/` | Cheat UI source. Vue 3 + Vuetify 4, ES module JS files. |
+| `cheat-engine/www/cheat/js/SettingsPath.js` | MV/MZ settings directory + legacy migration |
+| `cheat-engine/www/cheat/js/LockService.js` | Global switch/variable lock service (independent of panel lifetime) |
 | `cheat-engine/www/_cheat_initialize/mv/` | MV-specific `main.js` replacement |
 | `cheat-engine/www/_cheat_initialize/mz/` | MZ-specific `main.js` replacement |
 | `tools/` | Vendor build scripts (`build-shiki.mjs`, `copy-vue.mjs`, ...), `pack.mjs` (zip packaging), `Makefile` helpers (`gen-version.mjs`, `link-latest.mjs`, `clean.mjs`)|

@@ -411,14 +411,19 @@ export default {
 
           // Check if it's an enemy first
           if (gameEvent && this.isEnemyEvent(gameEvent)) {
+            const page =
+              typeof gameEvent.page === "function" ? gameEvent.page() : null;
+
             this.enemies.push({
               id: gameEvent._eventId || i,
               x: gameEvent._x !== undefined ? gameEvent._x : event.x,
               y: gameEvent._y !== undefined ? gameEvent._y : event.y,
               direction: gameEvent._direction || 2,
-              moving: gameEvent._moveType > 0,
-              characterName: gameEvent._characterName || "",
-              characterIndex: gameEvent._characterIndex || 0,
+              moving: page ? Number(page.moveType) > 0 : false,
+              characterName:
+                gameEvent._characterName || page?.image?.characterName || "",
+              characterIndex:
+                gameEvent._characterIndex ?? page?.image?.characterIndex ?? 0,
             });
           }
           // If not enemy, check if it's a treasure
@@ -443,43 +448,81 @@ export default {
 
     isEnemyEvent(event) {
       try {
-        const hasMovement = event._moveType > 0; // 1=random, 2=approach, 3=custom
-        const hasCharacterGraphic =
-          event._characterName && event._characterName !== "";
-        const notPlayer = event._eventId !== $gamePlayer._eventId;
+        // 传入的是 Game_Event（$gameMap._events[i]），它没有 _pages；
+        // 页面 / 指令都在对应的事件数据和当前页上。
+        const dataEvent =
+          typeof event.event === "function" ? event.event() : null;
+        const currentPage =
+          typeof event.page === "function" ? event.page() : null;
+        const pages =
+          dataEvent && Array.isArray(dataEvent.pages)
+            ? dataEvent.pages
+            : currentPage
+              ? [currentPage]
+              : [];
+
+        const currentList =
+          currentPage && Array.isArray(currentPage.list)
+            ? currentPage.list
+            : [];
+
+        // 移动类型在页上（page.moveType），不在 Game_Event 上。
+        const hasMovement =
+          (currentPage && Number(currentPage.moveType) > 0) ||
+          pages.some((page) => page && Number(page.moveType) > 0);
+
+        const characterName =
+          (typeof event.characterName === "function"
+            ? event.characterName()
+            : event._characterName) ||
+          currentPage?.image?.characterName ||
+          dataEvent?.pages?.[0]?.image?.characterName ||
+          "";
+
+        const notPlayer =
+          typeof $gamePlayer === "undefined" ||
+          !$gamePlayer ||
+          event._eventId !== $gamePlayer._eventId;
 
         // Moving characters are likely enemies
         if (hasMovement && notPlayer) {
           return true;
         }
 
-        if (!hasCharacterGraphic) {
+        if (!characterName) {
           return false;
         }
 
-        // Look for enemy-related patterns in event pages
-        if (event._pages) {
-          for (const page of event._pages) {
-            if (page && page.list) {
-              for (const command of page.list) {
-                // Check for battle processing command (code 301)
-                if (command.code === 301) return true;
-                // Check for common enemy event patterns
-                if (command.code === 108 || command.code === 408) {
-                  const comment = command.parameters[0] || "";
+        // 301（战斗处理）只会在当前页触发；注释 108/408 可能写在任意页。
+        const lists = [currentList];
 
-                  // Use pre-compiled regex for efficient multi-language enemy pattern matching
-                  if (this.enemyCommentPattern.test(comment)) {
-                    return true;
-                  }
-                }
+        pages.forEach((page) => {
+          if (page && Array.isArray(page.list) && page.list !== currentList) {
+            lists.push(page.list);
+          }
+        });
+
+        for (const list of lists) {
+          for (const command of list) {
+            if (!command) continue;
+
+            // Check for battle processing command (code 301)
+            if (command.code === 301) return true;
+
+            // Check for common enemy event patterns
+            if (command.code === 108 || command.code === 408) {
+              const comment = command.parameters?.[0] || "";
+
+              // Use pre-compiled regex for efficient multi-language enemy pattern matching
+              if (this.enemyCommentPattern.test(comment)) {
+                return true;
               }
             }
           }
         }
 
         // Check character filename patterns using pre-compiled regex
-        if (this.enemyImageNamePattern.test(event._characterName)) {
+        if (this.enemyImageNamePattern.test(characterName)) {
           return true;
         }
 
@@ -557,15 +600,19 @@ export default {
         this.enemies.forEach((enemy) => {
           const gameEvent = $gameMap._events[enemy.id];
           if (gameEvent) {
+            const page =
+              typeof gameEvent.page === "function" ? gameEvent.page() : null;
+            const moving = page ? Number(page.moveType) > 0 : false;
+
             if (enemy.x !== gameEvent._x || enemy.y !== gameEvent._y ||
                 enemy.direction !== gameEvent._direction ||
-                enemy.moving !== (gameEvent._moveType > 0)) {
+                enemy.moving !== moving) {
               changed = true;
             }
             enemy.x = gameEvent._x;
             enemy.y = gameEvent._y;
             enemy.direction = gameEvent._direction || 2;
-            enemy.moving = gameEvent._moveType > 0;
+            enemy.moving = moving;
           }
         });
         if (changed) this.needsRedraw = true;

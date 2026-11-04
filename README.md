@@ -120,6 +120,7 @@ pnpm test:mz        # 只测 MZ
 | `cheat-engine/www/cheat/components/` | 通用 UI 组件 |
 | `cheat-engine/www/cheat/js/` | 工具函数 / Cheat API |
 | `cheat-engine/www/cheat/js/SettingsPath.js` | MV/MZ 设置目录与旧目录迁移 |
+| `cheat-engine/www/cheat/js/LockService.js` | 全局开关 / 变量锁定服务 |
 | `cheat-engine/www/cheat/init/` | 插件入口 & 初始化 |
 | `cheat-engine/www/cheat/libs/` | 第三方库 (Vue, Vuetify, Shiki) |
 | `cheat-engine/www/cheat/css/` | 样式文件 |

@@ -118,11 +118,39 @@ export function registerSaveBackup({ test, page, type }) {
         fs.copyFileSync(meta.payloadFile, Backups.getSaveFilePath(slotB));
         const nativeSnapshotGold = readGold(slotB);
 
+        // payloadFile / 快照 ID 不能把读写引到 save-backups/ 之外
+        const insideAccepted = Backups.isPathInsideBackupDir(
+          meta.payloadFile,
+        );
+        const outsideRejected = !Backups.isPathInsideBackupDir(
+          require("path").resolve(process.cwd(), "..", "evil-snapshot.json"),
+        );
+        const invalidIdRejected =
+          !Backups.isValidSnapshotId("../evil") &&
+          !Backups.isValidSnapshotId("..\\evil") &&
+          !Backups.isValidSnapshotId("C:\\evil");
+
         exportPath = Backups.exportAll();
         const exportText = fs.readFileSync(exportPath, "utf-8");
         Backups.clearBackups();
         const imported = Backups.importFromJson(exportText);
         const listAfterImport = Backups.listBackups();
+
+        // 结构不对的导入数据必须被跳过，不能写出读档必崩的快照
+        const listAfterValidImport = listAfterImport.length;
+        const invalidImport = Backups.importFromJson(
+          JSON.stringify({
+            format: "cheat-save-backups",
+            version: 1,
+            backups: [
+              {
+                meta: { slot: slotB, kind: "manual", label: "broken" },
+                data: '{"nope":1}',
+              },
+            ],
+          }),
+        );
+        const listAfterInvalidImport = Backups.listBackups().length;
 
         copiedPath = Backups.copySaveFileToLocal(slotA);
         const copiedExists = fs.existsSync(copiedPath);
@@ -157,6 +185,34 @@ export function registerSaveBackup({ test, page, type }) {
           autoKeep: 5,
         });
 
+        // 结构损坏的快照不能写回存档
+        const corruptSnapshot = Backups.createSnapshot(
+          slotB,
+          "manual",
+          "corrupt",
+        );
+        fs.writeFileSync(
+          corruptSnapshot.payloadFile,
+          Backups.encodePayloadText(
+            '{"nope":1}',
+            corruptSnapshot.codec,
+          ),
+          "utf-8",
+        );
+
+        let corruptRestoreRejected = false;
+        let corruptErrorMessage = "";
+
+        try {
+          Backups.restoreBackup(corruptSnapshot.id, slotB);
+        } catch (error) {
+          corruptRestoreRejected = true;
+          corruptErrorMessage = String(error.message || error);
+        }
+
+        const goldAfterCorruptRestore = readGold(slotB);
+        Backups.deleteBackup(corruptSnapshot.id);
+
         return {
           slotA,
           slotB,
@@ -177,6 +233,9 @@ export function registerSaveBackup({ test, page, type }) {
               ? ".rpgsave"
               : "",
           nativeSnapshotGold,
+          insideAccepted,
+          outsideRejected,
+          invalidIdRejected,
           renamedLabel: renamed?.label,
           renamedMetaLabel: renamedMeta?.label,
           globalInfoPresent: !!globalInfo,
@@ -184,6 +243,13 @@ export function registerSaveBackup({ test, page, type }) {
           listBeforeExport,
           imported,
           listAfterImport: listAfterImport.length,
+          listAfterValidImport,
+          invalidImportAdded: invalidImport.added,
+          invalidImportSkipped: invalidImport.skipped,
+          listAfterInvalidImport,
+          corruptRestoreRejected,
+          corruptErrorMessage,
+          goldAfterCorruptRestore,
           copiedPath,
           copiedExists,
           quickLoadOk,
@@ -233,6 +299,9 @@ export function registerSaveBackup({ test, page, type }) {
       111,
       "快照载荷不能直接作为引擎存档读取",
     );
+    assert.equal(result.insideAccepted, true, "快照目录内的路径被误判为越界");
+    assert.equal(result.outsideRejected, true, "快照目录外的路径没有被拒绝");
+    assert.equal(result.invalidIdRejected, true, "非法的快照 ID 没有被拒绝");
     assert.equal(result.payloadPresent, true, "快照数据文件丢失");
     assert.equal(result.quickLoadOk, true, "快速读档失败");
     assert.equal(result.quickLoadGold, 111, "快速读档后没有加载快照内容");
@@ -252,6 +321,23 @@ export function registerSaveBackup({ test, page, type }) {
       result.listAfterImport,
       result.listBeforeExport,
       "导入后快照数量不正确",
+    );
+    assert.equal(result.invalidImportAdded, 0, "无效导入数据不应被写入");
+    assert.equal(result.invalidImportSkipped, 1, "无效导入数据没有计入跳过");
+    assert.equal(
+      result.listAfterInvalidImport,
+      result.listAfterValidImport,
+      "无效导入改变了快照数量",
+    );
+    assert.equal(
+      result.corruptRestoreRejected,
+      true,
+      "结构损坏的快照仍然被写回存档",
+    );
+    assert.equal(
+      result.goldAfterCorruptRestore,
+      111,
+      "损坏快照被拒绝后存档内容仍被改动",
     );
     assert.equal(result.copiedExists, true, "复制存档文件失败");
     assert.ok(

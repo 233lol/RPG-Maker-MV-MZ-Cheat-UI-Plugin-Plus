@@ -1,7 +1,6 @@
 import PageJump from "../components/PageJump.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
-import { KeyValueStorage } from "../js/KeyValueStorage.js";
-import { getCheatSettingsPath } from "../js/SettingsPath.js";
+import { LockService } from "../js/LockService.js";
 
 export default {
   name: "SwitchSettingPanel",
@@ -157,24 +156,14 @@ export default {
       ],
       tableItems: [],
       pagination: { page: 1, itemsPerPage: 5 },
-      lockUpdateTimer: null,
-      lockUpdateIntervalMs: 2500,
-      lockStorage: null,
       persistedLockMap: {},
     };
   },
 
   created() {
-    this.lockStorage = new KeyValueStorage(
-      getCheatSettingsPath("switch-locks.json"),
-    );
+    LockService.ensureLoaded();
     this.readPersistedLocks();
     this.initializeVariables();
-    this.startLockUpdater();
-  },
-
-  beforeUnmount() {
-    this.stopLockUpdater();
   },
 
   computed: {
@@ -257,19 +246,7 @@ export default {
     },
 
     readPersistedLocks() {
-      try {
-        const raw = this.lockStorage.getItem("data");
-        if (!raw) {
-          this.persistedLockMap = {};
-          return;
-        }
-
-        const data = JSON.parse(raw);
-        this.persistedLockMap = data && typeof data === "object" ? data : {};
-      } catch (error) {
-        console.warn("[cheat plugin] Can't read persisted switch locks, reset to empty", error);
-        this.persistedLockMap = {};
-      }
+      this.persistedLockMap = LockService.getSwitchLocks();
     },
 
     writePersistedLocks() {
@@ -286,7 +263,7 @@ export default {
       });
 
       this.persistedLockMap = payload;
-      this.lockStorage.setItem("data", JSON.stringify(payload));
+      LockService.setSwitchLocks(payload);
     },
 
     onItemChange(item) {
@@ -334,39 +311,12 @@ export default {
         return;
       }
 
-      const currentValue = !!$gameSwitches.value(item.id);
-      const lockValue = !!item.lockValue;
-      if (currentValue !== lockValue) {
-        $gameSwitches.setValue(item.id, lockValue);
-      }
+      LockService.applySwitchLock(item.id);
       item.value = !!$gameSwitches.value(item.id);
     },
 
     applyAllSwitchLocks() {
-      this.tableItems.forEach((item) => {
-        if (item.id > 0 && item.lockEnabled) {
-          this.applySwitchLock(item);
-        }
-      });
-    },
-
-    startLockUpdater() {
-      if (this.lockUpdateTimer) {
-        return;
-      }
-
-      this.lockUpdateTimer = window.setInterval(() => {
-        this.applyAllSwitchLocks();
-      }, this.lockUpdateIntervalMs);
-    },
-
-    stopLockUpdater() {
-      if (!this.lockUpdateTimer) {
-        return;
-      }
-
-      window.clearInterval(this.lockUpdateTimer);
-      this.lockUpdateTimer = null;
+      LockService.applySwitchLocks();
     },
 
     getLockMapById() {

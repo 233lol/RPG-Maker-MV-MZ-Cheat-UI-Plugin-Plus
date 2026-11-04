@@ -795,11 +795,47 @@ export class SaveBackupCheat {
       (item) =>
         item &&
         typeof item === "object" &&
-        typeof item.id === "string" &&
-        item.id.length > 0 &&
+        this.isValidSnapshotId(item.id) &&
         Number.isInteger(item.slot) &&
         item.slot >= 1,
     );
+  }
+
+  // 快照 ID 会直接拼进文件路径，必须挡住 ../、绝对路径、盘符等写法。
+  static isValidSnapshotId(id) {
+    return (
+      typeof id === "string" &&
+      id.length > 0 &&
+      id !== "." &&
+      id !== ".." &&
+      /^[A-Za-z0-9._-]+$/.test(id)
+    );
+  }
+
+  static assertSnapshotId(id) {
+    if (!this.isValidSnapshotId(id)) {
+      throw new Error("快照 ID 无效");
+    }
+
+    return id;
+  }
+
+  // 手工改过 index.json 时 payloadFile 可能指向快照目录以外。
+  // 读取 / 删除 / 展示前都必须确认目标仍在 save-backups/ 内。
+  static isPathInsideBackupDir(file) {
+    try {
+      if (typeof file !== "string" || file.length === 0) {
+        return false;
+      }
+
+      const path = require("path");
+      const base = path.resolve(getBackupDir());
+      const target = path.resolve(file);
+
+      return target === base || target.startsWith(base + path.sep);
+    } catch (error) {
+      return false;
+    }
   }
 
   static writeIndex(entries) {
@@ -831,7 +867,7 @@ export class SaveBackupCheat {
   }
 
   static getMetaPath(id) {
-    return `${getBackupDir()}/${id}.json`;
+    return `${getBackupDir()}/${this.assertSnapshotId(id)}.json`;
   }
 
   static getSnapshotCodec() {
@@ -847,25 +883,35 @@ export class SaveBackupCheat {
   }
 
   static getPayloadPath(id, meta = null) {
+    const safeId = this.assertSnapshotId(id);
     const codec =
       (meta && meta.codec) ||
       (meta && meta.saveExt === ".rmmzsave" ? "pako" : null) ||
       this.getSnapshotCodec();
     const extension = (meta && meta.saveExt) || this.getPayloadExtension(codec);
 
-    return `${getBackupDir()}/${id}${extension}`;
+    return `${getBackupDir()}/${safeId}${extension}`;
   }
 
   // 旧索引可能没有 payloadFile（或者扩展名与当前引擎不同），读取时按候选顺序探测。
   static findPayloadPath(meta) {
     const fs = this.requireFs();
 
-    if (!meta) {
+    if (!meta || !this.isValidSnapshotId(meta.id)) {
       return null;
     }
 
-    if (meta.payloadFile && fs.existsSync(meta.payloadFile)) {
-      return meta.payloadFile;
+    if (meta.payloadFile) {
+      if (this.isPathInsideBackupDir(meta.payloadFile)) {
+        if (fs.existsSync(meta.payloadFile)) {
+          return meta.payloadFile;
+        }
+      } else {
+        console.warn(
+          "[cheat plugin] 忽略指向快照目录外的 payloadFile",
+          meta.payloadFile,
+        );
+      }
     }
 
     const candidates = [];
@@ -912,10 +958,11 @@ export class SaveBackupCheat {
 
   static readMeta(id) {
     const fs = this.requireFs();
-    const file = this.getMetaPath(id);
+    let file = null;
     let meta = null;
 
     try {
+      file = this.getMetaPath(id);
       if (fs.existsSync(file)) {
         meta = JSON.parse(fs.readFileSync(file, "utf-8"));
       }
@@ -1127,6 +1174,40 @@ export class SaveBackupCheat {
     }
 
     return null;
+  }
+
+  // 写回存档 / 导入快照前的最后一道校验：宁可报错，也不要把损坏数据
+  // 覆盖到玩家的存档上。RPG Maker 的存档一定包含 system / party / actors
+  // 等对象，这里只要求至少命中一个，避免误伤改过结构的游戏。
+  static validateSaveText(jsonText, label = "存档数据") {
+    if (typeof jsonText !== "string" || jsonText.trim() === "") {
+      throw new Error(`${label}为空`);
+    }
+
+    const data = this.parseAnySaveData(jsonText);
+
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error(`${label}不是有效的存档 JSON`);
+    }
+
+    const knownKeys = [
+      "system",
+      "party",
+      "actors",
+      "switches",
+      "variables",
+      "player",
+      "map",
+    ];
+    const hasSaveShape = knownKeys.some((key) =>
+      Object.prototype.hasOwnProperty.call(data, key),
+    );
+
+    if (!hasSaveShape) {
+      throw new Error(`${label}缺少存档结构（system / party / actors 等）`);
+    }
+
+    return data;
   }
 
   static getMapInfo(mapId) {
@@ -1559,7 +1640,11 @@ export class SaveBackupCheat {
 
     for (const file of files) {
       try {
-        if (file && fs.existsSync(file)) {
+        if (!file || !this.isPathInsideBackupDir(file)) {
+          continue;
+        }
+
+        if (fs.existsSync(file)) {
           fs.unlinkSync(file);
         }
       } catch (error) {
@@ -1771,6 +1856,9 @@ export class SaveBackupCheat {
     const isSameSlot = slot === sourceSlot;
     const jsonText = this.readPayload(meta);
 
+    // 损坏 / 被替换的快照绝不能写回存档，先校验再备份。
+    this.validateSaveText(jsonText, "快照数据");
+
     // 只在「会覆盖已有存档」时才留退路。写到空槽位不用备份，
     // 尤其不能去备份目标槽位 —— 那会凭空造出一份空快照。
     if (this.hasSave(slot)) {
@@ -1933,6 +2021,16 @@ export class SaveBackupCheat {
 
       const slot = Number(item.meta.slot);
       if (!Number.isInteger(slot) || slot < 1) {
+        skipped++;
+        continue;
+      }
+
+      // 导入文件可能来自别处 / 被手工改坏，校验不过就跳过这一条，
+      // 不要写出一份读档必崩的快照。
+      try {
+        this.validateSaveText(item.data, "导入的快照数据");
+      } catch (error) {
+        console.warn("[cheat plugin] 跳过无效的导入快照", slot, error);
         skipped++;
         continue;
       }

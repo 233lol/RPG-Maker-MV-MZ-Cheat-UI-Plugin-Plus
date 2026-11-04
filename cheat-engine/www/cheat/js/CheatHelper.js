@@ -67,14 +67,34 @@ export class GeneralCheat {
     return data;
   }
 
-  // 当前真正开启了无敌的角色实例（过期条目已被 getGodModeData 重置掉）
+  // 当前真正开启了无敌的角色实例。
+  // 读档 / 新游戏会重建 Game_Actor，旧实例上的猴补丁已经无效；
+  // 这里顺手清掉过期条目（无敌本来就不跨存档）。
   static getGodModeActors() {
     const ret = [];
+    const map = this.getGodModeMap();
 
-    for (const data of this.getGodModeMap().values()) {
-      if (data.godMode && data.actor) {
-        ret.push(data.actor);
+    for (const [actorId, data] of map) {
+      if (!data.godMode || !data.actor) {
+        continue;
       }
+
+      let liveActor = null;
+
+      try {
+        if (typeof $gameActors !== "undefined" && $gameActors) {
+          liveActor = $gameActors.actor(actorId);
+        }
+      } catch (error) {
+        liveActor = null;
+      }
+
+      if (liveActor && liveActor !== data.actor) {
+        map.delete(actorId);
+        continue;
+      }
+
+      ret.push(data.actor);
     }
 
     return ret;
@@ -102,7 +122,14 @@ export class GeneralCheat {
     }
 
     this.godModeInterval = setInterval(() => {
-      for (const actor of GeneralCheat.getGodModeActors()) {
+      const actors = GeneralCheat.getGodModeActors();
+
+      if (actors.length === 0) {
+        GeneralCheat.syncGodModeInterval();
+        return;
+      }
+
+      for (const actor of actors) {
         actor.gainHp(actor.mhp);
         actor.gainMp(actor.mmp);
         actor.gainTp(actor.maxTp());
@@ -436,9 +463,11 @@ export class SceneCheat {
   }
 
   static toggleSaveScene() {
-    if (SceneManager._scene.constructor === Scene_Save) {
+    const scene = SceneManager._scene;
+
+    if (scene instanceof Scene_Save) {
       SceneManager.pop();
-    } else if (SceneManager._scene.constructor === Scene_Load) {
+    } else if (scene instanceof Scene_Load) {
       SceneManager.goto(Scene_Save);
     } else {
       SceneManager.push(Scene_Save);
@@ -446,9 +475,11 @@ export class SceneCheat {
   }
 
   static toggleLoadScene() {
-    if (SceneManager._scene.constructor === Scene_Load) {
+    const scene = SceneManager._scene;
+
+    if (scene instanceof Scene_Load) {
       SceneManager.pop();
-    } else if (SceneManager._scene.constructor === Scene_Save) {
+    } else if (scene instanceof Scene_Save) {
       SceneManager.goto(Scene_Load);
     } else {
       SceneManager.push(Scene_Load);
@@ -551,7 +582,7 @@ export class BattleCheat {
   static canExecuteBattleEndProcess() {
     return (
       SceneManager._scene &&
-      SceneManager._scene.constructor === Scene_Battle &&
+      SceneManager._scene instanceof Scene_Battle &&
       BattleManager._phase !== "battleEnd"
     );
   }
@@ -608,26 +639,120 @@ export class BattleCheat {
     return false;
   }
 
-  static toggleDisableRandomEncounter() {
-    // change $gamePlayer.canEncounter function
-    // if canEncounter is false, $gamePlayer.updateEncounterCount() do not decreases $gamePlayer._encounterCount
-    if (this.isDisableRandomEncounter()) {
-      if (this.canEncounter_bkup) {
-        $gamePlayer.canEncounter = this.canEncounter_bkup;
-      }
-    } else {
-      this.canEncounter_bkup = $gamePlayer.canEncounter;
-
-      $gamePlayer.canEncounter = function () {
-        return false;
-      };
+  static getCanEncounterBackups() {
+    if (!this.canEncounterBackups) {
+      this.canEncounterBackups = new WeakMap();
     }
 
-    this.disableRandomEncounter = !this.isDisableRandomEncounter();
+    return this.canEncounterBackups;
+  }
+
+  // 只替换当前 $gamePlayer 实例上的方法，原始方法按实例记录在 WeakMap 里。
+  // 读档 / 新游戏会换一个 Game_Player，旧实例的备份自然失效，不会把
+  // 旧函数错误地装到新实例上。
+  static applyRandomEncounterPatch() {
+    const player =
+      typeof $gamePlayer !== "undefined" ? $gamePlayer : null;
+
+    if (!player || typeof player.canEncounter !== "function") {
+      return false;
+    }
+
+    const backups = this.getCanEncounterBackups();
+
+    if (!backups.has(player)) {
+      backups.set(player, player.canEncounter);
+    }
+
+    player.canEncounter = function () {
+      return false;
+    };
+
+    return true;
+  }
+
+  static restoreRandomEncounterPatch() {
+    const player =
+      typeof $gamePlayer !== "undefined" ? $gamePlayer : null;
+
+    if (!player) {
+      return false;
+    }
+
+    const backups = this.getCanEncounterBackups();
+
+    if (backups.has(player)) {
+      player.canEncounter = backups.get(player);
+      backups.delete(player);
+    }
+
+    return true;
+  }
+
+  static setDisableRandomEncounter(disabled) {
+    this.disableRandomEncounter = !!disabled;
+
+    return this.disableRandomEncounter
+      ? this.applyRandomEncounterPatch()
+      : this.restoreRandomEncounterPatch();
+  }
+
+  static toggleDisableRandomEncounter() {
+    return this.setDisableRandomEncounter(!this.isDisableRandomEncounter());
   }
 
   static isDisableRandomEncounter() {
-    return !!this.disableRandomEncounter && this.disableRandomEncounter;
+    return !!this.disableRandomEncounter;
+  }
+
+  // 读档 / 新游戏后重新套用「不跨存档」以外的状态：
+  //  - 无敌模式绑定在角色实例上，换实例后由 GeneralCheat 清理；
+  //  - 禁止随机遇敌是玩家主动开的全局开关，需要 patch 到新的 $gamePlayer。
+  static syncAfterGameChange() {
+    try {
+      GeneralCheat.syncGodModeInterval();
+
+      if (this.isDisableRandomEncounter()) {
+        this.applyRandomEncounterPatch();
+      }
+    } catch (error) {
+      console.warn("[cheat plugin] 同步游戏状态失败", error);
+    }
+  }
+
+  static installGameStateHooks() {
+    if (this.gameStateHooksInstalled) {
+      return true;
+    }
+
+    if (
+      typeof DataManager === "undefined" ||
+      typeof DataManager.setupNewGame !== "function"
+    ) {
+      return false;
+    }
+
+    const sync = () => BattleCheat.syncAfterGameChange();
+
+    const originalSetupNewGame = DataManager.setupNewGame;
+    DataManager.setupNewGame = function () {
+      const result = originalSetupNewGame.apply(this, arguments);
+      sync();
+      return result;
+    };
+
+    if (typeof DataManager.extractSaveContents === "function") {
+      const originalExtractSaveContents = DataManager.extractSaveContents;
+      DataManager.extractSaveContents = function () {
+        const result = originalExtractSaveContents.apply(this, arguments);
+        sync();
+        return result;
+      };
+    }
+
+    this.gameStateHooksInstalled = true;
+
+    return true;
   }
 }
 
@@ -742,6 +867,8 @@ async function multiRetryAction(action, intervalTimeout, maxTryCount) {
     clearInterval(interval);
   }, intervalTimeout);
 }
+
+BattleCheat.installGameStateHooks();
 
 function initialize() {
   const intervalTimeout = 500;

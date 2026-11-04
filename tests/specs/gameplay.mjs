@@ -258,9 +258,212 @@ export function registerGameplay({ test, page, type, state }) {
     assert.equal(result.hasMapData, true, "地图事件面板没有加载地图数据");
   });
 
+  test("地图事件面板用页面数据识别敌人 / 移动事件", async () => {
+    const result = await page.evaluate(async () => {
+      const api = window.__cheatTest;
+      const panel = await api.openPanel("map-event-panel", "MapEventPanel");
+
+      const makePage = (moveType, list) => ({
+        image: { characterName: "Actor1", characterIndex: 0 },
+        moveType,
+        list,
+      });
+
+      // Game_Event 没有 _pages，页面数据必须从 event() / page() 取。
+      const battleEvent = {
+        _eventId: 9001,
+        event: () => ({
+          pages: [makePage(0, [{ code: 301, parameters: [] }])],
+        }),
+        page: () => makePage(0, [{ code: 301, parameters: [] }]),
+      };
+
+      const movingEvent = {
+        _eventId: 9002,
+        event: () => ({
+          pages: [{ image: { characterName: "" }, moveType: 2, list: [] }],
+        }),
+        page: () => ({ image: { characterName: "" }, moveType: 2, list: [] }),
+      };
+
+      const normalEvent = {
+        _eventId: 9003,
+        event: () => ({ pages: [makePage(0, [])] }),
+        page: () => makePage(0, []),
+      };
+
+      return {
+        battleDetected: panel.isEnemyEvent(battleEvent),
+        movingDetected: panel.isEnemyEvent(movingEvent),
+        normalDetected: panel.isEnemyEvent(normalEvent),
+      };
+    });
+
+    assert.equal(result.battleDetected, true, "没有识别出 301 战斗事件");
+    assert.equal(result.movingDetected, true, "没有识别出移动事件");
+    assert.equal(result.normalDetected, false, "普通事件被误判成敌人");
+  });
+
+  test("开关 / 变量锁定在面板关闭后仍然生效", async () => {
+    const result = await page.evaluate(async () => {
+      const api = window.__cheatTest;
+      const { LockService } = await import(
+        new URL("cheat/js/LockService.js", document.baseURI).href
+      );
+
+      const switchPanel = await api.openPanel(
+        "switch-setting-panel",
+        "SwitchSettingPanel",
+      );
+      await api.waitFor(() => switchPanel.tableItems.length > 0, 5000, 50);
+
+      const switchItem = switchPanel.tableItems.find((item) => item.id > 0);
+      const oldSwitch = !!$gameSwitches.value(switchItem.id);
+
+      let variablePanel = null;
+      let variableItem = null;
+      let oldVariable = null;
+      let lockedVariableValue = null;
+
+      try {
+        // 锁定开关（此时开关面板还挂在界面上）
+        switchItem.lockEnabled = true;
+        switchItem.lockValue = !oldSwitch;
+        switchPanel.writePersistedLocks();
+        switchPanel.applySwitchLock(switchItem);
+
+        const switchLockedImmediately =
+          $gameSwitches.value(switchItem.id) === !oldSwitch;
+
+        // 切到变量面板，开关面板会被卸载
+        variablePanel = await api.openPanel(
+          "variable-setting-panel",
+          "VariableSettingPanel",
+        );
+        await api.waitFor(
+          () => variablePanel.tableItems.length > 0,
+          5000,
+          50,
+        );
+        const switchPanelUnmounted = !api.panel("SwitchSettingPanel");
+
+        variableItem = variablePanel.tableItems.find(
+          (item) =>
+            item.id > 0 &&
+            typeof $gameVariables.value(item.id) === "number",
+        );
+        oldVariable = $gameVariables.value(variableItem.id);
+        lockedVariableValue = oldVariable + 1;
+
+        // 锁定变量
+        variableItem.lockEnabled = true;
+        variableItem.lockValue = lockedVariableValue;
+        variablePanel.writePersistedLocks();
+        variablePanel.applyVariableLock(variableItem);
+
+        const variableLockedImmediately =
+          $gameVariables.value(variableItem.id) === lockedVariableValue;
+
+        // 关闭作弊窗口，两个面板都会卸载
+        api.main().toggleCheatModal();
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        const variablePanelGone = !api.panel("VariableSettingPanel");
+
+        // 面板卸载后游戏改值，服务应在一个周期内改回来
+        $gameSwitches.setValue(switchItem.id, oldSwitch);
+        $gameVariables.setValue(variableItem.id, oldVariable);
+
+        const switchRestored = await api.waitFor(
+          () => $gameSwitches.value(switchItem.id) === !oldSwitch,
+          5000,
+          100,
+        );
+        const variableRestored = await api.waitFor(
+          () => $gameVariables.value(variableItem.id) === lockedVariableValue,
+          5000,
+          100,
+        );
+
+        return {
+          switchId: switchItem.id,
+          variableId: variableItem.id,
+          oldSwitch,
+          oldVariable,
+          switchLockedImmediately,
+          variableLockedImmediately,
+          switchPanelUnmounted,
+          variablePanelGone,
+          switchRestored: !!switchRestored,
+          variableRestored: !!variableRestored,
+        };
+      } finally {
+        LockService.setSwitchLocks({});
+        LockService.setVariableLocks({});
+        $gameSwitches.setValue(switchItem.id, oldSwitch);
+
+        if (variableItem) {
+          $gameVariables.setValue(variableItem.id, oldVariable);
+        }
+      }
+    });
+
+    assert.equal(result.switchLockedImmediately, true, "开关锁没有立即生效");
+    assert.equal(result.variableLockedImmediately, true, "变量锁没有立即生效");
+    assert.equal(
+      result.switchPanelUnmounted,
+      true,
+      "开关面板没有卸载，无法验证锁定是否独立于面板",
+    );
+    assert.equal(result.variablePanelGone, true, "面板没有卸载");
+    assert.equal(result.switchRestored, true, "关闭面板后开关锁失效");
+    assert.equal(result.variableRestored, true, "关闭面板后变量锁失效");
+  });
+
+  test("读档 / 新游戏后随机遇敌状态同步到新玩家实例", async () => {
+    const result = await page.evaluate(async () => {
+      const { BattleCheat } = await import(
+        new URL("cheat/js/CheatHelper.js", document.baseURI).href
+      );
+
+      const realPlayer = $gamePlayer;
+      const firstPlayer = { canEncounter: () => true };
+      const secondPlayer = { canEncounter: () => true };
+
+      try {
+        $gamePlayer = firstPlayer;
+        BattleCheat.setDisableRandomEncounter(true);
+        const firstPatched = firstPlayer.canEncounter() === false;
+
+        // 模拟读档 / 新游戏：引擎换了一个全新的 $gamePlayer
+        $gamePlayer = secondPlayer;
+        BattleCheat.syncAfterGameChange();
+        const secondPatched = secondPlayer.canEncounter() === false;
+
+        BattleCheat.setDisableRandomEncounter(false);
+        const secondRestored = secondPlayer.canEncounter() === true;
+
+        return {
+          firstPatched,
+          secondPatched,
+          secondRestored,
+          hooksInstalled: !!BattleCheat.gameStateHooksInstalled,
+        };
+      } finally {
+        BattleCheat.setDisableRandomEncounter(false);
+        $gamePlayer = realPlayer;
+      }
+    });
+
+    assert.equal(result.firstPatched, true, "随机遇敌没有立即关闭");
+    assert.equal(result.secondPatched, true, "新玩家实例没有重新套用随机遇敌补丁");
+    assert.equal(result.secondRestored, true, "关闭后没有恢复原始 canEncounter");
+    assert.equal(result.hooksInstalled, true, "读档 / 新游戏钩子没有安装");
+  });
+
   test("快捷键 / KeyValueStorage / 游戏速度设置写入磁盘", async () => {
     const result = await page.evaluate(async () => {
       const base = document.baseURI;
+      const api = window.__cheatTest;
       const { GLOBAL_SHORTCUT } = await import(
         new URL("cheat/js/GlobalShortcut.js", base).href
       );
@@ -308,6 +511,12 @@ export function registerGameplay({ test, page, type, state }) {
       GameSpeedCheat.setGameSpeed(1, GameSpeedCheat.sceneOptions().all);
       fs.unlinkSync(getCheatSettingsPath("gameSpeed.json"));
 
+      // 窗口失焦时收不到 keyup，当前组合键必须被清空
+      const main = api.main();
+      main.currentKey = Key.fromString("ctrl c");
+      window.dispatchEvent(new Event("blur"));
+      const blurCleared = main.currentKey.isEmpty();
+
       return {
         shortcutFileExists,
         settingsDir,
@@ -317,6 +526,7 @@ export function registerGameplay({ test, page, type, state }) {
         kvFileValue: kvFile.hello,
         kvRead,
         gameSpeedData: gameSpeedFile.data,
+        blurCleared,
       };
     });
 
@@ -332,6 +542,7 @@ export function registerGameplay({ test, page, type, state }) {
     assert.equal(result.restoredShortcut, "alt w", "快捷键没有还原");
     assert.equal(result.kvFileValue, "世界", "KeyValueStorage 没有写入 UTF-8 内容");
     assert.equal(result.kvRead, "世界", "KeyValueStorage 没有读回内容");
+    assert.equal(result.blurCleared, true, "窗口失焦后没有清空当前组合键");
 
     const gameSpeed = JSON.parse(result.gameSpeedData);
     assert.equal(gameSpeed.rate, 3);
