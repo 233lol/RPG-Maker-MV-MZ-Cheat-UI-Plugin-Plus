@@ -39,7 +39,15 @@ export function resolveNwExecutable() {
   // scoop / 手动安装的常见位置
   const home = os.homedir();
   candidates.push(
-    path.join(home, "scoop", "apps", "nwjs-sdk", "current", "nwjs-sdk", "nw.exe"),
+    path.join(
+      home,
+      "scoop",
+      "apps",
+      "nwjs-sdk",
+      "current",
+      "nwjs-sdk",
+      "nw.exe",
+    ),
     path.join(home, "scoop", "apps", "nwjs", "current", "nwjs", "nw.exe"),
     path.join(home, "scoop", "shims", "nw.exe"),
     "/usr/local/bin/nw",
@@ -118,7 +126,9 @@ export function installCheat(repoRoot, gameDir, type) {
   if (missing.length > 0) {
     throw new Error(
       "缺少 vendor 文件，先运行 `pnpm i && make vendor`（或 `pnpm run vendor:libs && pnpm run vendor:shiki`）：\n" +
-        missing.map((file) => `  - ${path.relative(repoRoot, file)}`).join("\n"),
+        missing
+          .map((file) => `  - ${path.relative(repoRoot, file)}`)
+          .join("\n"),
     );
   }
 
@@ -370,9 +380,7 @@ export class NwGame {
       }
 
       try {
-        const response = await fetch(
-          `http://127.0.0.1:${this.port}/json/list`,
-        );
+        const response = await fetch(`http://127.0.0.1:${this.port}/json/list`);
         const targets = await response.json();
         const page = targets.find((target) => target.type === "page");
 
@@ -403,7 +411,9 @@ export class NwGame {
         await new Promise((resolve, reject) => {
           this.ws.onopen = resolve;
           this.ws.onerror = (event) =>
-            reject(new Error(`WebSocket 连接失败: ${event?.message || "unknown"}`));
+            reject(
+              new Error(`WebSocket 连接失败: ${event?.message || "unknown"}`),
+            );
         });
 
         break;
@@ -440,7 +450,9 @@ export class NwGame {
       this.pending.delete(message.id);
 
       if (message.error) {
-        reject(new Error(message.error.message || JSON.stringify(message.error)));
+        reject(
+          new Error(message.error.message || JSON.stringify(message.error)),
+        );
       } else {
         resolve(message.result);
       }
@@ -470,7 +482,9 @@ export class NwGame {
       const entry = message.params.entry;
 
       if (entry && entry.level === "error") {
-        this.consoleErrors.push(`${entry.text || ""} ${entry.url || ""}`.trim());
+        this.consoleErrors.push(
+          `${entry.text || ""} ${entry.url || ""}`.trim(),
+        );
       }
     }
   }
@@ -519,7 +533,10 @@ export class NwGame {
     return result.result?.value;
   }
 
-  async waitFor(predicate, { timeout = 15000, interval = 100, label = "条件" } = {}) {
+  async waitFor(
+    predicate,
+    { timeout = 15000, interval = 100, label = "条件" } = {},
+  ) {
     const deadline = Date.now() + timeout;
     let lastValue;
 
@@ -527,7 +544,11 @@ export class NwGame {
       lastValue = await this.evaluate(() => {
         const errorPrinter = document.getElementById("errorPrinter");
         if (errorPrinter) {
-          const text = (errorPrinter.innerText || errorPrinter.textContent || "").trim();
+          const text = (
+            errorPrinter.innerText ||
+            errorPrinter.textContent ||
+            ""
+          ).trim();
           if (text) {
             return {
               __pageError: text,
@@ -581,7 +602,8 @@ export class NwGame {
           if (Array.isArray(node.children)) {
             for (const child of node.children) stack.push(child);
           }
-          if (node.suspense?.activeBranch) stack.push(node.suspense.activeBranch);
+          if (node.suspense?.activeBranch)
+            stack.push(node.suspense.activeBranch);
         }
 
         return false;

@@ -413,7 +413,6 @@ class GlobalShortcut {
   }
 
   initialize() {
-
     this.shortcutSettingsFile = getCheatSettingsPath("shortcuts.json");
 
     // initialize shortcut settings

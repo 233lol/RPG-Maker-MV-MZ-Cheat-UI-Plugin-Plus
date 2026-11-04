@@ -21,7 +21,6 @@ export function registerSaveBackup({ test, page, type }) {
       const [slotA, slotB] = slots;
       const defaultAutoOnSave = Backups.getSettings().autoOnSave;
       const originalGold = $gameParty.gold();
-      const savedFiles = [];
       let exportPath = null;
       let copiedPath = null;
 
@@ -101,7 +100,9 @@ export function registerSaveBackup({ test, page, type }) {
         const goldAfterCopy = readGold(slotB);
 
         Backups.renameBackup(meta.id, "renamed");
-        const renamed = Backups.listBackups().find((item) => item.id === meta.id);
+        const renamed = Backups.listBackups().find(
+          (item) => item.id === meta.id,
+        );
         const renamedMeta = Backups.readMeta(meta.id);
 
         const globalInfo = DataManager.savefileInfo
@@ -119,9 +120,7 @@ export function registerSaveBackup({ test, page, type }) {
         const nativeSnapshotGold = readGold(slotB);
 
         // payloadFile / 快照 ID 不能把读写引到 save-backups/ 之外
-        const insideAccepted = Backups.isPathInsideBackupDir(
-          meta.payloadFile,
-        );
+        const insideAccepted = Backups.isPathInsideBackupDir(meta.payloadFile);
         const outsideRejected = !Backups.isPathInsideBackupDir(
           require("path").resolve(process.cwd(), "..", "evil-snapshot.json"),
         );
@@ -173,12 +172,48 @@ export function registerSaveBackup({ test, page, type }) {
           (item) => item.kind === "auto" && item.slot === slotB,
         ).length;
         const autoSaveOk = await SceneCheat.quickSave(slotB);
-        const autoAfter = await api.waitFor(() => {
-          const count = Backups.listBackups().filter(
-            (item) => item.kind === "auto" && item.slot === slotB,
-          ).length;
-          return count > autoBefore ? count : null;
-        }, 15000, 100);
+        const autoAfter = await api.waitFor(
+          () => {
+            const count = Backups.listBackups().filter(
+              (item) => item.kind === "auto" && item.slot === slotB,
+            ).length;
+            return count > autoBefore ? count : null;
+          },
+          15000,
+          100,
+        );
+        // 自动快照保留份数：每个槽只保留最近 N 份，手动快照不受影响
+        const manualBeforeRetention = Backups.listBackups().filter(
+          (item) => item.kind === "manual",
+        ).length;
+
+        Backups.writeSettings({
+          autoOnSave: false,
+          autoSaveInterval: 1,
+          autoKeep: 1,
+        });
+        const retentionSeeds = [];
+
+        for (let i = 0; i < 3; i++) {
+          retentionSeeds.push(
+            Backups.createSnapshot(slotB, "auto", `retention-${i}`),
+          );
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+
+        const autosForSlot = Backups.listBackups().filter(
+          (item) => item.kind === "auto" && item.slot === slotB,
+        );
+        const retentionKept = autosForSlot.length;
+        const retentionNewestKept =
+          autosForSlot[0]?.id === retentionSeeds[2].id;
+        const retentionPruned = retentionSeeds
+          .slice(0, 2)
+          .every((item) => !Backups.isSnapshotPresent(item));
+        const manualAfterRetention = Backups.listBackups().filter(
+          (item) => item.kind === "manual",
+        ).length;
+
         Backups.writeSettings({
           autoOnSave: false,
           autoSaveInterval: 1,
@@ -193,10 +228,7 @@ export function registerSaveBackup({ test, page, type }) {
         );
         fs.writeFileSync(
           corruptSnapshot.payloadFile,
-          Backups.encodePayloadText(
-            '{"nope":1}',
-            corruptSnapshot.codec,
-          ),
+          Backups.encodePayloadText('{"nope":1}', corruptSnapshot.codec),
           "utf-8",
         );
 
@@ -257,6 +289,11 @@ export function registerSaveBackup({ test, page, type }) {
           quickLoadMs: Date.now() - quickLoadStarted,
           autoSaveOk,
           autoSnapshotAdded: autoAfter > autoBefore,
+          retentionKept,
+          retentionNewestKept,
+          retentionPruned,
+          manualBeforeRetention,
+          manualAfterRetention,
         };
       } finally {
         cleanup();
@@ -278,7 +315,11 @@ export function registerSaveBackup({ test, page, type }) {
       "renamed",
       "快照单份元数据没有更新（readMeta 读不到 <id>.json）",
     );
-    assert.equal(result.globalInfoPresent, true, "还原后没有更新 global 存档索引");
+    assert.equal(
+      result.globalInfoPresent,
+      true,
+      "还原后没有更新 global 存档索引",
+    );
     assert.equal(
       result.snapshotCodec,
       type === "mv" ? "lzstring" : "pako",
@@ -310,6 +351,26 @@ export function registerSaveBackup({ test, page, type }) {
       result.autoSnapshotAdded,
       true,
       "存档后没有生成自动快照（MZ Promise 钩子可能未等待写盘）",
+    );
+    assert.equal(
+      result.retentionKept,
+      1,
+      "自动快照没有按 autoKeep 裁剪到 1 份",
+    );
+    assert.equal(
+      result.retentionNewestKept,
+      true,
+      "自动快照裁剪后没有保留最新一份",
+    );
+    assert.equal(
+      result.retentionPruned,
+      true,
+      "被裁剪的自动快照文件没有从磁盘删除",
+    );
+    assert.equal(
+      result.manualAfterRetention,
+      result.manualBeforeRetention,
+      "自动快照裁剪误删了手动快照",
     );
     assert.ok(result.listBeforeExport >= 2, "还原前自动快照没有生成");
     assert.equal(

@@ -1,8 +1,9 @@
-import PageJump from "../components/PageJump.js";
+import PaginationFooter from "../components/PaginationFooter.js";
+import RefreshButton from "../components/RefreshButton.js";
+import SearchField from "../components/SearchField.js";
 import { markRaw } from "../libs/vue.js";
 import {
   ITEMS_PER_PAGE_OPTIONS,
-  getPageBounds,
   getPageCount,
 } from "../js/PaginationHelper.js";
 import { isPartyReady, requirePartyReady } from "../js/GameState.js";
@@ -15,7 +16,7 @@ const filteredSkillsCache = new Map();
 export default {
   name: "SkillSettingPanel",
 
-  components: { PageJump },
+  components: { PaginationFooter, RefreshButton, SearchField },
 
   template: `
 <v-card flat class="ma-0 pa-0">
@@ -49,34 +50,18 @@ export default {
                         @update:model-value="clampActorPage(actor)">
                     </v-checkbox>
                     <v-spacer></v-spacer>
-                    <v-tooltip
-                        location="bottom">
-                        <template #activator="{ props }">
-                            <v-btn
-                                color="pink"
-                                size="small"
-                                icon
-                                variant="elevated"
-                                v-bind="props"
-                                @click="initializeVariables">
-                                <v-icon>mdi-refresh</v-icon>
-                            </v-btn>
-                        </template>
-                        <span>重新加载游戏数据</span>
-                    </v-tooltip>
+                    <refresh-button
+                        variant="elevated"
+                        @click="initializeVariables">
+                    </refresh-button>
                 </v-card-actions>
 
-                <v-text-field
-                    label="搜索技能..."
-                    variant="solo"
-                    bg-color="grey-darken-3"
+                <search-field
                     v-model="actor.skillSearch"
-                    density="compact"
-                    hide-details
-                    @focus="$event.target.select()"
-                    @update:model-value="clampActorPage(actor)"
-                    @keydown.stop>
-                </v-text-field>
+                    label="搜索技能..."
+                    field-class=""
+                    @update:model-value="clampActorPage(actor)">
+                </search-field>
 
                 <v-data-table
                     density="compact"
@@ -118,28 +103,14 @@ export default {
                         </v-btn>
                     </template>
                     <template #bottom>
-                        <div class="d-flex align-center justify-space-between pa-2">
-                            <div class="d-flex align-center">
-                                <span class="text-body-small mr-2">每页</span>
-                                <v-select
-                                    v-model="actor.pagination.itemsPerPage"
-                                    :items="[5, 10, 15, 20]"
-                                    density="compact"
-                                    hide-details
-                                    variant="outlined"
-                                    style="width: 90px;"
-                                ></v-select>
-                            </div>
-                            <div class="d-flex align-center ga-2">
-                                <span class="text-body-small text-no-wrap">{{ paginationStartFor(actor) }}-{{ paginationStopFor(actor) }} / {{ totalCountFor(actor) }}</span>
-                                <v-pagination v-model="actor.pagination.page" :length="pageCountFor(actor)" density="compact" :total-visible="5" size="small"></v-pagination>
-                                <page-jump
-                                    :page="actor.pagination.page"
-                                    :page-count="pageCountFor(actor)"
-                                    @jump="(page) => jumpToPage(actor, page)">
-                                </page-jump>
-                            </div>
-                        </div>
+                        <pagination-footer
+                            v-model:page="actor.pagination.page"
+                            v-model:items-per-page="actor.pagination.itemsPerPage"
+                            :total="totalCountFor(actor)"
+                            :page-count="pageCountFor(actor)"
+                            :items-per-page-options="[5, 10, 15, 20]"
+                            @jump="(page) => jumpToPage(actor, page)">
+                        </pagination-footer>
                     </template>
                 </v-data-table>
             </v-card>
@@ -272,8 +243,12 @@ export default {
           // Search filter
           if (
             search &&
-            !String(skill.name ?? "").toLowerCase().includes(search) &&
-            !String(skill.description ?? "").toLowerCase().includes(search)
+            !String(skill.name ?? "")
+              .toLowerCase()
+              .includes(search) &&
+            !String(skill.description ?? "")
+              .toLowerCase()
+              .includes(search)
           ) {
             return false;
           }
@@ -294,22 +269,6 @@ export default {
 
     jumpToPage(actor, page) {
       actor.pagination.page = page;
-    },
-
-    paginationStartFor(actor) {
-      return getPageBounds(
-        this.totalCountFor(actor),
-        actor.pagination.page,
-        actor.pagination.itemsPerPage,
-      ).start;
-    },
-
-    paginationStopFor(actor) {
-      return getPageBounds(
-        this.totalCountFor(actor),
-        actor.pagination.page,
-        actor.pagination.itemsPerPage,
-      ).stop;
     },
 
     totalCountFor(actor) {

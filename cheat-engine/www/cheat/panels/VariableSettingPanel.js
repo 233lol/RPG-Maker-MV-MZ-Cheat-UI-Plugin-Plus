@@ -1,15 +1,13 @@
-import PageJump from "../components/PageJump.js";
+import PaginationFooter from "../components/PaginationFooter.js";
+import RefreshButton from "../components/RefreshButton.js";
+import SearchField from "../components/SearchField.js";
 import { LockService } from "../js/LockService.js";
 import {
   ITEMS_PER_PAGE_OPTIONS,
-  getPageBounds,
   getPageCount,
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
-import {
-  isVariablesReady,
-  requireVariablesReady,
-} from "../js/GameState.js";
+import { isVariablesReady, requireVariablesReady } from "../js/GameState.js";
 import { markRaw } from "../libs/vue.js";
 
 export default {
@@ -17,7 +15,7 @@ export default {
 
   mixins: [paginationWatcherMixin],
 
-  components: { PageJump },
+  components: { PaginationFooter, RefreshButton, SearchField },
 
   template: `
 <v-card flat class="ma-0 pa-0">
@@ -31,32 +29,11 @@ export default {
          :items-per-page-options="itemsPerPageOptions">
         <template #top>
             <div class="d-flex align-center">
-                <v-text-field
-                    label="搜索..."
-                    variant="solo"
-                    bg-color="grey-darken-3"
-                    v-model="search"
-                    density="compact"
-                    hide-details
-                    class="flex-grow-1"
-                    @focus="$event.target.select()"
-                    @keydown.stop>
-                </v-text-field>
-                <v-tooltip
-                    location="bottom">
-                    <template #activator="{ props }">
-                        <v-btn
-                            color="pink"
-                            size="small"
-                            icon
-                            class="ml-2"
-                            v-bind="props"
-                            @click="initializeVariables">
-                            <v-icon>mdi-refresh</v-icon>
-                        </v-btn>
-                    </template>
-                    <span>重新加载游戏数据</span>
-                </v-tooltip>
+                <search-field v-model="search"></search-field>
+                <refresh-button
+                    btn-class="ml-2"
+                    @click="initializeVariables">
+                </refresh-button>
             </div>
             <div class="d-flex align-center px-3 pt-3 pb-3">
                 <v-checkbox
@@ -125,28 +102,14 @@ export default {
             </v-btn>
         </template>
          <template #bottom>
-             <div class="d-flex align-center justify-space-between pa-2">
-                 <div class="d-flex align-center">
-                     <span class="text-body-small mr-2">每页</span>
-                     <v-select
-                         v-model="pagination.itemsPerPage"
-                         :items="[5, 10, 15, 20]"
-                         density="compact"
-                         hide-details
-                         variant="outlined"
-                style="width: 90px;"
-                     ></v-select>
-                 </div>
-                 <div class="d-flex align-center ga-2">
-                     <span class="text-body-small text-no-wrap">{{ paginationStart }}-{{ paginationStop }} / {{ totalCount }}</span>
-                     <v-pagination v-model="pagination.page" :length="pageCount" density="compact" :total-visible="5" size="small"></v-pagination>
-                     <page-jump
-                         :page="pagination.page"
-                         :page-count="pageCount"
-                         @jump="jumpToPage">
-                     </page-jump>
-                 </div>
-             </div>
+             <pagination-footer
+                 v-model:page="pagination.page"
+                 v-model:items-per-page="pagination.itemsPerPage"
+                 :total="totalCount"
+                 :page-count="pageCount"
+                 :items-per-page-options="[5, 10, 15, 20]"
+                 @jump="jumpToPage">
+             </pagination-footer>
          </template>
     </v-data-table>
 
@@ -243,8 +206,7 @@ export default {
           (item) =>
             String(item.name || "")
               .toLowerCase()
-              .includes(s) ||
-            this.formatValueForSearch(item.value).includes(s),
+              .includes(s) || this.formatValueForSearch(item.value).includes(s),
         );
       }
       return items;
@@ -261,30 +223,14 @@ export default {
       return lockableItems.every((item) => !!item.lockEnabled);
     },
 
-     totalCount() {
-       return this.filteredTableItems.length;
-     },
+    totalCount() {
+      return this.filteredTableItems.length;
+    },
 
-     paginationStart() {
-       return getPageBounds(
-         this.totalCount,
-         this.pagination.page,
-         this.pagination.itemsPerPage,
-       ).start;
-     },
-
-     paginationStop() {
-       return getPageBounds(
-         this.totalCount,
-         this.pagination.page,
-         this.pagination.itemsPerPage,
-       ).stop;
-     },
-
-     pageCount() {
-       return getPageCount(this.totalCount, this.pagination.itemsPerPage);
-     },
-   },
+    pageCount() {
+      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
+    },
+  },
 
   methods: {
     async initializeVariables() {
@@ -391,8 +337,9 @@ export default {
 
     formatValueForSearch(value) {
       try {
-        return String(this.isComplexValue(value) ? JSON.stringify(value) : value)
-          .toLowerCase();
+        return String(
+          this.isComplexValue(value) ? JSON.stringify(value) : value,
+        ).toLowerCase();
       } catch (error) {
         return String(value).toLowerCase();
       }
@@ -403,7 +350,7 @@ export default {
         return;
       }
 
-      let text = "";
+      let text;
 
       try {
         text = JSON.stringify(item.value, null, 2);
@@ -429,7 +376,7 @@ export default {
       if (!requireVariablesReady("修改变量")) return;
 
       const dialog = this.jsonDialog;
-      let parsed = null;
+      let parsed;
 
       try {
         parsed = JSON.parse(dialog.text);
@@ -442,9 +389,7 @@ export default {
 
       const item = this.tableItems.find((entry) => entry.id === dialog.id);
       if (item) {
-        item.value = this.markValueForDisplay(
-          $gameVariables.value(dialog.id),
-        );
+        item.value = this.markValueForDisplay($gameVariables.value(dialog.id));
         if (item.lockEnabled) {
           item.lockValue = item.value;
           this.writePersistedLocks();
@@ -531,6 +476,5 @@ export default {
 
       return map;
     },
-
   },
 };

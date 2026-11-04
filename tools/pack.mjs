@@ -44,7 +44,15 @@ function addDir(dir, archiveDir) {
 
 addDir(path.join(rootDir, "cheat-engine", "www", "cheat"), `${prefix}cheat/`);
 entries[`${prefix}js/main.js`] = readFileSync(
-  path.join(rootDir, "cheat-engine", "www", "_cheat_initialize", type, "js", "main.js"),
+  path.join(
+    rootDir,
+    "cheat-engine",
+    "www",
+    "_cheat_initialize",
+    type,
+    "js",
+    "main.js",
+  ),
 );
 
 writeFileSync(outfile, zipSync(entries, { level: 9 }));

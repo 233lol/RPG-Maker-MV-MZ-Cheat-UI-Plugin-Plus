@@ -11,11 +11,14 @@ function validateNwjsVersion() {
     return true;
   }
 
-  const lowVersion = nwjsVersion.localeCompare(minRequiredNwjsVersion, undefined, { numeric: true }) < 0;
+  const lowVersion =
+    nwjsVersion.localeCompare(minRequiredNwjsVersion, undefined, {
+      numeric: true,
+    }) < 0;
 
   if (lowVersion) {
-    let msg = "";
-    let docsUrl = "";
+    let msg;
+    let docsUrl;
 
     msg = `Node Webkit version of game is too low to using cheat
   - version=${nwjsVersion}, minimum required version=${minRequiredNwjsVersion}
@@ -48,7 +51,8 @@ function applyCheat() {
   const appDiv = document.createElement("div");
 
   appDiv.id = "app";
-  appDiv.style.cssText = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;";
+  appDiv.style.cssText =
+    "position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;";
   appDiv.innerHTML = `
 <v-app>
     <v-main>

@@ -24,7 +24,9 @@ export function createRunner(title) {
       } catch (error) {
         failed++;
         console.error(`[FAIL] ${entry.name} (${Date.now() - started} ms)`);
-        console.error(indent(error && error.stack ? error.stack : String(error)));
+        console.error(
+          indent(error && error.stack ? error.stack : String(error)),
+        );
       }
     }
 

@@ -1,9 +1,12 @@
+import RefreshButton from "../components/RefreshButton.js";
 import { GeneralCheat } from "../js/CheatHelper.js";
 import { isPartyReady, requirePartyReady } from "../js/GameState.js";
 import { markRaw } from "../libs/vue.js";
 
 export default {
   name: "StatsSettingPanel",
+
+  components: { RefreshButton },
 
   template: `
 <v-card flat class="ma-0 pa-0">
@@ -37,21 +40,10 @@ export default {
                         @change="onGodModeChange(actor)">
                     </v-checkbox>
                     <v-spacer></v-spacer>
-                    <v-tooltip
-                        location="bottom">
-                        <template #activator="{ props }">
-                            <v-btn
-                                color="pink"
-                                size="small"
-                                icon
-                                variant="elevated"
-                                v-bind="props"
-                                @click="initializeVariables">
-                                <v-icon>mdi-refresh</v-icon>
-                            </v-btn>
-                        </template>
-                        <span>重新加载游戏数据</span>
-                    </v-tooltip>
+                    <refresh-button
+                        variant="elevated"
+                        @click="initializeVariables">
+                    </refresh-button>
                 </v-card-actions>
                 <v-card-subtitle class="pa-0">等级 / 经验</v-card-subtitle>
                 <v-row class="mt-0 pt-3">
@@ -188,8 +180,7 @@ export default {
       const equipBonus = item._actor
         .equips()
         .reduce((sum, eq) => sum + (eq ? eq.params[paramIndex] : 0), 0);
-      item._actor._paramPlus[paramIndex] =
-        newVal - base - equipBonus - growth;
+      item._actor._paramPlus[paramIndex] = newVal - base - equipBonus - growth;
       this.initializeVariables();
     },
 

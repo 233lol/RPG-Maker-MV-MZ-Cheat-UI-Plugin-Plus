@@ -139,11 +139,7 @@ export function installTestApi() {
     },
 
     async waitSave(slot, timeout = 10000) {
-      const ok = await this.waitFor(
-        () => this.saveExists(slot),
-        timeout,
-        100,
-      );
+      const ok = await this.waitFor(() => this.saveExists(slot), timeout, 100);
 
       if (!ok) throw new Error(`存档 ${slot} 没有在 ${timeout} ms 内写入`);
 

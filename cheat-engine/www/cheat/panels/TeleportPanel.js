@@ -1,8 +1,8 @@
-import PageJump from "../components/PageJump.js";
+import PaginationFooter from "../components/PaginationFooter.js";
+import SearchField from "../components/SearchField.js";
 import { Alert } from "../js/AlertHelper.js";
 import {
   ITEMS_PER_PAGE_OPTIONS,
-  getPageBounds,
   getPageCount,
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
@@ -12,7 +12,7 @@ export default {
 
   mixins: [paginationWatcherMixin],
 
-  components: { PageJump },
+  components: { PaginationFooter, SearchField },
 
   template: `
 <v-card flat class="ma-0 pa-0">
@@ -92,17 +92,7 @@ export default {
          v-model:items-per-page="pagination.itemsPerPage"
          :items-per-page-options="itemsPerPageOptions">
         <template #top>
-            <v-text-field
-                label="搜索..."
-                variant="solo"
-                bg-color="grey-darken-3"
-                v-model="search"
-                density="compact"
-                hide-details
-
-                @focus="$event.target.select()"
-                @keydown.stop>
-            </v-text-field>
+            <search-field v-model="search" field-class=""></search-field>
             <v-checkbox
                 v-model="excludeFullPath"
                 density="compact"
@@ -133,28 +123,14 @@ export default {
             </v-tooltip>
         </template>
          <template #bottom>
-             <div class="d-flex align-center justify-space-between pa-2">
-                 <div class="d-flex align-center">
-                     <span class="text-body-small mr-2">每页</span>
-                     <v-select
-                         v-model="pagination.itemsPerPage"
-                         :items="[5, 10, 15, 20]"
-                         density="compact"
-                         hide-details
-                         variant="outlined"
-                         style="width: 90px;"
-                     ></v-select>
-                 </div>
-                 <div class="d-flex align-center ga-2">
-                     <span class="text-body-small text-no-wrap">{{ paginationStart }}-{{ paginationStop }} / {{ totalCount }}</span>
-                     <v-pagination v-model="pagination.page" :length="pageCount" density="compact" :total-visible="5" size="small"></v-pagination>
-                     <page-jump
-                         :page="pagination.page"
-                         :page-count="pageCount"
-                         @jump="jumpToPage">
-                     </page-jump>
-                 </div>
-             </div>
+             <pagination-footer
+                 v-model:page="pagination.page"
+                 v-model:items-per-page="pagination.itemsPerPage"
+                 :total="totalCount"
+                 :page-count="pageCount"
+                 :items-per-page-options="[5, 10, 15, 20]"
+                 @jump="jumpToPage">
+             </pagination-footer>
          </template>
     </v-data-table>
 </v-card>
@@ -216,9 +192,7 @@ export default {
   computed: {
     filteredTableHeaders() {
       if (this.excludeFullPath) {
-        return this.tableHeaders.filter(
-          (header) => header.key !== "fullPath",
-        );
+        return this.tableHeaders.filter((header) => header.key !== "fullPath");
       }
 
       return this.tableHeaders;
@@ -229,30 +203,20 @@ export default {
       const s = this.search.toLowerCase();
       return this.maps.filter(
         (item) =>
-          String(item.name ?? "").toLowerCase().includes(s) ||
-          String(item.fullPathJoin ?? "").toLowerCase().includes(s) ||
-          String(item.id ?? "").toLowerCase().includes(s),
+          String(item.name ?? "")
+            .toLowerCase()
+            .includes(s) ||
+          String(item.fullPathJoin ?? "")
+            .toLowerCase()
+            .includes(s) ||
+          String(item.id ?? "")
+            .toLowerCase()
+            .includes(s),
       );
     },
 
     totalCount() {
       return this.filteredMaps.length;
-    },
-
-    paginationStart() {
-      return getPageBounds(
-        this.totalCount,
-        this.pagination.page,
-        this.pagination.itemsPerPage,
-      ).start;
-    },
-
-    paginationStop() {
-      return getPageBounds(
-        this.totalCount,
-        this.pagination.page,
-        this.pagination.itemsPerPage,
-      ).stop;
     },
 
     pageCount() {
@@ -266,7 +230,10 @@ export default {
     },
 
     async initializeVariables() {
-      if (typeof $dataMapInfos === "undefined" || !Array.isArray($dataMapInfos)) {
+      if (
+        typeof $dataMapInfos === "undefined" ||
+        !Array.isArray($dataMapInfos)
+      ) {
         this.maps = [];
         return;
       }
@@ -370,11 +337,11 @@ export default {
     },
 
     updateCurrentPosition() {
-      if (typeof $gamePlayer !== 'undefined' && $gamePlayer) {
+      if (typeof $gamePlayer !== "undefined" && $gamePlayer) {
         this.currentX = $gamePlayer.x;
         this.currentY = $gamePlayer.y;
       }
-      if (typeof $gameMap !== 'undefined' && $gameMap) {
+      if (typeof $gameMap !== "undefined" && $gameMap) {
         const mapId = $gameMap.mapId();
         if ($dataMapInfos && $dataMapInfos[mapId]) {
           this.currentMapName = $dataMapInfos[mapId].name;

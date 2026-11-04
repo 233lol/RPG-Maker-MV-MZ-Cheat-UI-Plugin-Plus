@@ -16,7 +16,7 @@ Vue 2 + Vuetify 2 迁移至 Vue 3，UI 框架已升级至 Vuetify 4。
 
 ### 前置要求
 
-- [Node.js](https://nodejs.org/) >= 18
+- [Node.js](https://nodejs.org/) >= 18（构建）/ >= 22（无头测试，使用内置 `WebSocket`）
 - [pnpm](https://pnpm.io/)
 - GNU Make（Windows 可通过 `winget install GnuWin32.Make`、`choco install make` 或 `scoop install make` 安装）
 
@@ -45,6 +45,21 @@ make clean
 ```
 
 `make` / `make mv` / `make mz` 每次构建都会强制使用 Vue 生产构建，即使之前执行过 `make dev`，也不会把开发版误打包进产物；`make dev` 仅在本次打包使用开发构建。
+
+### 开发检查
+
+```shell
+pnpm run lint          # ESLint
+pnpm run format        # Prettier 自动格式化
+pnpm run format:check  # 只检查格式（CI 使用）
+pnpm run test:unit     # node --test 纯函数单测，不需要游戏 / nwjs-sdk
+pnpm run test:packaging # 压缩包结构测试，需要先 make 生成 vendor 文件
+make check             # lint + format:check + test:unit
+```
+
+代码风格配置见 `.editorconfig`、`.prettierrc.json`、`eslint.config.mjs`。RPG Maker 在运行时注入大量全局变量（`$gamePlayer`、`DataManager` 等），因此作弊源码关闭了 `no-undef`，其余推荐规则仍然启用。
+
+共享文案（搜索、分页、刷新、导航名称等）集中在 `cheat-engine/www/cheat/js/strings.js`，通过 `t("common.search")` 读取；面板内的一次性游戏名词仍保留在各自模板中，避免为改一个词引入额外间接层。
 
 构建产物位于项目根目录：
 - `mv-<commit-hash>.zip` / `mz-<commit-hash>.zip`
@@ -107,7 +122,7 @@ pnpm test:mz        # 只测 MZ
 - 把当前 `cheat-engine/www/cheat` 同步到测试游戏（MV 为 `www/cheat`，MZ 为 `cheat`），并替换 `main.js`；
 - 备份并在结束后还原设置目录（MV 为 `www/cheat-settings/`，MZ 为 `cheat-settings/`）与 `save/global.*`，测试只用空闲存档槽，不覆盖现有存档；
 - 覆盖启动、UI 挂载、15 个面板、键盘快捷键、穿墙 / 速度 / 游戏速度 / 随机遇敌 / 无敌、金币 / 等级 / 变量 / 开关 / 传送 / 地图事件、快捷键与设置在磁盘上的持久化，以及存档时间机器的保存 / 快照 / 还原 / 复制到其他槽 / 快速读取 / 导入导出；
-- 覆盖稳定性回归：分页 `All` 边界、原子写入、初始化提示队列、弹层点击拦截、技能字段缺失、对象变量 JSON 编辑、传送越界、game-ready 保护、Vue `markRaw` 与旧快照回填标记；
+- 覆盖稳定性回归：分页 `All` 边界与过滤后页码回收、原子写入失败清理、初始化提示队列及 20 条上限、弹层（菜单 / snackbar / tooltip）点击拦截、技能字段缺失、对象变量 JSON 编辑、传送坐标 / 地图校验、game-ready 保护、Vue `markRaw`、损坏的存读位置数据、物品数量与技能增删、恢复默认快捷键、自动快照保留份数裁剪与旧快照回填标记；
 - 校验 `tools/pack.mjs` 生成的 MV / MZ 压缩包目录结构、`main.js` 内容，以及 `main.js` 引用的入口路径确实存在于压缩包内。
 
 要求 Node.js >= 22（测试脚本使用内置 `WebSocket` 连接 nw.js 的 CDP）。
@@ -118,13 +133,15 @@ pnpm test:mz        # 只测 MZ
 |---|---|
 | `cheat-engine/www/cheat/` | Cheat UI 源码 (Vue 3 + Vuetify 4, ES Module) |
 | `cheat-engine/www/cheat/panels/` | 各功能面板组件 |
-| `cheat-engine/www/cheat/components/` | 通用 UI 组件 |
+| `cheat-engine/www/cheat/components/` | 通用 UI 组件（`SearchField`、`RefreshButton`、`PaginationFooter` 等） |
+| `cheat-engine/www/cheat/components/PaginationFooter.js` | 统一分页栏（每页条数 / 范围 / 页码 / 跳转） |
 | `cheat-engine/www/cheat/js/` | 工具函数 / Cheat API |
 | `cheat-engine/www/cheat/js/SettingsPath.js` | MV/MZ 设置目录与旧目录迁移 |
 | `cheat-engine/www/cheat/js/LockService.js` | 全局开关 / 变量锁定服务 |
 | `cheat-engine/www/cheat/js/AtomicFile.js` | 原子写入 JSON / 文本文件 |
 | `cheat-engine/www/cheat/js/GameState.js` | 游戏数据就绪检查 |
 | `cheat-engine/www/cheat/js/PaginationHelper.js` | 统一分页计算（含“全部”） |
+| `cheat-engine/www/cheat/js/strings.js` | 共享 UI 文案（搜索 / 分页 / 刷新 / 导航名称） |
 | `cheat-engine/www/cheat/js/ClickGuard.js` | 作弊 UI / 弹层点击拦截 |
 | `cheat-engine/www/cheat/init/` | 插件入口 & 初始化 |
 | `cheat-engine/www/cheat/libs/` | 第三方库 (Vue, Vuetify, Shiki) |
@@ -133,6 +150,10 @@ pnpm test:mz        # 只测 MZ
 | `cheat-engine/www/_cheat_initialize/mv/` | MV 替换用 `main.js` |
 | `cheat-engine/www/_cheat_initialize/mz/` | MZ 替换用 `main.js` |
 | `tools/` | Vendor 构建脚本 |
+| `tests/` | nw.js 无头端到端测试（需要测试游戏与 nwjs-sdk） |
+| `tests/unit/` | `node --test` 纯函数单元测试（CI 可直接运行） |
+| `tests/run-packaging.mjs` | 只跑压缩包结构测试，不需要测试游戏 |
+| `CHANGELOG.md` | 版本变更记录 |
 
 ## 工作原理
 
@@ -224,9 +245,23 @@ make vendor            # 生成全部 vendor 文件
 
 最简单的方式是直接 `pnpm i && make`，构建时会按依赖自动补齐全部 vendor 文件。
 
+## 版本与发布
+
+- `package.json` 的 `version` 是唯一的语义化版本来源（当前 `1.3.0`）。
+- 构建时 `tools/gen-version.mjs` 会把版本与 commit 写进 `cheat/version.js`（`RPGSEMVER` / `RPGVERSION`），面板底部显示 `v<版本> · <commit>`。
+- 每次发版请同时更新 `package.json`、`CHANGELOG.md`，并打 `vX.Y.Z` 标签；压缩包仍按 commit 短哈希命名。
+- 版本历史见 [`CHANGELOG.md`](CHANGELOG.md)。
+
 ## CI
 
-GitHub Actions 在推送到 `main`、`vue-3` 时自动构建并上传 `.zip` 产物。
+GitHub Actions 在推送到 `main`、`vue-3`（以及相关 `pull_request`）时执行：
+
+1. `pnpm run lint`、`pnpm run format:check`
+2. `pnpm run test:unit`（纯函数单测）
+3. `make` 构建 MV / MZ 压缩包
+4. `pnpm run test:packaging` 校验压缩包目录结构与入口路径
+
+最后上传两个 `.zip` 产物。完整的 nw.js 无头测试仍需本地准备 `mv/`、`mz/` 测试游戏，未放进 CI。
 
 ## 许可证
 

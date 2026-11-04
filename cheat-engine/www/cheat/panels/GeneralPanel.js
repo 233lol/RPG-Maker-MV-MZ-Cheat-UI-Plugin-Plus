@@ -6,8 +6,9 @@ import {
   BattleCheat,
 } from "../js/CheatHelper.js";
 
+import RefreshButton from "../components/RefreshButton.js";
 import interpretCodes from "../js/eventCodes.js";
-import { RPGVERSION } from "../version.js";
+import * as BuildVersion from "../version.js";
 
 // shiki 体积较大，改为首次使用时动态加载并缓存，避免随面板启动解析
 let codeToHtmlPromise = null;
@@ -38,6 +39,8 @@ function plainParamHtml(text) {
 
 export default {
   name: "GeneralPanel",
+
+  components: { RefreshButton },
 
   template: `
 <v-card 
@@ -263,21 +266,10 @@ export default {
             {{ versionLabel }}
         </a>
     </v-card-text>
-    <v-tooltip
-        location="bottom">
-        <template #activator="{ props }">
-            <v-btn
-                color="pink"
-                size="small"
-                icon
-                style="position: absolute; top: 0px; right: 0px;"
-                v-bind="props"
-                @click="initializeVariables">
-                <v-icon>mdi-refresh</v-icon>
-            </v-btn>
-        </template>
-        <span>重新加载游戏数据</span>
-    </v-tooltip>
+    <refresh-button
+        btn-style="position: absolute; top: 0px; right: 0px;"
+        @click="initializeVariables">
+    </refresh-button>
 </v-card>
     `,
 
@@ -658,10 +650,7 @@ export default {
         return true;
       }
 
-      if (
-        typeof node.closest === "function" &&
-        node.closest(".v-dialog")
-      ) {
+      if (typeof node.closest === "function" && node.closest(".v-dialog")) {
         return true;
       }
 
@@ -793,11 +782,16 @@ export default {
     },
 
     versionLabel() {
-      return `Commit ${RPGVERSION}, Vue 3 + Vuetify 4`;
+      const commit = BuildVersion.RPGVERSION || "unknown";
+      const semver = BuildVersion.RPGSEMVER;
+
+      return semver
+        ? `v${semver} · ${commit} · Vue 3 + Vuetify 4`
+        : `Commit ${commit} · Vue 3 + Vuetify 4`;
     },
 
     versionUrl() {
-      return `https://github.com/233lol/RPG-Maker-MV-MZ-Cheat-UI-Plugin-Plus/commit/${RPGVERSION}`;
+      return `https://github.com/233lol/RPG-Maker-MV-MZ-Cheat-UI-Plugin-Plus/commit/${BuildVersion.RPGVERSION}`;
     },
   },
 };

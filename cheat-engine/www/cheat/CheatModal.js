@@ -1,3 +1,4 @@
+import { t } from "./js/strings.js";
 import GeneralPanel from "./panels/GeneralPanel.js";
 import HealthSettingPanel from "./panels/HealthSettingPanel.js";
 import StatsSettingPanel from "./panels/StatsSettingPanel.js";
@@ -103,87 +104,87 @@ export default {
   data() {
     return {
       navWidth: 160,
-      openedGroups: ['物品'],
+      openedGroups: [t("nav.items")],
 
       navTreeItems: [
         {
-          name: "常用",
+          name: t("nav.general"),
           icon: "mdi-hammer-screwdriver",
           component: "general-panel",
         },
         {
-          name: "战斗",
+          name: t("nav.battle"),
           icon: "mdi-battery-70",
           component: "health-setting-panel",
         },
         {
-          name: "等级/属性",
+          name: t("nav.stats"),
           icon: "mdi-sword-cross",
           component: "stats-setting-panel",
         },
         {
-          name: "物品",
+          name: t("nav.items"),
           icon: "mdi-bag-personal-outline",
           children: [
             {
-              name: "道具",
+              name: t("nav.item"),
               icon: "mdi-flask-empty-plus",
               component: "item-setting-panel",
             },
             {
-              name: "武器",
+              name: t("nav.weapon"),
               icon: "mdi-sword",
               component: "weapon-setting-panel",
             },
             {
-              name: "防具",
+              name: t("nav.armor"),
               icon: "mdi-shield-plus",
               component: "armor-setting-panel",
             },
           ],
         },
-          {
-              name: "技能",
-              icon: "mdi-lightning-bolt",
-              component: "skill-setting-panel",
-          },
-          {
-              name: "变量",
-              icon: "mdi-variable",
-              component: "variable-setting-panel",
-          },
-          {
-              name: "全局变量",
-              icon: "mdi-file-tree",
-              component: "global-variable-panel",
-          },
         {
-          name: "开关",
+          name: t("nav.skill"),
+          icon: "mdi-lightning-bolt",
+          component: "skill-setting-panel",
+        },
+        {
+          name: t("nav.variable"),
+          icon: "mdi-variable",
+          component: "variable-setting-panel",
+        },
+        {
+          name: t("nav.globalVariable"),
+          icon: "mdi-file-tree",
+          component: "global-variable-panel",
+        },
+        {
+          name: t("nav.switch"),
           icon: "mdi-toggle-switch",
           component: "switch-setting-panel",
         },
         {
-          name: "存读位置",
+          name: t("nav.saveLocation"),
           icon: "mdi-map-marker-plus",
           component: "save-recall-panel",
         },
         {
-          name: "存档时间机器",
+          name: t("nav.saveBackup"),
           icon: "mdi-backup-restore",
           component: "save-backup-panel",
         },
         {
-          name: "传送",
+          name: t("nav.teleport"),
           icon: "mdi-run-fast",
           component: "teleport-panel",
         },
         {
-          name: "地图事件",
+          name: t("nav.mapEvent"),
           icon: "mdi-map-search",
           component: "map-event-panel",
         },
         {
-          name: "快捷键",
+          name: t("nav.shortcut"),
           icon: "mdi-keyboard-outline",
           component: "shortcut-panel",
         },

@@ -157,12 +157,12 @@ export function registerGameplay({ test, page, type, state }) {
       result.maxHp,
       "战斗面板没有恢复全员 HP",
     );
+    assert.equal(result.levelAfter, result.nextLevel, "属性面板修改等级失败");
     assert.equal(
-      result.levelAfter,
-      result.nextLevel,
-      "属性面板修改等级失败",
+      result.godAfterOn,
+      !result.godBefore,
+      "属性面板没有切换无敌模式",
     );
-    assert.equal(result.godAfterOn, !result.godBefore, "属性面板没有切换无敌模式");
     assert.equal(result.godAfterOff, result.godBefore, "无敌模式没有还原");
   });
 
@@ -248,13 +248,21 @@ export function registerGameplay({ test, page, type, state }) {
     assert.notEqual(result.oldSwitch, result.newSwitch, "开关面板没有切换开关");
     assert.equal(result.recallAfterAdd, result.recallBefore + 1);
     assert.equal(result.recallAfterRemove, result.recallBefore);
-    assert.equal(result.reservedMapId, result.mapId, "传送面板没有设置目标地图");
+    assert.equal(
+      result.reservedMapId,
+      result.mapId,
+      "传送面板没有设置目标地图",
+    );
     assert.deepEqual(
       result.reservedPosition,
       result.expectedPosition,
       "传送面板没有把玩家放到目标坐标",
     );
-    assert.equal(result.mapEventMapId, result.mapId, "地图事件面板地图 ID 不同步");
+    assert.equal(
+      result.mapEventMapId,
+      result.mapId,
+      "地图事件面板地图 ID 不同步",
+    );
     assert.equal(result.hasMapData, true, "地图事件面板没有加载地图数据");
   });
 
@@ -340,17 +348,12 @@ export function registerGameplay({ test, page, type, state }) {
           "variable-setting-panel",
           "VariableSettingPanel",
         );
-        await api.waitFor(
-          () => variablePanel.tableItems.length > 0,
-          5000,
-          50,
-        );
+        await api.waitFor(() => variablePanel.tableItems.length > 0, 5000, 50);
         const switchPanelUnmounted = !api.panel("SwitchSettingPanel");
 
         variableItem = variablePanel.tableItems.find(
           (item) =>
-            item.id > 0 &&
-            typeof $gameVariables.value(item.id) === "number",
+            item.id > 0 && typeof $gameVariables.value(item.id) === "number",
         );
         oldVariable = $gameVariables.value(variableItem.id);
         lockedVariableValue = oldVariable + 1;
@@ -455,8 +458,16 @@ export function registerGameplay({ test, page, type, state }) {
     });
 
     assert.equal(result.firstPatched, true, "随机遇敌没有立即关闭");
-    assert.equal(result.secondPatched, true, "新玩家实例没有重新套用随机遇敌补丁");
-    assert.equal(result.secondRestored, true, "关闭后没有恢复原始 canEncounter");
+    assert.equal(
+      result.secondPatched,
+      true,
+      "新玩家实例没有重新套用随机遇敌补丁",
+    );
+    assert.equal(
+      result.secondRestored,
+      true,
+      "关闭后没有恢复原始 canEncounter",
+    );
     assert.equal(result.hooksInstalled, true, "读档 / 新游戏钩子没有安装");
   });
 
@@ -496,6 +507,14 @@ export function registerGameplay({ test, page, type, state }) {
       GLOBAL_SHORTCUT.writeShortcutSettings();
       const restored = JSON.parse(fs.readFileSync(shortcutFile, "utf-8"));
 
+      GLOBAL_SHORTCUT.restoreDefaultSettings();
+      const afterReset = JSON.parse(fs.readFileSync(shortcutFile, "utf-8"));
+      const runtimeAfterReset =
+        GLOBAL_SHORTCUT.getShortcut("toggleNoClip").asString();
+      const tempLeftovers = fs
+        .readdirSync(settingsDir)
+        .filter((name) => name.endsWith(".tmp"));
+
       const kvPath = getCheatSettingsPath("test-kv.json");
       const storage = new KeyValueStorage(kvPath);
       storage.setItem("hello", "世界");
@@ -523,6 +542,9 @@ export function registerGameplay({ test, page, type, state }) {
         defaultShortcut: defaults.toggleCheatModal?.shortcut,
         changedShortcut: changed.toggleNoClip?.shortcut,
         restoredShortcut: restored.toggleNoClip?.shortcut,
+        resetShortcut: afterReset.toggleNoClip?.shortcut,
+        runtimeAfterReset,
+        tempLeftovers,
         kvFileValue: kvFile.hello,
         kvRead,
         gameSpeedData: gameSpeedFile.data,
@@ -540,7 +562,18 @@ export function registerGameplay({ test, page, type, state }) {
     assert.equal(result.defaultShortcut, "ctrl c");
     assert.equal(result.changedShortcut, "alt q", "快捷键修改没有落盘");
     assert.equal(result.restoredShortcut, "alt w", "快捷键没有还原");
-    assert.equal(result.kvFileValue, "世界", "KeyValueStorage 没有写入 UTF-8 内容");
+    assert.equal(result.resetShortcut, "alt w", "恢复默认快捷键没有写回默认值");
+    assert.equal(
+      result.runtimeAfterReset,
+      "alt w",
+      "恢复默认后运行时状态没有刷新",
+    );
+    assert.deepEqual(result.tempLeftovers, [], "快捷键写入残留了临时文件");
+    assert.equal(
+      result.kvFileValue,
+      "世界",
+      "KeyValueStorage 没有写入 UTF-8 内容",
+    );
     assert.equal(result.kvRead, "世界", "KeyValueStorage 没有读回内容");
     assert.equal(result.blurCleared, true, "窗口失焦后没有清空当前组合键");
 

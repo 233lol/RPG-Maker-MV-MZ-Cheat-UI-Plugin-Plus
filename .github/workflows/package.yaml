@@ -8,8 +8,13 @@ on:
     paths:
       - "cheat-engine/**"
       - "tools/**"
+      - "tests/**"
       - "Makefile"
       - ".github/workflows/**"
+      - "eslint.config.mjs"
+      - ".prettierrc.json"
+      - ".prettierignore"
+      - ".editorconfig"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
@@ -17,8 +22,13 @@ on:
     paths:
       - "cheat-engine/**"
       - "tools/**"
+      - "tests/**"
       - "Makefile"
       - ".github/workflows/**"
+      - "eslint.config.mjs"
+      - ".prettierrc.json"
+      - ".prettierignore"
+      - ".editorconfig"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
@@ -43,8 +53,16 @@ jobs:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+      - name: lint
+        run: pnpm run lint
+      - name: check formatting
+        run: pnpm run format:check
+      - name: unit tests
+        run: pnpm run test:unit
       - name: build and package
         run: make
+      - name: packaging tests
+        run: pnpm run test:packaging
       - name: Upload artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:

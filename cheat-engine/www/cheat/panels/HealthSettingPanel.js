@@ -1,3 +1,4 @@
+import RefreshButton from "../components/RefreshButton.js";
 import HealthSettingTab from "./HealthSettingTab.js";
 import { BattleCheat } from "../js/CheatHelper.js";
 import { isPartyReady } from "../js/GameState.js";
@@ -8,6 +9,7 @@ export default {
 
   components: {
     HealthSettingTab,
+    RefreshButton,
   },
 
   template: `
@@ -68,21 +70,10 @@ export default {
             </health-setting-tab>
         </v-card-text>
     </template>
-    <v-tooltip
-        location="bottom">
-        <template #activator="{ props }">
-            <v-btn
-                color="pink"
-                size="small"
-                icon
-                style="position: absolute; top: 0px; right: 0px;"
-                v-bind="props"
-                @click="initializeVariables">
-                <v-icon>mdi-refresh</v-icon>
-            </v-btn>
-        </template>
-        <span>重新加载游戏数据</span>
-    </v-tooltip>
+    <refresh-button
+        btn-style="position: absolute; top: 0px; right: 0px;"
+        @click="initializeVariables">
+    </refresh-button>
 </v-card>
     `,
 
@@ -100,15 +91,10 @@ export default {
 
   methods: {
     initializeVariables() {
-      if (
-        !isPartyReady() ||
-        typeof $gameTroop === "undefined" ||
-        !$gameTroop
-      ) {
+      if (!isPartyReady() || typeof $gameTroop === "undefined" || !$gameTroop) {
         this.enemy = [];
         this.party = [];
-        this.disableRandomEncounter =
-          BattleCheat.isDisableRandomEncounter();
+        this.disableRandomEncounter = BattleCheat.isDisableRandomEncounter();
         return;
       }
 

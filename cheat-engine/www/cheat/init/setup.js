@@ -1,5 +1,11 @@
 import { createApp } from "../libs/vue.js";
-import { createVuetify, components, directives, aliases, mdi } from "../libs/vuetify.js";
+import {
+  createVuetify,
+  components,
+  directives,
+  aliases,
+  mdi,
+} from "../libs/vuetify.js";
 
 import MainComponent from "../MainComponent.js";
 

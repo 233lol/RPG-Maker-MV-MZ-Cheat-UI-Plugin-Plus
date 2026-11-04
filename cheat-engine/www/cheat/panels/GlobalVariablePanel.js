@@ -1,9 +1,15 @@
-import PageJump from "../components/PageJump.js";
+import PaginationFooter from "../components/PaginationFooter.js";
+import RefreshButton from "../components/RefreshButton.js";
+import SearchField from "../components/SearchField.js";
 import { Alert } from "../js/AlertHelper.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
 import { getCheatSettingsPath } from "../js/SettingsPath.js";
-import { getPageBounds, getPageCount, paginate, paginationWatcherMixin } from "../js/PaginationHelper.js";
+import {
+  getPageCount,
+  paginate,
+  paginationWatcherMixin,
+} from "../js/PaginationHelper.js";
 import { markRaw } from "../libs/vue.js";
 import {
   ROOT_FILTERS,
@@ -99,25 +105,16 @@ export default {
 
   mixins: [paginationWatcherMixin],
 
-  components: { PageJump },
+  components: { PaginationFooter, RefreshButton, SearchField },
 
   template: `
 <v-card flat class="ma-0 pa-0">
     <div class="d-flex align-center">
-        <v-text-field
-            label="搜索变量名 / 值..."
-            variant="solo"
-            bg-color="grey-darken-3"
+        <search-field
             v-model="search"
-            density="compact"
-            hide-details
+            label="搜索变量名 / 值..."
             clearable
-            class="flex-grow-1"
-            @focus="$event.target.select()"
-            @keydown.stop>
-            <template #prepend-inner>
-                <v-icon size="small">mdi-magnify</v-icon>
-            </template>
+            prepend-icon="mdi-magnify">
             <template #append-inner>
                 <v-tooltip location="bottom">
                     <template #activator="{ props }">
@@ -133,21 +130,11 @@ export default {
                     <span>{{ deepSearch ? '关闭深度搜索（只搜索当前层）' : '深度搜索（递归搜索所有嵌套变量）' }}</span>
                 </v-tooltip>
             </template>
-        </v-text-field>
-        <v-tooltip location="bottom">
-            <template #activator="{ props }">
-                <v-btn
-                    v-bind="props"
-                    color="pink"
-                    size="small"
-                    icon
-                    class="ml-2"
-                    @click="reloadAll">
-                    <v-icon>mdi-refresh</v-icon>
-                </v-btn>
-            </template>
-            <span>重新加载游戏数据</span>
-        </v-tooltip>
+        </search-field>
+        <refresh-button
+            btn-class="ml-2"
+            @click="reloadAll">
+        </refresh-button>
         <v-tooltip location="bottom">
             <template #activator="{ props }">
                 <v-btn
@@ -387,36 +374,18 @@ export default {
         </div>
     </div>
 
-    <div v-else class="d-flex align-center justify-space-between mt-1">
-        <div class="d-flex align-center">
-            <span class="text-body-small mr-2">每页</span>
-            <v-select
-                v-model="pagination.itemsPerPage"
-                :items="itemsPerPageOptions"
-                density="compact"
-                hide-details
-                variant="outlined"
-                style="width: 96px;">
-            </v-select>
-        </div>
-        <div class="d-flex align-center ga-2">
-            <span class="text-body-small text-no-wrap">{{ paginationStart }}-{{ paginationStop }} / {{ totalCount }}</span>
-            <v-pagination
-                v-if="showPagination"
-                v-model="pagination.page"
-                :length="pageCount"
-                density="compact"
-                :total-visible="5"
-                size="small">
-            </v-pagination>
-            <page-jump
-                v-if="showPagination"
-                :page="pagination.page"
-                :page-count="pageCount"
-                @jump="jumpToPage">
-            </page-jump>
-        </div>
-    </div>
+    <pagination-footer
+        v-else
+        v-model:page="pagination.page"
+        v-model:items-per-page="pagination.itemsPerPage"
+        :total="totalCount"
+        :page-count="pageCount"
+        :items-per-page-options="itemsPerPageOptions"
+        :show-pagination="showPagination"
+        select-width="96px"
+        wrapper-class="mt-1"
+        @jump="jumpToPage">
+    </pagination-footer>
     <v-dialog v-model="jsonDialog.show" max-width="720" persistent>
         <v-card
             @keydown.stop
@@ -757,22 +726,6 @@ export default {
     showPagination() {
       return this.pageCount > 1;
     },
-
-    paginationStart() {
-      return getPageBounds(
-        this.totalCount,
-        this.pagination.page,
-        this.pagination.itemsPerPage,
-      ).start;
-    },
-
-    paginationStop() {
-      return getPageBounds(
-        this.totalCount,
-        this.pagination.page,
-        this.pagination.itemsPerPage,
-      ).stop;
-    },
   },
 
   methods: {
@@ -945,9 +898,7 @@ export default {
           : String(highlightKey);
 
       const page =
-        this.highlightKey === null
-          ? 1
-          : this.findPageOfKey(this.highlightKey);
+        this.highlightKey === null ? 1 : this.findPageOfKey(this.highlightKey);
 
       // 切换层级后清空搜索框与搜索结果，避免新层级里的变量被搜索词过滤。
       // 清空搜索会触发 watcher 把分页重置到第 1 页，

@@ -962,7 +962,7 @@ export function scanRootGlobals(root = window) {
     }
   });
 
-  let ownNames = [];
+  let ownNames;
   try {
     ownNames = Object.getOwnPropertyNames(root);
   } catch (error) {
@@ -1250,4 +1250,3 @@ export const SEARCH_LIMIT_REASONS = {
 if (typeof window !== "undefined" && typeof document !== "undefined") {
   prewarmGlobalObjectHelper();
 }
-

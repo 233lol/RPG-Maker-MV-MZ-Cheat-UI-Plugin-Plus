@@ -53,7 +53,7 @@ export default {
 
   mounted() {
     this.alertHandler = (level, msg, err = null, timeout = 1500) => {
-      let color = null;
+      let color;
       switch (level) {
         case "success":
           color = "green";
@@ -88,7 +88,6 @@ export default {
   beforeUnmount() {
     Alert.clearHandler(this.alertHandler);
   },
-
 
   methods: {
     show(options) {

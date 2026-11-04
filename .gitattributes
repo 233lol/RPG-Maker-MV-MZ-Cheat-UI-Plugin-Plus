@@ -1,3 +1,7 @@
+# Keep the working tree LF-only so Prettier/ESLint results are stable on Windows
+# (core.autocrlf=true would otherwise rewrite files to CRLF on checkout).
+* text=auto eol=lf
+
 cheat-engine/www/cheat/libs/*         linguist-vendored
 cheat-engine/www/cheat/css/*          linguist-vendored
 cheat-engine/www/cheat/css/main.css  -linguist-vendored

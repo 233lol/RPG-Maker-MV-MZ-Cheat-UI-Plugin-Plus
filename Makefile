@@ -21,7 +21,7 @@ src := $(call rwildcard,cheat-engine/www/cheat/,*) $(call rwildcard,cheat-engine
 # 默认生产构建；`make dev` 会以 VUE=dev 覆盖，仅在打包期间使用开发构建
 VUE ?= prod
 
-.PHONY: all clean vendor dev prod ui-vendor force-version $(type)
+.PHONY: all clean vendor dev prod check ui-vendor force-version $(type)
 
 all: $(type)
 
@@ -42,6 +42,12 @@ dev:
 # prod: 使用 Vue 生产构建打包（与 make 等价）
 prod:
 	$(MAKE) VUE=prod $(type)
+
+# 静态检查 + 纯函数单测（不需要测试游戏 / nwjs-sdk）
+check:
+	pnpm run lint
+	pnpm run format:check
+	pnpm run test:unit
 
 $(vuetifycss) $(mdicss) $(mdifonts):
 	pnpm run vendor:assets$(if $(filter dev,$(VUE)),:dev)

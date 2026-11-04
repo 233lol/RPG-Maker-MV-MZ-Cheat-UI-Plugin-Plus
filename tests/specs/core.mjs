@@ -104,7 +104,10 @@ export function registerCore({ test, page, type, state }) {
     assert.equal(game.scene, "Scene_Map");
     assert.ok(game.mapId > 0, `地图 ID 无效: ${game.mapId}`);
     assert.ok(game.party.length > 0, "队伍里没有角色");
-    assert.ok(game.party.every((actor) => actor.mhp > 0), "角色最大 HP 异常");
+    assert.ok(
+      game.party.every((actor) => actor.mhp > 0),
+      "角色最大 HP 异常",
+    );
     assert.ok(Number.isFinite(game.gold), "金币数值异常");
 
     state.game = game;
@@ -147,7 +150,13 @@ export function registerCore({ test, page, type, state }) {
     });
 
     assert.ok(nav.count >= 16, `导航项数量异常: ${nav.count}`);
-    for (const title of ["常用", "物品", "全局变量", "存档时间机器", "快捷键"]) {
+    for (const title of [
+      "常用",
+      "物品",
+      "全局变量",
+      "存档时间机器",
+      "快捷键",
+    ]) {
       assert.ok(nav.titles.includes(title), `导航缺少「${title}」`);
     }
 
@@ -158,10 +167,10 @@ export function registerCore({ test, page, type, state }) {
       modifiers: 2,
     });
 
-    const closed = await page.waitFor(
-      () => !window.__cheatTest.main()?.show,
-      { timeout: 5000, label: "Ctrl+C 关闭作弊窗口" },
-    );
+    const closed = await page.waitFor(() => !window.__cheatTest.main()?.show, {
+      timeout: 5000,
+      label: "Ctrl+C 关闭作弊窗口",
+    });
 
     assert.equal(closed, true);
   });
@@ -181,11 +190,15 @@ export function registerCore({ test, page, type, state }) {
           switches: proxy.switchNames?.length,
           maps: proxy.maps?.length,
           shortcuts: proxy.shortcuts?.length,
-          backups: Array.isArray(proxy.backups) ? proxy.backups.length : undefined,
+          backups: Array.isArray(proxy.backups)
+            ? proxy.backups.length
+            : undefined,
           locations: Array.isArray(proxy.locations)
             ? proxy.locations.length
             : undefined,
-          entries: Array.isArray(proxy.entries) ? proxy.entries.length : undefined,
+          entries: Array.isArray(proxy.entries)
+            ? proxy.entries.length
+            : undefined,
           loaded: proxy.initialLoaded,
           mapId: proxy.currentMapId,
         };
@@ -220,6 +233,7 @@ export function registerCore({ test, page, type, state }) {
       return {
         panels: output,
         version: versionModule.RPGVERSION,
+        semver: versionModule.RPGSEMVER,
         modalText,
       };
     }, PANELS);
@@ -244,7 +258,10 @@ export function registerCore({ test, page, type, state }) {
     assert.ok(metrics("SwitchSettingPanel").switches > 0, "开关列表为空");
     assert.ok(metrics("TeleportPanel").maps > 0, "传送地图列表为空");
     assert.ok(metrics("ShortcutPanel").shortcuts > 0, "快捷键列表为空");
-    assert.ok(metrics("GlobalVariablePanel").loaded, "全局变量面板没有完成初始化");
+    assert.ok(
+      metrics("GlobalVariablePanel").loaded,
+      "全局变量面板没有完成初始化",
+    );
     assert.ok(metrics("GlobalVariablePanel").entries > 0, "全局变量列表为空");
     assert.equal(
       metrics("MapEventPanel").mapId,
@@ -253,9 +270,14 @@ export function registerCore({ test, page, type, state }) {
     );
 
     assert.ok(result.version, "version.js 没有导出 RPGVERSION");
+    assert.ok(result.semver, "version.js 没有导出 RPGSEMVER");
     assert.ok(
-      result.modalText.includes(`Commit ${result.version}`),
-      `版本号没有显示在界面上（期望 Commit ${result.version}）`,
+      result.modalText.includes(`v${result.semver}`),
+      `界面上没有显示语义化版本（期望 v${result.semver}）`,
+    );
+    assert.ok(
+      result.modalText.includes(result.version),
+      `界面上没有显示 commit（期望 ${result.version}）`,
     );
 
     state.version = result.version;

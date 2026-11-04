@@ -1,11 +1,11 @@
 import KeyInputField from "../components/KeyInputField.js";
-import PageJump from "../components/PageJump.js";
+import PaginationFooter from "../components/PaginationFooter.js";
+import SearchField from "../components/SearchField.js";
 import { GLOBAL_SHORTCUT } from "../js/GlobalShortcut.js";
 import { Key } from "../js/KeyCodes.js";
 import { Alert } from "../js/AlertHelper.js";
 import {
   ITEMS_PER_PAGE_OPTIONS,
-  getPageBounds,
   getPageCount,
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
@@ -17,7 +17,8 @@ export default {
 
   components: {
     KeyInputField,
-    PageJump,
+    PaginationFooter,
+    SearchField,
   },
 
   template: `
@@ -26,17 +27,11 @@ export default {
         <v-col
             cols="12"
             md="8">
-            <v-text-field
-                label="搜索..."
-                variant="solo"
-                bg-color="grey-darken-3"
+            <search-field
                 v-model="search"
-                density="compact"
-                hide-details
-                @update:model-value="onSearchChange"
-                @focus="$event.target.select()"
-                @keydown.stop>
-            </v-text-field>
+                field-class=""
+                @update:model-value="onSearchChange">
+            </search-field>
         </v-col>
         <v-col
             cols="12"
@@ -156,28 +151,15 @@ export default {
             </td>
         </template>
          <template #bottom>
-             <div class="d-flex align-center justify-space-between pa-2">
-                 <div class="d-flex align-center">
-                     <span class="text-body-small mr-2">每页</span>
-                     <v-select
-                         v-model="pagination.itemsPerPage"
-                         :items="[5, 10, 15, 20]"
-                         density="compact"
-                         hide-details
-                         variant="outlined"
-                         style="width: 70px;"
-                     ></v-select>
-                 </div>
-                 <div class="d-flex align-center ga-2">
-                     <span class="text-body-small text-no-wrap">{{ paginationStart }}-{{ paginationStop }} / {{ totalCount }}</span>
-                     <v-pagination v-model="pagination.page" :length="pageCount" density="compact" :total-visible="5" size="small"></v-pagination>
-                     <page-jump
-                         :page="pagination.page"
-                         :page-count="pageCount"
-                         @jump="jumpToPage">
-                     </page-jump>
-                 </div>
-             </div>
+             <pagination-footer
+                 v-model:page="pagination.page"
+                 v-model:items-per-page="pagination.itemsPerPage"
+                 :total="totalCount"
+                 :page-count="pageCount"
+                 :items-per-page-options="[5, 10, 15, 20]"
+                 select-width="70px"
+                 @jump="jumpToPage">
+             </pagination-footer>
          </template>
     </v-data-table>
 </v-card>
@@ -236,10 +218,11 @@ export default {
       });
       if (this.search && this.search.trim()) {
         const s = this.search.toLowerCase();
-        items = items.filter((item) =>
-          item.name.toLowerCase().includes(s) ||
-          item.desc.toLowerCase().includes(s) ||
-          item.shortcut.asDisplayString().toLowerCase().includes(s)
+        items = items.filter(
+          (item) =>
+            item.name.toLowerCase().includes(s) ||
+            item.desc.toLowerCase().includes(s) ||
+            item.shortcut.asDisplayString().toLowerCase().includes(s),
         );
       }
       return items;
@@ -247,22 +230,6 @@ export default {
 
     totalCount() {
       return this.filteredShortcuts.length;
-    },
-
-    paginationStart() {
-      return getPageBounds(
-        this.totalCount,
-        this.pagination.page,
-        this.pagination.itemsPerPage,
-      ).start;
-    },
-
-    paginationStop() {
-      return getPageBounds(
-        this.totalCount,
-        this.pagination.page,
-        this.pagination.itemsPerPage,
-      ).stop;
     },
 
     pageCount() {
@@ -361,6 +328,5 @@ export default {
         },
       );
     },
-
   },
 };

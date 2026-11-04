@@ -22,7 +22,10 @@ function expand(pattern) {
   const base = norm.slice(slash + 1);
   const re = new RegExp(
     "^" +
-      base.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]") +
+      base
+        .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*/g, "[^/]*")
+        .replace(/\?/g, "[^/]") +
       "$",
   );
 
@@ -33,7 +36,9 @@ function expand(pattern) {
     return [];
   }
 
-  return entries.filter((e) => re.test(e)).map((e) => (dir ? `${dir}/${e}` : e));
+  return entries
+    .filter((e) => re.test(e))
+    .map((e) => (dir ? `${dir}/${e}` : e));
 }
 
 let removed = 0;

@@ -379,7 +379,10 @@ export default {
         if ($gamePlayer) {
           const newX = $gamePlayer.x;
           const newY = $gamePlayer.y;
-          if (newX !== this.playerPosition.x || newY !== this.playerPosition.y) {
+          if (
+            newX !== this.playerPosition.x ||
+            newY !== this.playerPosition.y
+          ) {
             this.playerPosition = { x: newX, y: newY };
             this.needsRedraw = true;
           }
@@ -615,9 +618,12 @@ export default {
               typeof gameEvent.page === "function" ? gameEvent.page() : null;
             const moving = page ? Number(page.moveType) > 0 : false;
 
-            if (enemy.x !== gameEvent._x || enemy.y !== gameEvent._y ||
-                enemy.direction !== gameEvent._direction ||
-                enemy.moving !== moving) {
+            if (
+              enemy.x !== gameEvent._x ||
+              enemy.y !== gameEvent._y ||
+              enemy.direction !== gameEvent._direction ||
+              enemy.moving !== moving
+            ) {
               changed = true;
             }
             enemy.x = gameEvent._x;

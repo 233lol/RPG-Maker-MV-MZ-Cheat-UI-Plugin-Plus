@@ -17,7 +17,10 @@ import { registerStability } from "./specs/stability.mjs";
 import { registerSaveBackup } from "./specs/save-backup.mjs";
 import { registerPackaging } from "./specs/packaging.mjs";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 
 function parseArgs(argv) {
   const args = {
@@ -109,10 +112,13 @@ async function main() {
     try {
       await game.start();
       await game.evaluate(installTestApi);
-      await game.waitFor(() => window.__cheatTest && window.__cheatTest.main(), {
-        timeout: 10000,
-        label: "测试 API 安装",
-      });
+      await game.waitFor(
+        () => window.__cheatTest && window.__cheatTest.main(),
+        {
+          timeout: 10000,
+          label: "测试 API 安装",
+        },
+      );
 
       registerCore({ test: runner.test, page: game, type, state });
       registerGameplay({ test: runner.test, page: game, type, state });

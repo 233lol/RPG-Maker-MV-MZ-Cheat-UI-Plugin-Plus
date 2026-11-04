@@ -5,9 +5,9 @@ import { requireGameReady } from "./GameState.js";
 
 export class GeneralCheat {
   // will be replaced from main component
-  static toggleCheatModal(componentName = null) { }
+  static toggleCheatModal(componentName = null) {}
 
-  static openCheatModal(componentName = null) { }
+  static openCheatModal(componentName = null) {}
 
   static toggleNoClip(notify = false) {
     // 键盘监听在 app 挂载时就绑定了，读档 / 加载转圈（MZ 还要初始化 effekseer
@@ -683,8 +683,7 @@ export class BattleCheat {
   // 读档 / 新游戏会换一个 Game_Player，旧实例的备份自然失效，不会把
   // 旧函数错误地装到新实例上。
   static applyRandomEncounterPatch() {
-    const player =
-      typeof $gamePlayer !== "undefined" ? $gamePlayer : null;
+    const player = typeof $gamePlayer !== "undefined" ? $gamePlayer : null;
 
     if (!player || typeof player.canEncounter !== "function") {
       return false;
@@ -704,8 +703,7 @@ export class BattleCheat {
   }
 
   static restoreRandomEncounterPatch() {
-    const player =
-      typeof $gamePlayer !== "undefined" ? $gamePlayer : null;
+    const player = typeof $gamePlayer !== "undefined" ? $gamePlayer : null;
 
     if (!player) {
       return false;
@@ -883,14 +881,12 @@ export class MessageCheat {
 }
 
 async function multiRetryAction(action, intervalTimeout, maxTryCount) {
-  let finished = false;
   let tryCount = 0;
 
   const interval = setInterval(() => {
     try {
       ++tryCount;
       action();
-      finished = true;
     } catch (e) {
       // 初始化读取失败按次重试，失败过程需要留痕（最后一次成功即不再输出）
       console.warn(e);
@@ -915,7 +911,7 @@ function initialize() {
     GameSpeedCheat.__readSettings,
   ];
 
-  const intervals = initializeActions.forEach((action) =>
+  initializeActions.forEach((action) =>
     multiRetryAction(action, intervalTimeout, maxTryCount),
   );
 }

@@ -1,10 +1,10 @@
-import PageJump from "../components/PageJump.js";
+import PaginationFooter from "../components/PaginationFooter.js";
+import RefreshButton from "../components/RefreshButton.js";
+import SearchField from "../components/SearchField.js";
 import { KEY_VALUE_STORAGE } from "../js/KeyValueStorage.js";
-import { Alert } from "../js/AlertHelper.js";
 import { isGameReady, requireGameReady } from "../js/GameState.js";
 import {
   ITEMS_PER_PAGE_OPTIONS,
-  getPageBounds,
   getPageCount,
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
@@ -14,7 +14,7 @@ export default {
 
   mixins: [paginationWatcherMixin],
 
-  components: { PageJump },
+  components: { PaginationFooter, RefreshButton, SearchField },
 
   template: `
 <v-card flat class="ma-0 pa-0">
@@ -62,32 +62,11 @@ export default {
          :items-per-page-options="itemsPerPageOptions">
         <template #top>
             <div class="d-flex align-center">
-                <v-text-field
-                    label="搜索..."
-                    variant="solo"
-                    bg-color="grey-darken-3"
-                    v-model="search"
-                    density="compact"
-                    hide-details
-                    class="flex-grow-1"
-                    @focus="$event.target.select()"
-                    @keydown.stop>
-                </v-text-field>
-                <v-tooltip
-                    location="bottom">
-                    <template #activator="{ props }">
-                        <v-btn
-                            color="pink"
-                            size="small"
-                            icon
-                            class="ml-2"
-                            v-bind="props"
-                            @click="initializeVariables">
-                            <v-icon>mdi-refresh</v-icon>
-                        </v-btn>
-                    </template>
-                    <span>重新加载游戏数据</span>
-                </v-tooltip>
+                <search-field v-model="search"></search-field>
+                <refresh-button
+                    btn-class="ml-2"
+                    @click="initializeVariables">
+                </refresh-button>
             </div>
         </template>
         <template
@@ -130,28 +109,14 @@ export default {
             </v-tooltip>
         </template>
          <template #bottom>
-             <div class="d-flex align-center justify-space-between pa-2">
-                 <div class="d-flex align-center">
-                     <span class="text-body-small mr-2">每页</span>
-                     <v-select
-                         v-model="pagination.itemsPerPage"
-                         :items="[5, 10, 15, 20]"
-                         density="compact"
-                         hide-details
-                         variant="outlined"
-                         style="width: 90px;"
-                     ></v-select>
-                 </div>
-                 <div class="d-flex align-center ga-2">
-                     <span class="text-body-small text-no-wrap">{{ paginationStart }}-{{ paginationStop }} / {{ totalCount }}</span>
-                     <v-pagination v-model="pagination.page" :length="pageCount" density="compact" :total-visible="5" size="small"></v-pagination>
-                     <page-jump
-                         :page="pagination.page"
-                         :page-count="pageCount"
-                         @jump="jumpToPage">
-                     </page-jump>
-                 </div>
-             </div>
+             <pagination-footer
+                 v-model:page="pagination.page"
+                 v-model:items-per-page="pagination.itemsPerPage"
+                 :total="totalCount"
+                 :page-count="pageCount"
+                 :items-per-page-options="[5, 10, 15, 20]"
+                 @jump="jumpToPage">
+             </pagination-footer>
          </template>
     </v-data-table>
 </v-card>
@@ -224,8 +189,12 @@ export default {
         const s = this.search.toLowerCase();
         items = items.filter(
           (item) =>
-            String(item.name ?? "").toLowerCase().includes(s) ||
-            String(item.mapName ?? "").toLowerCase().includes(s),
+            String(item.name ?? "")
+              .toLowerCase()
+              .includes(s) ||
+            String(item.mapName ?? "")
+              .toLowerCase()
+              .includes(s),
         );
       }
       return items;
@@ -233,22 +202,6 @@ export default {
 
     totalCount() {
       return this.filteredTableItems.length;
-    },
-
-    paginationStart() {
-      return getPageBounds(
-        this.totalCount,
-        this.pagination.page,
-        this.pagination.itemsPerPage,
-      ).start;
-    },
-
-    paginationStop() {
-      return getPageBounds(
-        this.totalCount,
-        this.pagination.page,
-        this.pagination.itemsPerPage,
-      ).stop;
     },
 
     pageCount() {
@@ -331,11 +284,16 @@ export default {
         ) {
           this.locations = parsed;
         } else {
-          console.warn("[cheat plugin] cheat.locations has unexpected structure, ignored");
+          console.warn(
+            "[cheat plugin] cheat.locations has unexpected structure, ignored",
+          );
           this.locations = [];
         }
       } catch (error) {
-        console.warn("[cheat plugin] Can't parse cheat.locations, reset to empty", error);
+        console.warn(
+          "[cheat plugin] Can't parse cheat.locations, reset to empty",
+          error,
+        );
         this.locations = [];
       }
     },

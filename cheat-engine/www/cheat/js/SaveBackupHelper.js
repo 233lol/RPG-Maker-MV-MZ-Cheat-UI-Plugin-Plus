@@ -184,7 +184,10 @@ export class SaveBackupCheat {
           : "",
       };
     } catch (error) {
-      console.warn("[cheat plugin] DataManager.loadSavefileInfo 读取失败", error);
+      console.warn(
+        "[cheat plugin] DataManager.loadSavefileInfo 读取失败",
+        error,
+      );
       return null;
     }
   }
@@ -400,7 +403,10 @@ export class SaveBackupCheat {
         }
       }
     } catch (error) {
-      console.warn("[cheat plugin] StorageManager.localFilePath 调用失败", error);
+      console.warn(
+        "[cheat plugin] StorageManager.localFilePath 调用失败",
+        error,
+      );
     }
 
     // MZ：只有 filePath(saveName)，传入 "fileN" 才会得到 fileN.rmmzsave
@@ -555,7 +561,10 @@ export class SaveBackupCheat {
       // 继续尝试相对路径
     }
 
-    for (const candidate of ["./js/libs/lz-string.js", "./www/js/libs/lz-string.js"]) {
+    for (const candidate of [
+      "./js/libs/lz-string.js",
+      "./www/js/libs/lz-string.js",
+    ]) {
       try {
         const loaded = require(candidate);
 
@@ -902,7 +911,9 @@ export class SaveBackupCheat {
 
     add(this.getPayloadPath(meta.id, meta));
     add(this.getPayloadPath(meta.id, { codec: "pako", saveExt: ".rmmzsave" }));
-    add(this.getPayloadPath(meta.id, { codec: "lzstring", saveExt: ".rpgsave" }));
+    add(
+      this.getPayloadPath(meta.id, { codec: "lzstring", saveExt: ".rpgsave" }),
+    );
 
     for (const file of candidates) {
       if (fs.existsSync(file)) {
@@ -931,7 +942,7 @@ export class SaveBackupCheat {
 
   static readMeta(id) {
     const fs = this.requireFs();
-    let file = null;
+    let file;
     let meta = null;
 
     try {
@@ -989,8 +1000,7 @@ export class SaveBackupCheat {
 
     const raw = fs.readFileSync(payloadFile, "utf-8");
     const codec =
-      meta.codec ||
-      (payloadFile.endsWith(".rmmzsave") ? "pako" : null);
+      meta.codec || (payloadFile.endsWith(".rmmzsave") ? "pako" : null);
 
     const jsonText = this.decodePayloadText(raw, codec, "快照数据");
 
@@ -1044,7 +1054,10 @@ export class SaveBackupCheat {
         }
       } catch (error) {
         // 存档损坏 / 压缩方式不认识（如 pako）都只影响展示，不影响快照本身
-        console.warn("[cheat plugin] 解析存档元数据失败，仅保留存档头信息", error);
+        console.warn(
+          "[cheat plugin] 解析存档元数据失败，仅保留存档头信息",
+          error,
+        );
       }
     } else {
       try {
@@ -1054,7 +1067,10 @@ export class SaveBackupCheat {
           saveObject = this.parseAnySaveData(text);
         }
       } catch (error) {
-        console.warn("[cheat plugin] 解析存档元数据失败，仅保留存档头信息", error);
+        console.warn(
+          "[cheat plugin] 解析存档元数据失败，仅保留存档头信息",
+          error,
+        );
       }
     }
 
@@ -1067,7 +1083,11 @@ export class SaveBackupCheat {
       //   标准 MV/MZ：player.map._mapId
       //   另一些版本：顶层 map._mapId（实测「芙兰与罪人之岛」就是这种）
       const mapId =
-        Number(saveObject.player && saveObject.player.map && saveObject.player.map._mapId) ||
+        Number(
+          saveObject.player &&
+            saveObject.player.map &&
+            saveObject.player.map._mapId,
+        ) ||
         Number(saveObject.map && saveObject.map._mapId) ||
         0;
 
@@ -1097,7 +1117,11 @@ export class SaveBackupCheat {
     }
 
     try {
-      if (!meta.savefileTimeText && Number.isFinite(saveObject.saveTime) && saveObject.saveTime > 0) {
+      if (
+        !meta.savefileTimeText &&
+        Number.isFinite(saveObject.saveTime) &&
+        saveObject.saveTime > 0
+      ) {
         meta.savefileTime = Number(saveObject.saveTime);
         meta.savefileTimeText = this.formatDateTime(saveObject.saveTime);
       } else if (
@@ -1277,7 +1301,8 @@ export class SaveBackupCheat {
       }
 
       const hasPlaytime = Number(entry.playtimeFrames) > 0 || !!entry.playtime;
-      const hasSaveTime = Number(entry.savefileTime) > 0 || !!entry.savefileTimeText;
+      const hasSaveTime =
+        Number(entry.savefileTime) > 0 || !!entry.savefileTimeText;
 
       if (hasPlaytime && hasSaveTime) {
         continue;
@@ -1361,7 +1386,11 @@ export class SaveBackupCheat {
       // 只有「快照之后这个槽位被重新存过档」时，当前存档里的地图才代表快照里的地图。
       // 否则（快照比存档新）说明快照拍的进度比磁盘上那份更靠后，回填会写错。
       const savePath = this.getSaveFilePath(slot);
-      if (!savePath || !fs.existsSync(savePath) || !fs.existsSync(payloadFile)) {
+      if (
+        !savePath ||
+        !fs.existsSync(savePath) ||
+        !fs.existsSync(payloadFile)
+      ) {
         continue;
       }
 
@@ -1442,7 +1471,11 @@ export class SaveBackupCheat {
           this.writeMeta(meta);
         }
       } catch (error) {
-        console.warn("[cheat plugin] 从快照数据回填元数据失败", entry.id, error);
+        console.warn(
+          "[cheat plugin] 从快照数据回填元数据失败",
+          entry.id,
+          error,
+        );
       }
     }
 
@@ -1466,11 +1499,16 @@ export class SaveBackupCheat {
 
     return {
       count: entries.length,
-      autoCount: entries.filter((item) => item.kind === BACKUP_KIND_AUTO).length,
+      autoCount: entries.filter((item) => item.kind === BACKUP_KIND_AUTO)
+        .length,
       manualCount: entries.filter((item) => item.kind === BACKUP_KIND_MANUAL)
         .length,
-      missingCount: entries.filter((item) => !this.isSnapshotPresent(item)).length,
-      bytes: entries.reduce((sum, item) => sum + (Number(item.sizeBytes) || 0), 0),
+      missingCount: entries.filter((item) => !this.isSnapshotPresent(item))
+        .length,
+      bytes: entries.reduce(
+        (sum, item) => sum + (Number(item.sizeBytes) || 0),
+        0,
+      ),
     };
   }
 
@@ -1490,7 +1528,12 @@ export class SaveBackupCheat {
     return id;
   }
 
-  static createSnapshot(slot, kind = BACKUP_KIND_MANUAL, label = "", options = {}) {
+  static createSnapshot(
+    slot,
+    kind = BACKUP_KIND_MANUAL,
+    label = "",
+    options = {},
+  ) {
     slot = Number(slot);
 
     if (!this.isLocalMode()) {
@@ -1602,10 +1645,7 @@ export class SaveBackupCheat {
   static removeSnapshotFiles(entry) {
     const fs = this.requireFs();
     const payloadFile = this.findPayloadPath(entry);
-    const files = [
-      payloadFile,
-      this.getMetaPath(entry.id),
-    ];
+    const files = [payloadFile, this.getMetaPath(entry.id)];
 
     for (const file of files) {
       try {
@@ -1623,7 +1663,9 @@ export class SaveBackupCheat {
   }
 
   static renameBackup(id, newLabel) {
-    const label = String(newLabel || "").trim().slice(0, MAX_NAME_LENGTH);
+    const label = String(newLabel || "")
+      .trim()
+      .slice(0, MAX_NAME_LENGTH);
     const entries = this.readIndex();
     const entry = entries.find((item) => item.id === id);
 
@@ -1670,15 +1712,15 @@ export class SaveBackupCheat {
     }
 
     const entries = this.readIndex();
-    const targets = kind ? entries.filter((item) => item.kind === kind) : entries;
+    const targets = kind
+      ? entries.filter((item) => item.kind === kind)
+      : entries;
 
     for (const entry of targets) {
       this.removeSnapshotFiles(entry);
     }
 
-    this.writeIndex(
-      kind ? entries.filter((item) => item.kind !== kind) : [],
-    );
+    this.writeIndex(kind ? entries.filter((item) => item.kind !== kind) : []);
 
     return targets.length;
   }
@@ -1718,7 +1760,10 @@ export class SaveBackupCheat {
     }
 
     const autos = this.readIndex()
-      .filter((entry) => Number(entry.slot) === key && entry.kind === BACKUP_KIND_AUTO)
+      .filter(
+        (entry) =>
+          Number(entry.slot) === key && entry.kind === BACKUP_KIND_AUTO,
+      )
       .sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
 
     return autos.length > 0 ? autos[0] : null;
@@ -1961,12 +2006,12 @@ export class SaveBackupCheat {
       throw new Error(WARN_NO_NWJS);
     }
 
-    let parsed = null;
+    let parsed;
 
     try {
       parsed = JSON.parse(String(text || ""));
     } catch (error) {
-      throw new Error("文件不是合法的 JSON");
+      throw new Error("文件不是合法的 JSON", { cause: error });
     }
 
     if (
@@ -2005,7 +2050,9 @@ export class SaveBackupCheat {
       }
 
       const id = this.generateId(
-        item.meta.kind === BACKUP_KIND_AUTO ? BACKUP_KIND_AUTO : BACKUP_KIND_MANUAL,
+        item.meta.kind === BACKUP_KIND_AUTO
+          ? BACKUP_KIND_AUTO
+          : BACKUP_KIND_MANUAL,
         slot,
         knownIds,
       );
@@ -2015,7 +2062,10 @@ export class SaveBackupCheat {
       const meta = {
         id: id,
         slot: slot,
-        kind: item.meta.kind === BACKUP_KIND_AUTO ? BACKUP_KIND_AUTO : BACKUP_KIND_MANUAL,
+        kind:
+          item.meta.kind === BACKUP_KIND_AUTO
+            ? BACKUP_KIND_AUTO
+            : BACKUP_KIND_MANUAL,
         createdAt: Number(item.meta.createdAt) || Date.now(),
         label: String(item.meta.label || "").slice(0, MAX_NAME_LENGTH),
         sizeBytes: item.data.length,
@@ -2200,7 +2250,10 @@ export class SaveBackupCheat {
       return meta;
     } catch (error) {
       // 自动快照失败绝不能影响游戏本身的存档流程
-      console.warn("[cheat plugin] 存档后自动快照失败（不影响游戏存档）", error);
+      console.warn(
+        "[cheat plugin] 存档后自动快照失败（不影响游戏存档）",
+        error,
+      );
       return null;
     }
   }
@@ -2228,7 +2281,10 @@ export class SaveBackupCheat {
         try {
           SaveBackupCheat.onGameSave(savefileId);
         } catch (error) {
-          console.warn("[cheat plugin] 存档后自动快照异常（不影响游戏存档）", error);
+          console.warn(
+            "[cheat plugin] 存档后自动快照异常（不影响游戏存档）",
+            error,
+          );
         }
       };
 
@@ -2243,7 +2299,10 @@ export class SaveBackupCheat {
           afterSave();
         }
       } catch (error) {
-        console.warn("[cheat plugin] 存档后自动快照异常（不影响游戏存档）", error);
+        console.warn(
+          "[cheat plugin] 存档后自动快照异常（不影响游戏存档）",
+          error,
+        );
       }
 
       return result;
@@ -2257,4 +2316,3 @@ export class SaveBackupCheat {
 }
 
 SaveBackupCheat.installSaveHook();
-

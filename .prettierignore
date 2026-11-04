@@ -1,0 +1,20 @@
+node_modules/
+mv/
+mz/
+*.zip
+
+# Docs are edited by hand to keep Chinese line breaks readable.
+*.md
+
+# Lock / workspace metadata is generated or tool-owned.
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+# Vendor / generated files
+cheat-engine/www/cheat/libs/
+cheat-engine/www/cheat/css/
+cheat-engine/www/cheat/fonts/
+cheat-engine/www/cheat/version.js
+
+# Vendored or generated assets are excluded from ESLint as well.
+assets/

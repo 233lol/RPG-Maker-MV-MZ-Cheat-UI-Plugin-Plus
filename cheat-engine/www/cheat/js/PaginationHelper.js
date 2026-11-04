@@ -3,13 +3,14 @@
 // v-data-table 的 "All" 选项值是 -1，直接把 itemsPerPage 代入
 // (page - 1) * itemsPerPage + 1 会得到 0 / 负数，导致页码标签和
 // pageCount 全错。这里统一把它当成「全部」。
+import { t } from "./strings.js";
 
 export const ITEMS_PER_PAGE_OPTIONS = [
   5,
   10,
   15,
   20,
-  { title: "全部", value: -1 },
+  { title: t("common.all"), value: -1 },
 ];
 
 // 返回 0 表示「全部」

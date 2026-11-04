@@ -30,10 +30,7 @@ function pack(repoRoot, type) {
 }
 
 function assertPackagedPath(files, archivePath, label) {
-  assert.ok(
-    files[archivePath],
-    `${label} 引用的 ${archivePath} 不在压缩包里`,
-  );
+  assert.ok(files[archivePath], `${label} 引用的 ${archivePath} 不在压缩包里`);
 }
 
 function extractQuotedStrings(source) {

@@ -1,10 +1,11 @@
-import PageJump from "../components/PageJump.js";
+import PaginationFooter from "../components/PaginationFooter.js";
+import RefreshButton from "../components/RefreshButton.js";
+import SearchField from "../components/SearchField.js";
 import { Alert } from "../js/AlertHelper.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { SaveBackupCheat } from "../js/SaveBackupHelper.js";
 import {
   ITEMS_PER_PAGE_OPTIONS,
-  getPageBounds,
   getPageCount,
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
@@ -17,7 +18,7 @@ export default {
 
   mixins: [paginationWatcherMixin],
 
-  components: { PageJump },
+  components: { PaginationFooter, RefreshButton, SearchField },
 
   template: `
 <v-card flat class="ma-0 pa-0">
@@ -31,20 +32,13 @@ export default {
                 </div>
                 <div class="text-grey-lighten-1">{{ currentSaveLine }}</div>
             </div>
-            <v-tooltip location="bottom">
-                <template #activator="{ props }">
-                    <v-btn
-                        v-bind="props"
-                        color="pink"
-                        size="x-small"
-                        icon
-                        variant="text"
-                        @click="reload">
-                        <v-icon size="small">mdi-refresh</v-icon>
-                    </v-btn>
-                </template>
-                <span>重新加载存档数据</span>
-            </v-tooltip>
+            <refresh-button
+                size="x-small"
+                icon-size="small"
+                variant="text"
+                tooltip="重新加载存档数据"
+                @click="reload">
+            </refresh-button>
         </div>
 
         <!-- 第 2 行：开关 + 两个数字参数。
@@ -171,19 +165,12 @@ export default {
         no-data-text="还没有快照。游戏内存一次档就会自动生成。">
         <template #top>
             <div class="d-flex align-center flex-wrap ga-2 pb-1">
-                <v-text-field
-                    label="搜索地图 / 时间..."
-                    variant="solo"
-                    bg-color="grey-darken-3"
+                <search-field
                     v-model="search"
-                    density="compact"
-                    hide-details
+                    label="搜索地图 / 时间..."
                     clearable
-                    class="flex-grow-1"
-                    style="min-width: 150px;"
-                    @focus="$event.target.select()"
-                    @keydown.stop>
-                </v-text-field>
+                    field-style="min-width: 150px;">
+                </search-field>
                 <v-select
                     label="槽位"
                     variant="solo"
@@ -273,19 +260,17 @@ export default {
         </template>
 
         <template #bottom>
-            <div class="d-flex align-center justify-space-between flex-wrap ga-1 pa-1">
-                <span class="text-body-small">
-                    {{ paginationStart }}-{{ paginationStop }} / {{ totalCount }}
-                </span>
-                <div class="d-flex align-center ga-2">
-                    <v-pagination v-model="pagination.page" :length="pageCount" density="compact" :total-visible="4" size="small"></v-pagination>
-                    <page-jump
-                        :page="pagination.page"
-                        :page-count="pageCount"
-                        @jump="jumpToPage">
-                    </page-jump>
-                </div>
-            </div>
+            <pagination-footer
+                :page="pagination.page"
+                :items-per-page="pagination.itemsPerPage"
+                :total="totalCount"
+                :page-count="pageCount"
+                :show-page-size="false"
+                :total-visible="4"
+                wrapper-class="flex-wrap ga-1 pa-1"
+                @update:page="pagination.page = $event"
+                @jump="jumpToPage">
+            </pagination-footer>
         </template>
     </v-data-table>
 
@@ -341,7 +326,13 @@ export default {
         { title: "槽位", key: "slot", width: "19%" },
         { title: "存档内进度", key: "progress", sortable: false, width: "47%" },
         { title: "快照时间", key: "createdText", width: "34%" },
-        { title: "操作", key: "actions", sortable: false, width: 60, align: "center" },
+        {
+          title: "操作",
+          key: "actions",
+          sortable: false,
+          width: 60,
+          align: "center",
+        },
       ],
     };
   },
@@ -425,11 +416,15 @@ export default {
       let items = this.backups;
 
       if (this.slotFilter !== "all") {
-        items = items.filter((item) => Number(item.slot) === Number(this.slotFilter));
+        items = items.filter(
+          (item) => Number(item.slot) === Number(this.slotFilter),
+        );
       }
 
       // 备注已不是主标识，但历史快照 / 导入的快照里可能还有，一并参与搜索
-      const keyword = String(this.search || "").trim().toLowerCase();
+      const keyword = String(this.search || "")
+        .trim()
+        .toLowerCase();
       if (keyword) {
         items = items.filter((item) => {
           const haystack = [
@@ -451,22 +446,6 @@ export default {
 
     totalCount() {
       return this.filteredTableItems.length;
-    },
-
-    paginationStart() {
-      return getPageBounds(
-        this.totalCount,
-        this.pagination.page,
-        this.pagination.itemsPerPage,
-      ).start;
-    },
-
-    paginationStop() {
-      return getPageBounds(
-        this.totalCount,
-        this.pagination.page,
-        this.pagination.itemsPerPage,
-      ).stop;
     },
 
     pageCount() {
@@ -510,13 +489,15 @@ export default {
     // 空串时只同步 settings（这样下面那行提示会跟着变），但不立刻回写 1 ——
     // 否则用户删掉数字的一瞬间就被填回 "1"，等于删不掉。
     onIntervalInput(value) {
-      this.intervalText = value === null || value === undefined ? "" : String(value);
+      this.intervalText =
+        value === null || value === undefined ? "" : String(value);
       this.settings.autoSaveInterval = this.parseCount(this.intervalText, 1);
       this.onSettingsChange();
     },
 
     onKeepInput(value) {
-      this.keepText = value === null || value === undefined ? "" : String(value);
+      this.keepText =
+        value === null || value === undefined ? "" : String(value);
       this.settings.autoKeep = this.parseCount(this.keepText, 1);
       this.onSettingsChange();
     },
@@ -544,9 +525,9 @@ export default {
 
     // 只取前导数字（type=number 在部分输入法下会短暂给出 "3e" 之类的中间态）
     parseCount(value, min) {
-      const match = String(value === null || value === undefined ? "" : value).match(
-        /\d+/,
-      );
+      const match = String(
+        value === null || value === undefined ? "" : value,
+      ).match(/\d+/);
       const num = match ? parseInt(match[0], 10) : NaN;
 
       if (!Number.isFinite(num)) {
@@ -615,7 +596,7 @@ export default {
       const name = item.mapName || "";
 
       if (name) {
-        // 很多游戏的地图名自带编号（如「01　海岸」），再补一次 (2) 就是重复信息
+        // 很多游戏的地图名自带编号（如「01 海岸」），再补一次 (2) 就是重复信息
         const hasOwnNumber = /^\s*\d/.test(name);
         const suffix = !hasOwnNumber && item.mapId ? ` (${item.mapId})` : "";
 
@@ -749,7 +730,8 @@ export default {
 
       let consequence;
       if (isSameSlot && hasTarget) {
-        consequence = "覆盖前会自动为存档 " + targetSlot + " 留一份快照，可以再还原回去。";
+        consequence =
+          "覆盖前会自动为存档 " + targetSlot + " 留一份快照，可以再还原回去。";
       } else if (isSameSlot) {
         consequence = `存档 ${targetSlot} 当前为空，将直接写入。`;
       } else if (hasTarget) {
