@@ -1,6 +1,7 @@
 import { Alert } from "./AlertHelper.js";
 import { ConfirmDialog } from "./DialogHelper.js";
 import { getCheatSettingsPath } from "./SettingsPath.js";
+import { writeJsonAtomic, writeTextAtomic } from "./AtomicFile.js";
 
 // 存档时间机器：把存档快照另存到 cheat 自己的目录，随时回滚。
 //
@@ -839,31 +840,11 @@ export class SaveBackupCheat {
   }
 
   static writeIndex(entries) {
-    const fs = this.requireFs();
     this.ensureBackupDir();
 
-    if (!Array.isArray(entries) || entries.length === 0) {
-      // 没有条目时直接重建空索引，避免留下上一位玩家的残留
-      fs.writeFileSync(getIndexFile(), "[]", "utf-8");
-      return;
-    }
+    const data = Array.isArray(entries) ? entries : [];
 
-    // 先写临时文件再改名：写一半崩掉也不会毁掉整个索引
-    const tmpFile = `${getIndexFile()}.tmp`;
-
-    try {
-      fs.writeFileSync(tmpFile, JSON.stringify(entries, null, 2), "utf-8");
-      fs.renameSync(tmpFile, getIndexFile());
-    } catch (error) {
-      try {
-        if (fs.existsSync(tmpFile)) {
-          fs.unlinkSync(tmpFile);
-        }
-      } catch (cleanupError) {
-        // 清不掉临时文件不影响主流程
-      }
-      throw error;
-    }
+    writeJsonAtomic(getIndexFile(), data);
   }
 
   static getMetaPath(id) {
@@ -945,15 +926,7 @@ export class SaveBackupCheat {
   }
 
   static writeMeta(meta) {
-    const fs = this.requireFs();
-    const path = require("path");
-    const file = this.getMetaPath(meta.id);
-
-    if (!fs.existsSync(path.dirname(file))) {
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-    }
-
-    fs.writeFileSync(file, JSON.stringify(meta, null, 2), "utf-8");
+    writeJsonAtomic(this.getMetaPath(meta.id), meta);
   }
 
   static readMeta(id) {
@@ -984,9 +957,6 @@ export class SaveBackupCheat {
   }
 
   static writePayload(meta, jsonText) {
-    const fs = this.requireFs();
-    const path = require("path");
-
     if (!meta.codec) {
       meta.codec = this.getSnapshotCodec();
     }
@@ -996,16 +966,12 @@ export class SaveBackupCheat {
 
     const payloadFile = this.getPayloadPath(meta.id, meta);
 
-    if (!fs.existsSync(path.dirname(payloadFile))) {
-      fs.mkdirSync(path.dirname(payloadFile), { recursive: true });
-    }
-
     const encoded = this.encodePayloadText(jsonText, meta.codec);
     if (!encoded) {
       throw new Error("压缩存档数据失败，无法写入快照");
     }
 
-    fs.writeFileSync(payloadFile, encoded, "utf-8");
+    writeTextAtomic(payloadFile, encoded, "utf-8");
 
     meta.payloadFile = payloadFile;
     meta.payloadSize = encoded.length;
@@ -1459,18 +1425,21 @@ export class SaveBackupCheat {
           changed = true;
         }
 
-        if (changed) {
-          entry.payloadBackfillChecked = true;
-          anyChanged = true;
+        // 成功读出快照内容后，无论有没有补到字段都记上标记：
+        // 老快照可能本来就没有地图 / 时长，反复解压整份存档没有意义。
+        entry.payloadBackfillChecked = true;
+        anyChanged = true;
 
-          const meta = this.readMeta(entry.id);
-          if (meta) {
+        const meta = this.readMeta(entry.id);
+        if (meta) {
+          if (changed) {
             meta.mapId = entry.mapId;
             meta.mapName = entry.mapName;
             meta.playtimeFrames = entry.playtimeFrames;
             meta.playtime = entry.playtime;
-            this.writeMeta(meta);
           }
+          meta.payloadBackfillChecked = true;
+          this.writeMeta(meta);
         }
       } catch (error) {
         console.warn("[cheat plugin] 从快照数据回填元数据失败", entry.id, error);
@@ -2148,10 +2117,8 @@ export class SaveBackupCheat {
     }
 
     const next = { ...this.getSettings(), ...(patch || {}) };
-    const fs = this.requireFs();
 
-    this.ensureBackupDir();
-    fs.writeFileSync(this.getSettingsPath(), JSON.stringify(next, null, 2), "utf-8");
+    writeJsonAtomic(this.getSettingsPath(), next);
 
     return next;
   }

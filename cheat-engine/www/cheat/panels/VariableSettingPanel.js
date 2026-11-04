@@ -1,8 +1,21 @@
 import PageJump from "../components/PageJump.js";
 import { LockService } from "../js/LockService.js";
+import {
+  ITEMS_PER_PAGE_OPTIONS,
+  getPageBounds,
+  getPageCount,
+  paginationWatcherMixin,
+} from "../js/PaginationHelper.js";
+import {
+  isVariablesReady,
+  requireVariablesReady,
+} from "../js/GameState.js";
+import { markRaw } from "../libs/vue.js";
 
 export default {
   name: "VariableSettingPanel",
+
+  mixins: [paginationWatcherMixin],
 
   components: { PageJump },
 
@@ -15,7 +28,7 @@ export default {
         :items="filteredTableItems"
          v-model:page="pagination.page"
          v-model:items-per-page="pagination.itemsPerPage"
-         :items-per-page-options="[5, 10, 15, { title: 'All', value: -1 }]">
+         :items-per-page-options="itemsPerPageOptions">
         <template #top>
             <div class="d-flex align-center">
                 <v-text-field
@@ -70,7 +83,26 @@ export default {
         </template>
         <template
             #item.value="{ item }">
+            <div
+                v-if="isComplexValue(item.value)"
+                class="d-flex align-center"
+                style="gap: 4px;">
+                <span
+                    class="text-body-small text-truncate"
+                    style="max-width: 130px;"
+                    :title="formatValuePreview(item.value)">
+                    {{ formatValuePreview(item.value) }}
+                </span>
+                <v-btn
+                    size="x-small"
+                    variant="text"
+                    color="deep-purple"
+                    @click.stop="openJsonEditor(item)">
+                    JSON
+                </v-btn>
+            </div>
             <v-text-field
+                v-else
                 bg-color="grey-darken-3"
                 class="inline-field"
                 style="width: 90px;"
@@ -117,6 +149,39 @@ export default {
              </div>
          </template>
     </v-data-table>
+
+    <v-dialog v-model="jsonDialog.show" max-width="720" persistent>
+        <v-card>
+            <v-card-title class="d-flex align-center">
+                <span class="text-title-medium">编辑变量 {{ jsonDialog.name || jsonDialog.id }}（JSON）</span>
+                <v-spacer></v-spacer>
+                <v-btn icon size="small" @click="closeJsonEditor">
+                    <v-icon>mdi-close</v-icon>
+                </v-btn>
+            </v-card-title>
+            <v-card-text>
+                <v-textarea
+                    v-model="jsonDialog.text"
+                    variant="outlined"
+                    auto-grow
+                    rows="12"
+                    hide-details
+                    style="font-family: monospace; font-size: 12px;"
+                    @keydown.stop>
+                </v-textarea>
+                <div
+                    v-if="jsonDialog.error"
+                    class="text-red-lighten-1 text-body-small mt-2">
+                    {{ jsonDialog.error }}
+                </div>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn variant="text" @click="closeJsonEditor">取消</v-btn>
+                <v-btn color="primary" @click="saveJsonEditor">保存</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 </v-card>
     `,
 
@@ -145,7 +210,15 @@ export default {
       ],
       tableItems: [],
       pagination: { page: 1, itemsPerPage: 5 },
+      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
       persistedLockMap: {},
+      jsonDialog: {
+        show: false,
+        id: 0,
+        name: "",
+        text: "",
+        error: "",
+      },
     };
   },
 
@@ -166,9 +239,12 @@ export default {
       });
       if (this.search && this.search.trim()) {
         const s = this.search.toLowerCase();
-        items = items.filter((item) =>
-          String(item.name || "").toLowerCase().includes(s) ||
-          String(item.value).toLowerCase().includes(s)
+        items = items.filter(
+          (item) =>
+            String(item.name || "")
+              .toLowerCase()
+              .includes(s) ||
+            this.formatValueForSearch(item.value).includes(s),
         );
       }
       return items;
@@ -190,40 +266,55 @@ export default {
      },
 
      paginationStart() {
-       if (this.totalCount === 0) return 0;
-       return (this.pagination.page - 1) * this.pagination.itemsPerPage + 1;
+       return getPageBounds(
+         this.totalCount,
+         this.pagination.page,
+         this.pagination.itemsPerPage,
+       ).start;
      },
 
      paginationStop() {
-       return Math.min(this.pagination.page * this.pagination.itemsPerPage, this.totalCount);
+       return getPageBounds(
+         this.totalCount,
+         this.pagination.page,
+         this.pagination.itemsPerPage,
+       ).stop;
      },
 
      pageCount() {
-       return Math.ceil(this.filteredTableItems.length / this.pagination.itemsPerPage) || 1;
+       return getPageCount(this.totalCount, this.pagination.itemsPerPage);
      },
    },
 
   methods: {
     async initializeVariables() {
+      if (!isVariablesReady() || typeof $dataSystem === "undefined") {
+        this.tableItems = [];
+        return;
+      }
+
       const previousLockMap = this.getLockMapById();
       this.variableNames = await this.getVariableNames();
 
       this.tableItems = this.variableNames.map((varName, idx) => {
         const savedLock = previousLockMap.get(idx);
+        const currentValue = $gameVariables.value(idx);
         return {
           id: idx,
           name: varName,
-          value: $gameVariables.value(idx),
+          value: this.markValueForDisplay(currentValue),
           lockEnabled: savedLock ? savedLock.lockEnabled : false,
           lockValue: savedLock
             ? savedLock.lockValue
-            : $gameVariables.value(idx),
+            : this.markValueForDisplay(currentValue),
         };
       });
     },
 
     async getVariableNames() {
-      return $dataSystem.variables.slice();
+      return Array.isArray($dataSystem?.variables)
+        ? $dataSystem.variables.slice()
+        : [];
     },
 
     readPersistedLocks() {
@@ -248,7 +339,15 @@ export default {
     },
 
     onItemChange(item, newValue) {
+      if (!requireVariablesReady("修改变量")) return;
+
       const v = $gameVariables.value(item.id);
+
+      if (this.isComplexValue(v)) {
+        this.openJsonEditor(item);
+        return;
+      }
+
       if (typeof v === "number") {
         const num = Number(newValue);
         if (!Number.isFinite(num)) {
@@ -260,14 +359,104 @@ export default {
         $gameVariables.setValue(item.id, newValue);
       }
 
-      item.value = $gameVariables.value(item.id);
+      item.value = this.markValueForDisplay($gameVariables.value(item.id));
       if (item.lockEnabled) {
         item.lockValue = item.value;
         this.writePersistedLocks();
       }
     },
 
+    isComplexValue(value) {
+      return value !== null && typeof value === "object";
+    },
+
+    // 对象 / 数组变量不要被 Vue 深度代理：游戏逻辑和锁定服务都按原始引用比较。
+    markValueForDisplay(value) {
+      return this.isComplexValue(value) ? markRaw(value) : value;
+    },
+
+    formatValuePreview(value) {
+      try {
+        const text = JSON.stringify(value);
+
+        if (typeof text !== "string") {
+          return String(value);
+        }
+
+        return text.length > 80 ? `${text.slice(0, 77)}...` : text;
+      } catch (error) {
+        return String(value);
+      }
+    },
+
+    formatValueForSearch(value) {
+      try {
+        return String(this.isComplexValue(value) ? JSON.stringify(value) : value)
+          .toLowerCase();
+      } catch (error) {
+        return String(value).toLowerCase();
+      }
+    },
+
+    openJsonEditor(item) {
+      if (!item) {
+        return;
+      }
+
+      let text = "";
+
+      try {
+        text = JSON.stringify(item.value, null, 2);
+      } catch (error) {
+        text = String(item.value);
+      }
+
+      this.jsonDialog = {
+        show: true,
+        id: item.id,
+        name: item.name,
+        text,
+        error: "",
+      };
+    },
+
+    closeJsonEditor() {
+      this.jsonDialog.show = false;
+      this.jsonDialog.error = "";
+    },
+
+    saveJsonEditor() {
+      if (!requireVariablesReady("修改变量")) return;
+
+      const dialog = this.jsonDialog;
+      let parsed = null;
+
+      try {
+        parsed = JSON.parse(dialog.text);
+      } catch (error) {
+        dialog.error = `JSON 解析失败: ${String(error.message || error)}`;
+        return;
+      }
+
+      $gameVariables.setValue(dialog.id, parsed);
+
+      const item = this.tableItems.find((entry) => entry.id === dialog.id);
+      if (item) {
+        item.value = this.markValueForDisplay(
+          $gameVariables.value(dialog.id),
+        );
+        if (item.lockEnabled) {
+          item.lockValue = item.value;
+          this.writePersistedLocks();
+        }
+      }
+
+      this.closeJsonEditor();
+    },
+
     toggleItemLock(item) {
+      if (!requireVariablesReady("锁定变量")) return;
+
       item.lockEnabled = !item.lockEnabled;
       if (item.lockEnabled) {
         item.lockValue = $gameVariables.value(item.id);
@@ -278,6 +467,8 @@ export default {
     },
 
     toggleAllFilteredLocks() {
+      if (!requireVariablesReady("批量锁定变量")) return;
+
       const targetLockEnabled = !this.allFilteredLocked;
 
       this.filteredTableItems.forEach((item) => {

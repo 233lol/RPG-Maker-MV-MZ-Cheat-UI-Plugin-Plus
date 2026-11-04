@@ -1,3 +1,5 @@
+import { markRaw } from "../libs/vue.js";
+
 export default {
   name: "MapEventPanel",
 
@@ -251,7 +253,7 @@ export default {
     updateCurrentMapData() {
       try {
         this.currentMapId = $gameMap.mapId();
-        this.mapData = $dataMap;
+        this.mapData = markRaw($dataMap);
 
         if (this.mapData) {
           this.updateCanvasSize();
@@ -389,13 +391,18 @@ export default {
 
     updateMapEvents() {
       try {
-        // Clear all event arrays
-        this.mapEvents = [];
-        this.enemies = [];
-        this.treasureBoxes = [];
-        this.regularEvents = [];
+        const mapEvents = [];
+        const enemies = [];
+        const treasureBoxes = [];
+        const regularEvents = [];
 
-        if (!$dataMap || !$dataMap.events) return;
+        if (!$dataMap || !$dataMap.events) {
+          this.mapEvents = markRaw(mapEvents);
+          this.enemies = enemies;
+          this.treasureBoxes = treasureBoxes;
+          this.regularEvents = markRaw(regularEvents);
+          return;
+        }
 
         // Single pass through events - classify each one
         for (let i = 1; i < $dataMap.events.length; i++) {
@@ -404,7 +411,7 @@ export default {
             continue;
 
           // Add to main events list
-          this.mapEvents.push(event);
+          mapEvents.push(event);
 
           // Get corresponding game event for dynamic data
           const gameEvent = $gameMap._events[i];
@@ -414,7 +421,7 @@ export default {
             const page =
               typeof gameEvent.page === "function" ? gameEvent.page() : null;
 
-            this.enemies.push({
+            enemies.push({
               id: gameEvent._eventId || i,
               x: gameEvent._x !== undefined ? gameEvent._x : event.x,
               y: gameEvent._y !== undefined ? gameEvent._y : event.y,
@@ -428,7 +435,7 @@ export default {
           }
           // If not enemy, check if it's a treasure
           else if (this.isTreasureEvent(event)) {
-            this.treasureBoxes.push({
+            treasureBoxes.push({
               x: event.x,
               y: event.y,
               id: event.id,
@@ -437,10 +444,14 @@ export default {
           }
           // If neither enemy nor treasure, add to regular events
           else {
-            this.regularEvents.push(event);
+            regularEvents.push(event);
           }
         }
 
+        this.mapEvents = markRaw(mapEvents);
+        this.enemies = enemies;
+        this.treasureBoxes = treasureBoxes;
+        this.regularEvents = markRaw(regularEvents);
       } catch (error) {
         console.warn("Could not get map events:", error);
       }

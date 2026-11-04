@@ -52,7 +52,7 @@ export default {
   },
 
   mounted() {
-    Alert.alertInternal = (level, msg, err = null, timeout = 1500) => {
+    this.alertHandler = (level, msg, err = null, timeout = 1500) => {
       let color = null;
       switch (level) {
         case "success":
@@ -81,6 +81,12 @@ export default {
         console.error(`[cheat plugin ${level}] ${msg}`, err);
       }
     };
+
+    Alert.setHandler(this.alertHandler);
+  },
+
+  beforeUnmount() {
+    Alert.clearHandler(this.alertHandler);
   },
 
 

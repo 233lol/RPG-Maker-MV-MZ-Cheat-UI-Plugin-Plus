@@ -3,6 +3,7 @@ import { Alert } from "../js/AlertHelper.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
 import { getCheatSettingsPath } from "../js/SettingsPath.js";
+import { getPageBounds, getPageCount, paginate, paginationWatcherMixin } from "../js/PaginationHelper.js";
 import { markRaw } from "../libs/vue.js";
 import {
   ROOT_FILTERS,
@@ -95,6 +96,8 @@ function entriesShallowEqual(a, b) {
 
 export default {
   name: "GlobalVariablePanel",
+
+  mixins: [paginationWatcherMixin],
 
   components: { PageJump },
 
@@ -740,22 +743,14 @@ export default {
     },
 
     pageCount() {
-      if (this.effectiveItemsPerPage <= 0) {
-        return 1;
-      }
-
-      return Math.ceil(this.totalCount / this.effectiveItemsPerPage) || 1;
+      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
     },
 
     pagedEntries() {
-      if (this.effectiveItemsPerPage <= 0) {
-        return this.filteredEntries;
-      }
-
-      const start = (this.pagination.page - 1) * this.effectiveItemsPerPage;
-      return this.filteredEntries.slice(
-        start,
-        start + this.effectiveItemsPerPage,
+      return paginate(
+        this.filteredEntries,
+        this.pagination.page,
+        this.pagination.itemsPerPage,
       );
     },
 
@@ -764,26 +759,19 @@ export default {
     },
 
     paginationStart() {
-      if (this.totalCount === 0) {
-        return 0;
-      }
-
-      if (this.effectiveItemsPerPage <= 0) {
-        return 1;
-      }
-
-      return (this.pagination.page - 1) * this.effectiveItemsPerPage + 1;
+      return getPageBounds(
+        this.totalCount,
+        this.pagination.page,
+        this.pagination.itemsPerPage,
+      ).start;
     },
 
     paginationStop() {
-      if (this.effectiveItemsPerPage <= 0) {
-        return this.totalCount;
-      }
-
-      return Math.min(
-        this.pagination.page * this.effectiveItemsPerPage,
+      return getPageBounds(
         this.totalCount,
-      );
+        this.pagination.page,
+        this.pagination.itemsPerPage,
+      ).stop;
     },
   },
 

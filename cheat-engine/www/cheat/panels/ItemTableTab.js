@@ -1,8 +1,17 @@
 import PageJump from "../components/PageJump.js";
-import { toRaw } from "../libs/vue.js";
+import { markRaw, toRaw } from "../libs/vue.js";
+import {
+  ITEMS_PER_PAGE_OPTIONS,
+  getPageBounds,
+  getPageCount,
+  paginationWatcherMixin,
+} from "../js/PaginationHelper.js";
+import { isPartyReady, requirePartyReady } from "../js/GameState.js";
 
 export default {
   name: "ItemTableTab",
+
+  mixins: [paginationWatcherMixin],
 
   components: { PageJump },
 
@@ -15,7 +24,7 @@ export default {
          :items="filteredTableItems"
          v-model:page="pagination.page"
          v-model:items-per-page="pagination.itemsPerPage"
-         :items-per-page-options="[5, 10, 15, { title: 'All', value: -1 }]">
+         :items-per-page-options="itemsPerPageOptions">
         <template #top>
             <div class="d-flex align-center">
                 <v-text-field
@@ -122,6 +131,7 @@ export default {
       tableHeaders: [],
       tableItems: [],
       pagination: { page: 1, itemsPerPage: 5 },
+      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
     };
   },
 
@@ -183,16 +193,23 @@ export default {
      },
 
      paginationStart() {
-       if (this.totalCount === 0) return 0;
-       return (this.pagination.page - 1) * this.pagination.itemsPerPage + 1;
+       return getPageBounds(
+         this.totalCount,
+         this.pagination.page,
+         this.pagination.itemsPerPage,
+       ).start;
      },
 
      paginationStop() {
-       return Math.min(this.pagination.page * this.pagination.itemsPerPage, this.totalCount);
+       return getPageBounds(
+         this.totalCount,
+         this.pagination.page,
+         this.pagination.itemsPerPage,
+       ).stop;
      },
 
      pageCount() {
-       return Math.ceil(this.filteredTableItems.length / this.pagination.itemsPerPage) || 1;
+       return getPageCount(this.totalCount, this.pagination.itemsPerPage);
      },
    },
 
@@ -204,12 +221,17 @@ export default {
         key: "amount",
       });
 
+      if (!isPartyReady()) {
+        this.tableItems = [];
+        return;
+      }
+
       this.tableItems = this.items
         .filter((item) => !!item)
         .map((item) => {
           const rawItem = toRaw(item);
           const tableItem = this.asTableData(rawItem);
-          tableItem._item = rawItem;
+          tableItem._item = markRaw(rawItem);
           tableItem.amount = $gameParty.numItems(rawItem);
 
           return tableItem;
@@ -217,6 +239,8 @@ export default {
     },
 
     onItemChange(item) {
+      if (!requirePartyReady("修改物品数量")) return;
+
       const amount = Number(item.amount);
       if (!Number.isFinite(amount)) {
         item.amount = $gameParty.numItems(toRaw(item._item));

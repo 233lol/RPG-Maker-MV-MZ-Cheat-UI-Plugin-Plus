@@ -1,9 +1,21 @@
 import PageJump from "../components/PageJump.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { LockService } from "../js/LockService.js";
+import {
+  ITEMS_PER_PAGE_OPTIONS,
+  getPageBounds,
+  getPageCount,
+  paginationWatcherMixin,
+} from "../js/PaginationHelper.js";
+import {
+  isSwitchesReady,
+  requireSwitchesReady,
+} from "../js/GameState.js";
 
 export default {
   name: "SwitchSettingPanel",
+
+  mixins: [paginationWatcherMixin],
 
   components: { PageJump },
 
@@ -16,7 +28,7 @@ export default {
         :items="filteredTableItems"
          v-model:page="pagination.page"
          v-model:items-per-page="pagination.itemsPerPage"
-         :items-per-page-options="[5, 10, 15, { title: 'All', value: -1 }]">
+         :items-per-page-options="itemsPerPageOptions">
         <template #top>
             <div class="d-flex align-center">
                 <v-text-field
@@ -156,6 +168,7 @@ export default {
       ],
       tableItems: [],
       pagination: { page: 1, itemsPerPage: 5 },
+      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
       persistedLockMap: {},
     };
   },
@@ -208,21 +221,33 @@ export default {
      },
 
      paginationStart() {
-       if (this.totalCount === 0) return 0;
-       return (this.pagination.page - 1) * this.pagination.itemsPerPage + 1;
+       return getPageBounds(
+         this.totalCount,
+         this.pagination.page,
+         this.pagination.itemsPerPage,
+       ).start;
      },
 
      paginationStop() {
-       return Math.min(this.pagination.page * this.pagination.itemsPerPage, this.totalCount);
+       return getPageBounds(
+         this.totalCount,
+         this.pagination.page,
+         this.pagination.itemsPerPage,
+       ).stop;
      },
 
      pageCount() {
-       return Math.ceil(this.filteredTableItems.length / this.pagination.itemsPerPage) || 1;
+       return getPageCount(this.totalCount, this.pagination.itemsPerPage);
      },
    },
 
   methods: {
     async initializeVariables() {
+      if (!isSwitchesReady() || typeof $dataSystem === "undefined") {
+        this.tableItems = [];
+        return;
+      }
+
       const previousLockMap = this.getLockMapById();
       this.switchNames = await this.getSwitchNames();
 
@@ -242,7 +267,9 @@ export default {
     },
 
     async getSwitchNames() {
-      return $dataSystem.switches.slice();
+      return Array.isArray($dataSystem?.switches)
+        ? $dataSystem.switches.slice()
+        : [];
     },
 
     readPersistedLocks() {
@@ -267,6 +294,8 @@ export default {
     },
 
     onItemChange(item) {
+      if (!requireSwitchesReady("修改开关")) return;
+
       // modify value
       $gameSwitches.setValue(item.id, item.value);
 
@@ -279,6 +308,8 @@ export default {
     },
 
     toggleItemLock(item) {
+      if (!requireSwitchesReady("锁定开关")) return;
+
       item.lockEnabled = !item.lockEnabled;
       if (item.lockEnabled) {
         item.lockValue = !!$gameSwitches.value(item.id);
@@ -289,6 +320,8 @@ export default {
     },
 
     toggleAllFilteredLocks() {
+      if (!requireSwitchesReady("批量锁定开关")) return;
+
       const targetLockEnabled = !this.allFilteredLocked;
 
       this.filteredTableItems.forEach((item) => {
@@ -384,6 +417,8 @@ export default {
             color: "green",
             label: this.allSwitchOn ? "Turn Off" : "Turn On",
             async action() {
+              if (!requireSwitchesReady("批量修改开关")) return;
+
               const value = !self.allSwitchOn;
               self.filteredTableItems.forEach((item) => {
                 $gameSwitches.setValue(item.id, value);

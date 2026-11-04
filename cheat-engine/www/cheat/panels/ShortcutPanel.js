@@ -3,9 +3,17 @@ import PageJump from "../components/PageJump.js";
 import { GLOBAL_SHORTCUT } from "../js/GlobalShortcut.js";
 import { Key } from "../js/KeyCodes.js";
 import { Alert } from "../js/AlertHelper.js";
+import {
+  ITEMS_PER_PAGE_OPTIONS,
+  getPageBounds,
+  getPageCount,
+  paginationWatcherMixin,
+} from "../js/PaginationHelper.js";
 
 export default {
   name: "ShortcutPanel",
+
+  mixins: [paginationWatcherMixin],
 
   components: {
     KeyInputField,
@@ -78,7 +86,7 @@ export default {
         :items="filteredShortcuts"
          v-model:page="pagination.page"
          v-model:items-per-page="pagination.itemsPerPage"
-         :items-per-page-options="[5, 10, 15, { title: 'All', value: -1 }]">
+         :items-per-page-options="itemsPerPageOptions">
         <template
             #item.shortcut="{ item }">
             <key-input-field
@@ -204,6 +212,7 @@ export default {
         },
       ],
       pagination: { page: 1, itemsPerPage: 5 },
+      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
     };
   },
 
@@ -241,16 +250,23 @@ export default {
     },
 
     paginationStart() {
-      if (this.totalCount === 0) return 0;
-      return (this.pagination.page - 1) * this.pagination.itemsPerPage + 1;
+      return getPageBounds(
+        this.totalCount,
+        this.pagination.page,
+        this.pagination.itemsPerPage,
+      ).start;
     },
 
     paginationStop() {
-      return Math.min(this.pagination.page * this.pagination.itemsPerPage, this.totalCount);
+      return getPageBounds(
+        this.totalCount,
+        this.pagination.page,
+        this.pagination.itemsPerPage,
+      ).stop;
     },
 
     pageCount() {
-      return Math.ceil(this.filteredShortcuts.length / this.pagination.itemsPerPage) || 1;
+      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
     },
   },
 

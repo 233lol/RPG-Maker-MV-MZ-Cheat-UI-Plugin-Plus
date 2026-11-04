@@ -1,5 +1,7 @@
 import HealthSettingTab from "./HealthSettingTab.js";
 import { BattleCheat } from "../js/CheatHelper.js";
+import { isPartyReady } from "../js/GameState.js";
+import { markRaw } from "../libs/vue.js";
 
 export default {
   name: "HealthSettingPanel",
@@ -98,8 +100,20 @@ export default {
 
   methods: {
     initializeVariables() {
-      this.enemy = $gameTroop.members().map((member) => member);
-      this.party = $gameParty.members().map((member) => member);
+      if (
+        !isPartyReady() ||
+        typeof $gameTroop === "undefined" ||
+        !$gameTroop
+      ) {
+        this.enemy = [];
+        this.party = [];
+        this.disableRandomEncounter =
+          BattleCheat.isDisableRandomEncounter();
+        return;
+      }
+
+      this.enemy = markRaw($gameTroop.members().slice());
+      this.party = markRaw($gameParty.members().slice());
       this.disableRandomEncounter = BattleCheat.isDisableRandomEncounter();
     },
 
@@ -162,6 +176,8 @@ export default {
       if (!Array.isArray(items)) return;
       for (const item of items) {
         const member = item._member;
+        if (!member) continue;
+
         const hp = Number(item.hp.hp);
         const mp = Number(item.mp.mp);
         if (Number.isFinite(hp)) {

@@ -1,6 +1,7 @@
 import { Alert } from "./AlertHelper.js";
 import { KeyValueStorage } from "./KeyValueStorage.js";
 import { getCheatSettingsPath } from "./SettingsPath.js";
+import { requireGameReady } from "./GameState.js";
 
 export class GeneralCheat {
   // will be replaced from main component
@@ -11,8 +12,7 @@ export class GeneralCheat {
   static toggleNoClip(notify = false) {
     // 键盘监听在 app 挂载时就绑定了，读档 / 加载转圈（MZ 还要初始化 effekseer
     // WASM）这段窗口里 $gamePlayer 还不存在，直接取属性会抛错。
-    if (!$gamePlayer) {
-      Alert.warn("玩家数据尚未初始化，无法切换穿墙状态");
+    if (!requireGameReady("切换穿墙状态")) {
       return;
     }
 
@@ -142,6 +142,10 @@ export class GeneralCheat {
       return;
     }
 
+    if (!requireGameReady("切换无敌模式")) {
+      return;
+    }
+
     const godModeData = this.getGodModeData(actor);
     godModeData.godMode = true;
 
@@ -191,6 +195,10 @@ export class GeneralCheat {
 
   static godModeOff(actor) {
     if (!(actor instanceof Game_Actor) || !this.isGodMode(actor)) {
+      return;
+    }
+
+    if (!requireGameReady("切换无敌模式")) {
       return;
     }
 
@@ -416,6 +424,10 @@ export class SpeedCheat {
   }
 
   static setSpeed(speed, fixed = false) {
+    if (!requireGameReady("修改移动速度")) {
+      return;
+    }
+
     SpeedCheat.__setSpeed(speed);
 
     if (fixed) {
@@ -452,7 +464,9 @@ export class SpeedCheat {
     }
 
     if (data.fixed) {
-      SpeedCheat.setSpeed(data.speed, data.fixed);
+      // 启动阶段游戏数据可能还没创建：先启动定时器，__setSpeed 会等
+      // $gamePlayer 出现后再套用，保持“固定速度”跨读档生效的旧行为。
+      SpeedCheat.setFixSpeedInterval(data.speed);
     }
   }
 }
@@ -487,6 +501,10 @@ export class SceneCheat {
   }
 
   static async quickSave(slot = 1) {
+    if (!requireGameReady("快速保存")) {
+      return false;
+    }
+
     try {
       $gameSystem.onBeforeSave();
       const result = await DataManager.saveGame(slot);
@@ -532,6 +550,8 @@ export class BattleCheat {
   }
 
   static recoverAllEnemy() {
+    if (!requireGameReady("恢复敌人生命值")) return;
+
     for (const member of $gameTroop.members()) {
       this.recover(member);
     }
@@ -540,6 +560,8 @@ export class BattleCheat {
   }
 
   static recoverAllParty() {
+    if (!requireGameReady("恢复己方成员")) return;
+
     for (const member of $gameParty.members()) {
       this.recover(member);
     }
@@ -548,6 +570,8 @@ export class BattleCheat {
   }
 
   static fillTpAllEnemy() {
+    if (!requireGameReady("补满敌人 TP")) return;
+
     for (const member of $gameTroop.members()) {
       member.setTp(member.maxTp());
     }
@@ -556,6 +580,8 @@ export class BattleCheat {
   }
 
   static fillTpAllParty() {
+    if (!requireGameReady("补满己方成员 TP")) return;
+
     for (const member of $gameParty.members()) {
       member.setTp(member.maxTp());
     }
@@ -564,6 +590,8 @@ export class BattleCheat {
   }
 
   static changeAllEnemyHealth(newHp) {
+    if (!requireGameReady("修改敌人 HP")) return;
+
     for (const member of $gameTroop.members()) {
       member.setHp(newHp);
     }
@@ -572,6 +600,8 @@ export class BattleCheat {
   }
 
   static changeAllPartyHealth(newHp) {
+    if (!requireGameReady("修改队员 HP")) return;
+
     for (const member of $gameParty.members()) {
       member.setHp(newHp);
     }
@@ -588,6 +618,8 @@ export class BattleCheat {
   }
 
   static encounterBattle() {
+    if (!requireGameReady("触发遇敌")) return;
+
     $gamePlayer._encounterCount = 0;
   }
 
@@ -690,6 +722,10 @@ export class BattleCheat {
   }
 
   static setDisableRandomEncounter(disabled) {
+    if (!requireGameReady("切换随机遇敌")) {
+      return false;
+    }
+
     this.disableRandomEncounter = !!disabled;
 
     return this.disableRandomEncounter

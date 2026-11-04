@@ -107,6 +107,7 @@ pnpm test:mz        # 只测 MZ
 - 把当前 `cheat-engine/www/cheat` 同步到测试游戏（MV 为 `www/cheat`，MZ 为 `cheat`），并替换 `main.js`；
 - 备份并在结束后还原设置目录（MV 为 `www/cheat-settings/`，MZ 为 `cheat-settings/`）与 `save/global.*`，测试只用空闲存档槽，不覆盖现有存档；
 - 覆盖启动、UI 挂载、15 个面板、键盘快捷键、穿墙 / 速度 / 游戏速度 / 随机遇敌 / 无敌、金币 / 等级 / 变量 / 开关 / 传送 / 地图事件、快捷键与设置在磁盘上的持久化，以及存档时间机器的保存 / 快照 / 还原 / 复制到其他槽 / 快速读取 / 导入导出；
+- 覆盖稳定性回归：分页 `All` 边界、原子写入、初始化提示队列、弹层点击拦截、技能字段缺失、对象变量 JSON 编辑、传送越界、game-ready 保护、Vue `markRaw` 与旧快照回填标记；
 - 校验 `tools/pack.mjs` 生成的 MV / MZ 压缩包目录结构、`main.js` 内容，以及 `main.js` 引用的入口路径确实存在于压缩包内。
 
 要求 Node.js >= 22（测试脚本使用内置 `WebSocket` 连接 nw.js 的 CDP）。
@@ -121,6 +122,10 @@ pnpm test:mz        # 只测 MZ
 | `cheat-engine/www/cheat/js/` | 工具函数 / Cheat API |
 | `cheat-engine/www/cheat/js/SettingsPath.js` | MV/MZ 设置目录与旧目录迁移 |
 | `cheat-engine/www/cheat/js/LockService.js` | 全局开关 / 变量锁定服务 |
+| `cheat-engine/www/cheat/js/AtomicFile.js` | 原子写入 JSON / 文本文件 |
+| `cheat-engine/www/cheat/js/GameState.js` | 游戏数据就绪检查 |
+| `cheat-engine/www/cheat/js/PaginationHelper.js` | 统一分页计算（含“全部”） |
+| `cheat-engine/www/cheat/js/ClickGuard.js` | 作弊 UI / 弹层点击拦截 |
 | `cheat-engine/www/cheat/init/` | 插件入口 & 初始化 |
 | `cheat-engine/www/cheat/libs/` | 第三方库 (Vue, Vuetify, Shiki) |
 | `cheat-engine/www/cheat/css/` | 样式文件 |

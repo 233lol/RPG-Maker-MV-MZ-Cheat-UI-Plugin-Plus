@@ -1,5 +1,11 @@
 import PageJump from "../components/PageJump.js";
 import { markRaw } from "../libs/vue.js";
+import {
+  ITEMS_PER_PAGE_OPTIONS,
+  getPageBounds,
+  getPageCount,
+} from "../js/PaginationHelper.js";
+import { isPartyReady, requirePartyReady } from "../js/GameState.js";
 
 // 模块级缓存：getFilteredSkills 每轮渲染被调用 5 次（表格 items + 4 个分页方法），
 // 缓存过滤结果避免重复全量 map+filter；搜索/过滤开关/已学技能/刷新数据任一变化即失效。
@@ -39,7 +45,8 @@ export default {
                         v-model="actor.onlyLearned"
                         density="compact"
                         hide-details
-                        label="只显示已学习技能">
+                        label="只显示已学习技能"
+                        @update:model-value="clampActorPage(actor)">
                     </v-checkbox>
                     <v-spacer></v-spacer>
                     <v-tooltip
@@ -67,6 +74,7 @@ export default {
                     density="compact"
                     hide-details
                     @focus="$event.target.select()"
+                    @update:model-value="clampActorPage(actor)"
                     @keydown.stop>
                 </v-text-field>
 
@@ -76,7 +84,7 @@ export default {
                     :items="getFilteredSkills(actor)"
                     v-model:page="actor.pagination.page"
                     v-model:items-per-page="actor.pagination.itemsPerPage"
-                    :items-per-page-options="[5, 10, 15, { title: 'All', value: -1 }]"
+                    :items-per-page-options="itemsPerPageOptions"
                     no-data-text="没有匹配的技能"
                     class="mt-2">
                     <template #header.isLearned="{ column }">
@@ -145,6 +153,7 @@ export default {
       selectedTab: null,
       actors: [],
       allSkills: [],
+      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
       skillHeaders: [
         {
           title: "已学",
@@ -180,10 +189,10 @@ export default {
   methods: {
     extractSkillData(skill) {
       return {
-        _skill: skill,
+        _skill: markRaw(skill),
         id: skill.id,
-        name: skill.name,
-        description: skill.description,
+        name: String(skill.name ?? ""),
+        description: String(skill.description ?? ""),
         iconIndex: skill.iconIndex,
       };
     },
@@ -195,9 +204,9 @@ export default {
         .map((s) => s.id);
 
       return {
-        _actor: actor,
+        _actor: markRaw(actor),
         id: actor._actorId,
-        name: actor._name,
+        name: String(actor._name ?? actor.name?.() ?? ""),
         level: actor.level,
         onlyLearned: false,
         skillSearch: "",
@@ -207,6 +216,12 @@ export default {
     },
 
     initializeVariables() {
+      if (!isPartyReady()) {
+        this.allSkills = [];
+        this.actors = [];
+        return;
+      }
+
       // Load all skills from game data.
       // markRaw：技能表只读展示且结构静态，无需 deep Proxy 响应式化
       this.allSkills = markRaw(
@@ -257,8 +272,8 @@ export default {
           // Search filter
           if (
             search &&
-            !skill.name.toLowerCase().includes(search) &&
-            !skill.description.toLowerCase().includes(search)
+            !String(skill.name ?? "").toLowerCase().includes(search) &&
+            !String(skill.description ?? "").toLowerCase().includes(search)
           ) {
             return false;
           }
@@ -282,14 +297,19 @@ export default {
     },
 
     paginationStartFor(actor) {
-      const total = this.getFilteredSkills(actor).length;
-      if (total === 0) return 0;
-      return (actor.pagination.page - 1) * actor.pagination.itemsPerPage + 1;
+      return getPageBounds(
+        this.totalCountFor(actor),
+        actor.pagination.page,
+        actor.pagination.itemsPerPage,
+      ).start;
     },
 
     paginationStopFor(actor) {
-      const total = this.getFilteredSkills(actor).length;
-      return Math.min(actor.pagination.page * actor.pagination.itemsPerPage, total);
+      return getPageBounds(
+        this.totalCountFor(actor),
+        actor.pagination.page,
+        actor.pagination.itemsPerPage,
+      ).stop;
     },
 
     totalCountFor(actor) {
@@ -297,10 +317,26 @@ export default {
     },
 
     pageCountFor(actor) {
-      return Math.ceil(this.getFilteredSkills(actor).length / actor.pagination.itemsPerPage) || 1;
+      return getPageCount(
+        this.totalCountFor(actor),
+        actor.pagination.itemsPerPage,
+      );
+    },
+
+    clampActorPage(actor) {
+      if (!actor || !actor.pagination) {
+        return;
+      }
+
+      const pageCount = this.pageCountFor(actor);
+      if (actor.pagination.page > pageCount) {
+        actor.pagination.page = pageCount;
+      }
     },
 
     addSkill(actor, skillItem) {
+      if (!requirePartyReady("添加技能")) return;
+
       const actorObj = actor._actor;
       const skill = skillItem._skill;
 
@@ -317,9 +353,13 @@ export default {
         .skills()
         .filter((s) => !!s)
         .map((s) => s.id);
+
+      this.clampActorPage(actor);
     },
 
     removeSkill(actor, skillItem) {
+      if (!requirePartyReady("移除技能")) return;
+
       const actorObj = actor._actor;
       const skill = skillItem._skill;
 
@@ -331,6 +371,8 @@ export default {
         .skills()
         .filter((s) => !!s)
         .map((s) => s.id);
+
+      this.clampActorPage(actor);
     },
   },
 };

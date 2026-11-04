@@ -2,6 +2,7 @@ import { Key } from "./KeyCodes.js";
 import { Alert } from "./AlertHelper.js";
 import { cloneObject } from "./Tools.js";
 import { getCheatSettingsPath } from "./SettingsPath.js";
+import { writeJsonAtomic } from "./AtomicFile.js";
 import {
   SpeedCheat,
   SceneCheat,
@@ -584,30 +585,7 @@ class GlobalShortcut {
 
   writeRawShortcutSettings(shortcutSettings) {
     if (Utils.isNwjs()) {
-      const fs = require("fs");
-      const path = require("path");
-
-      // remove previous settings file
-      try {
-        fs.unlinkSync(this.shortcutSettingsFile);
-      } catch (e) {
-        if (e && e.code !== "ENOENT") {
-          console.warn("[cheat plugin] Can't remove previous shortcut settings file", e);
-        }
-      }
-
-      // create parent directory if not exists
-      const parentDir = path.dirname(this.shortcutSettingsFile);
-
-      if (!fs.existsSync(parentDir)) {
-        fs.mkdirSync(parentDir, { recursive: true });
-      }
-
-      // create file
-      fs.writeFileSync(
-        this.shortcutSettingsFile,
-        JSON.stringify(shortcutSettings, null, 2),
-      );
+      writeJsonAtomic(this.shortcutSettingsFile, shortcutSettings);
     }
   }
 
@@ -619,15 +597,8 @@ class GlobalShortcut {
 
   restoreDefaultSettings() {
     if (Utils.isNwjs()) {
-      // remove settings file
-      try {
-        require("fs").unlinkSync(this.shortcutSettingsFile);
-      } catch (e) {
-        if (e && e.code !== "ENOENT") {
-          console.warn("[cheat plugin] Can't remove shortcut settings file", e);
-        }
-      }
-
+      // 不再先 unlink 再重建：直接原子覆盖成默认值，避免中途崩溃丢配置。
+      writeJsonAtomic(this.shortcutSettingsFile, defaultShortcutSettings);
       this.initialize();
     }
   }

@@ -1,3 +1,5 @@
+import { markRaw } from "../libs/vue.js";
+
 export default {
   name: "HealthSettingTab",
 
@@ -84,7 +86,7 @@ export default {
       handler() {
         this.editingItems = this.items.map((member) => {
           return {
-            _member: member,
+            _member: markRaw(member),
             name: member.name(),
             hp: {
               hp: Number(member.hp),

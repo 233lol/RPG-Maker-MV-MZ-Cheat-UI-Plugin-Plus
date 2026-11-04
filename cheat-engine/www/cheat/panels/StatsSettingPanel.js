@@ -1,4 +1,5 @@
 import { GeneralCheat } from "../js/CheatHelper.js";
+import { isPartyReady, requirePartyReady } from "../js/GameState.js";
 import { markRaw } from "../libs/vue.js";
 
 export default {
@@ -136,13 +137,24 @@ export default {
     },
 
     initializeVariables() {
-      this.paramNames = $dataSystem.terms.params;
+      if (!isPartyReady()) {
+        this.paramNames = [];
+        this.actors = [];
+        return;
+      }
+
+      this.paramNames =
+        typeof $dataSystem !== "undefined" && $dataSystem?.terms?.params
+          ? $dataSystem.terms.params
+          : [];
       this.actors = $gameParty
         .members()
         .map((actor) => this.extractActorData(actor));
     },
 
     onLevelChange(item) {
+      if (!requirePartyReady("修改角色等级")) return;
+
       const level = Number(item.level);
       if (Number.isFinite(level) && level >= 1) {
         item._actor.changeLevel(level, false);
@@ -151,6 +163,8 @@ export default {
     },
 
     onExpChange(item) {
+      if (!requirePartyReady("修改角色经验")) return;
+
       const exp = Number(item.exp);
       if (Number.isFinite(exp) && exp >= 0) {
         item._actor.changeExp(exp, false);
@@ -159,6 +173,8 @@ export default {
     },
 
     onParamChange(item, paramIndex) {
+      if (!requirePartyReady("修改角色属性")) return;
+
       const newVal = Number(item.param[paramIndex]);
       if (!Number.isFinite(newVal)) {
         this.initializeVariables();

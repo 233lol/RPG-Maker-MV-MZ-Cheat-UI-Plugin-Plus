@@ -2,12 +2,20 @@ import PageJump from "../components/PageJump.js";
 import { Alert } from "../js/AlertHelper.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { SaveBackupCheat } from "../js/SaveBackupHelper.js";
+import {
+  ITEMS_PER_PAGE_OPTIONS,
+  getPageBounds,
+  getPageCount,
+  paginationWatcherMixin,
+} from "../js/PaginationHelper.js";
 import { markRaw } from "../libs/vue.js";
 
 // 存档时间机器面板：手动/自动快照、一键回滚、导入导出。
 // 核心逻辑全在 js/SaveBackupHelper.js，这里只负责展示与二次确认。
 export default {
   name: "SaveBackupPanel",
+
+  mixins: [paginationWatcherMixin],
 
   components: { PageJump },
 
@@ -159,7 +167,7 @@ export default {
         :items="filteredTableItems"
         v-model:page="pagination.page"
         v-model:items-per-page="pagination.itemsPerPage"
-        :items-per-page-options="[5, 10, 15, { title: 'All', value: -1 }]"
+        :items-per-page-options="itemsPerPageOptions"
         no-data-text="还没有快照。游戏内存一次档就会自动生成。">
         <template #top>
             <div class="d-flex align-center flex-wrap ga-2 pb-1">
@@ -325,6 +333,7 @@ export default {
       slotFilter: "all",
 
       pagination: { page: 1, itemsPerPage: 5 },
+      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
 
       // 面板只有 ~600px 宽：三列就够，表头纵向换行的坑见 css/main.css 的
       // .cheat-save-backup-table。槽位列既要放 #N 也要放存档次数，给宽一点。
@@ -445,19 +454,23 @@ export default {
     },
 
     paginationStart() {
-      if (this.totalCount === 0) return 0;
-      return (this.pagination.page - 1) * this.pagination.itemsPerPage + 1;
+      return getPageBounds(
+        this.totalCount,
+        this.pagination.page,
+        this.pagination.itemsPerPage,
+      ).start;
     },
 
     paginationStop() {
-      return Math.min(
-        this.pagination.page * this.pagination.itemsPerPage,
+      return getPageBounds(
         this.totalCount,
-      );
+        this.pagination.page,
+        this.pagination.itemsPerPage,
+      ).stop;
     },
 
     pageCount() {
-      return Math.ceil(this.totalCount / this.pagination.itemsPerPage) || 1;
+      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
     },
   },
 

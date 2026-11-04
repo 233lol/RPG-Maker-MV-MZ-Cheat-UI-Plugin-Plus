@@ -1,7 +1,16 @@
 import PageJump from "../components/PageJump.js";
+import { Alert } from "../js/AlertHelper.js";
+import {
+  ITEMS_PER_PAGE_OPTIONS,
+  getPageBounds,
+  getPageCount,
+  paginationWatcherMixin,
+} from "../js/PaginationHelper.js";
 
 export default {
   name: "TeleportPanel",
+
+  mixins: [paginationWatcherMixin],
 
   components: { PageJump },
 
@@ -81,7 +90,7 @@ export default {
         :items="filteredMaps"
          v-model:page="pagination.page"
          v-model:items-per-page="pagination.itemsPerPage"
-         :items-per-page-options="[5, 10, 15, { title: 'All', value: -1 }]">
+         :items-per-page-options="itemsPerPageOptions">
         <template #top>
             <v-text-field
                 label="搜索..."
@@ -167,6 +176,7 @@ export default {
       maps: [],
 
       pagination: { page: 1, itemsPerPage: 5 },
+      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
 
       tableHeaders: [
         {
@@ -217,10 +227,11 @@ export default {
     filteredMaps() {
       if (!this.search || !this.search.trim()) return this.maps;
       const s = this.search.toLowerCase();
-      return this.maps.filter((item) =>
-        item.name.toLowerCase().includes(s) ||
-        item.fullPathJoin.toLowerCase().includes(s) ||
-        String(item.id).toLowerCase().includes(s)
+      return this.maps.filter(
+        (item) =>
+          String(item.name ?? "").toLowerCase().includes(s) ||
+          String(item.fullPathJoin ?? "").toLowerCase().includes(s) ||
+          String(item.id ?? "").toLowerCase().includes(s),
       );
     },
 
@@ -229,16 +240,23 @@ export default {
     },
 
     paginationStart() {
-      if (this.totalCount === 0) return 0;
-      return (this.pagination.page - 1) * this.pagination.itemsPerPage + 1;
+      return getPageBounds(
+        this.totalCount,
+        this.pagination.page,
+        this.pagination.itemsPerPage,
+      ).start;
     },
 
     paginationStop() {
-      return Math.min(this.pagination.page * this.pagination.itemsPerPage, this.totalCount);
+      return getPageBounds(
+        this.totalCount,
+        this.pagination.page,
+        this.pagination.itemsPerPage,
+      ).stop;
     },
 
     pageCount() {
-      return Math.ceil(this.filteredMaps.length / this.pagination.itemsPerPage) || 1;
+      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
     },
   },
 
@@ -248,6 +266,11 @@ export default {
     },
 
     async initializeVariables() {
+      if (typeof $dataMapInfos === "undefined" || !Array.isArray($dataMapInfos)) {
+        this.maps = [];
+        return;
+      }
+
       const mapNames = await this.getMapNames($dataMapInfos);
 
       this.maps = $dataMapInfos
@@ -269,7 +292,7 @@ export default {
     },
 
     async getMapNames(dataMapInfos) {
-      return dataMapInfos.map((m) => (m ? m.name : ""));
+      return dataMapInfos.map((m) => String(m?.name ?? ""));
     },
 
     getMapAncestors(id, path) {
@@ -288,11 +311,62 @@ export default {
     },
 
     teleportLocation(mapId, x, y) {
-      if (!Number.isFinite(x) || !Number.isFinite(y)) {
-        return;
+      const targetMapId = Number(mapId);
+
+      if (
+        !Number.isInteger(targetMapId) ||
+        targetMapId <= 0 ||
+        !Number.isInteger(x) ||
+        !Number.isInteger(y) ||
+        x < 0 ||
+        y < 0
+      ) {
+        Alert.warn("传送坐标必须是正整数");
+        return false;
       }
-      $gamePlayer.reserveTransfer(mapId, x, y, $gamePlayer.direction(), 0);
+
+      if (
+        typeof $dataMapInfos === "undefined" ||
+        !$dataMapInfos ||
+        !$dataMapInfos[targetMapId]
+      ) {
+        Alert.warn(`地图 ${targetMapId} 不存在`);
+        return false;
+      }
+
+      if (typeof $gamePlayer === "undefined" || !$gamePlayer) {
+        Alert.warn("玩家数据尚未初始化，无法传送");
+        return false;
+      }
+
+      // 只有当前地图能拿到宽高；其他地图的 $dataMap 不能为了取尺寸而加载，
+      // 那会覆盖当前地图数据，所以只做非负整数 + 地图存在性校验。
+      if (
+        typeof $gameMap !== "undefined" &&
+        $gameMap &&
+        $gameMap.mapId() === targetMapId
+      ) {
+        const valid =
+          typeof $gameMap.isValid === "function"
+            ? $gameMap.isValid(x, y)
+            : x < $gameMap.width() && y < $gameMap.height();
+
+        if (!valid) {
+          Alert.warn(`坐标 ${x},${y} 超出当前地图范围`);
+          return false;
+        }
+      }
+
+      $gamePlayer.reserveTransfer(
+        targetMapId,
+        x,
+        y,
+        $gamePlayer.direction(),
+        0,
+      );
       $gamePlayer.setPosition(x, y);
+      this.updateCurrentPosition();
+      return true;
     },
 
     updateCurrentPosition() {
@@ -311,9 +385,27 @@ export default {
     sameMapTeleport() {
       const x = Number(this.inputX);
       const y = Number(this.inputY);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+
+      if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) {
+        Alert.warn("传送坐标必须是正整数");
         return;
       }
+
+      if (
+        typeof $gamePlayer === "undefined" ||
+        !$gamePlayer ||
+        typeof $gameMap === "undefined" ||
+        !$gameMap
+      ) {
+        Alert.warn("玩家数据尚未初始化，无法传送");
+        return;
+      }
+
+      if (x >= $gameMap.width() || y >= $gameMap.height()) {
+        Alert.warn(`坐标 ${x},${y} 超出当前地图范围`);
+        return;
+      }
+
       $gamePlayer.setPosition(x, y);
       $gamePlayer.center(x, y);
       $gamePlayer.makeEncounterCount();

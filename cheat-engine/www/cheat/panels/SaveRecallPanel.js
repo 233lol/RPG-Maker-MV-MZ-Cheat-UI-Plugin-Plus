@@ -1,8 +1,18 @@
 import PageJump from "../components/PageJump.js";
 import { KEY_VALUE_STORAGE } from "../js/KeyValueStorage.js";
+import { Alert } from "../js/AlertHelper.js";
+import { isGameReady, requireGameReady } from "../js/GameState.js";
+import {
+  ITEMS_PER_PAGE_OPTIONS,
+  getPageBounds,
+  getPageCount,
+  paginationWatcherMixin,
+} from "../js/PaginationHelper.js";
 
 export default {
   name: "SaveRecallPanel",
+
+  mixins: [paginationWatcherMixin],
 
   components: { PageJump },
 
@@ -49,7 +59,7 @@ export default {
         :items="filteredTableItems"
          v-model:page="pagination.page"
          v-model:items-per-page="pagination.itemsPerPage"
-         :items-per-page-options="[5, 10, 15, { title: 'All', value: -1 }]">
+         :items-per-page-options="itemsPerPageOptions">
         <template #top>
             <div class="d-flex align-center">
                 <v-text-field
@@ -176,6 +186,7 @@ export default {
         },
       ],
       pagination: { page: 1, itemsPerPage: 5 },
+      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
     };
   },
 
@@ -191,10 +202,13 @@ export default {
           // 保留原始下标：删除必须按原始数组位置，
           // 而 #item.actions 里的 index 是过滤后 / 当前页的下标
           locationIndex: idx,
-          name: location.name,
-          mapName: $dataMapInfos[location.mapId]
-            ? $dataMapInfos[location.mapId].name
-            : "NULL",
+          name: String(location.name ?? ""),
+          mapName:
+            typeof $dataMapInfos !== "undefined" &&
+            $dataMapInfos &&
+            $dataMapInfos[location.mapId]
+              ? String($dataMapInfos[location.mapId].name ?? "NULL")
+              : "NULL",
           mapId: location.mapId,
           coord: {
             x: location.x,
@@ -208,9 +222,10 @@ export default {
       let items = this.tableItems;
       if (this.search && this.search.trim()) {
         const s = this.search.toLowerCase();
-        items = items.filter((item) =>
-          item.name.toLowerCase().includes(s) ||
-          item.mapName.toLowerCase().includes(s)
+        items = items.filter(
+          (item) =>
+            String(item.name ?? "").toLowerCase().includes(s) ||
+            String(item.mapName ?? "").toLowerCase().includes(s),
         );
       }
       return items;
@@ -221,16 +236,23 @@ export default {
     },
 
     paginationStart() {
-      if (this.totalCount === 0) return 0;
-      return (this.pagination.page - 1) * this.pagination.itemsPerPage + 1;
+      return getPageBounds(
+        this.totalCount,
+        this.pagination.page,
+        this.pagination.itemsPerPage,
+      ).start;
     },
 
     paginationStop() {
-      return Math.min(this.pagination.page * this.pagination.itemsPerPage, this.totalCount);
+      return getPageBounds(
+        this.totalCount,
+        this.pagination.page,
+        this.pagination.itemsPerPage,
+      ).stop;
     },
 
     pageCount() {
-      return Math.ceil(this.filteredTableItems.length / this.pagination.itemsPerPage) || 1;
+      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
     },
   },
 
@@ -241,6 +263,12 @@ export default {
 
     async initializeVariables() {
       this.loadLocations();
+
+      if (!isGameReady()) {
+        this.currentMapName = "";
+        return;
+      }
+
       this.currentMapName = await this.getMapFullPath($gameMap.mapId());
     },
 
@@ -325,6 +353,8 @@ export default {
     },
 
     addLocation(locationAlias) {
+      if (!requireGameReady("保存当前位置")) return;
+
       this.locations.push({
         name: locationAlias,
         mapId: $gameMap.mapId(),
@@ -340,6 +370,8 @@ export default {
     },
 
     teleportLocation(mapId, x, y) {
+      if (!requireGameReady("传送到保存位置")) return;
+
       if (!Number.isFinite(x) || !Number.isFinite(y)) {
         return;
       }

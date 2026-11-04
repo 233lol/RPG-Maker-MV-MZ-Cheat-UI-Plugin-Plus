@@ -13,6 +13,7 @@ import { createRunner } from "./lib/runner.mjs";
 import { installTestApi } from "./specs/helpers.mjs";
 import { registerCore } from "./specs/core.mjs";
 import { registerGameplay } from "./specs/gameplay.mjs";
+import { registerStability } from "./specs/stability.mjs";
 import { registerSaveBackup } from "./specs/save-backup.mjs";
 import { registerPackaging } from "./specs/packaging.mjs";
 
@@ -115,6 +116,7 @@ async function main() {
 
       registerCore({ test: runner.test, page: game, type, state });
       registerGameplay({ test: runner.test, page: game, type, state });
+      registerStability({ test: runner.test, page: game, type, state });
       registerSaveBackup({ test: runner.test, page: game, type, state });
 
       const result = await runner.run();
