@@ -37,13 +37,24 @@ export const gameDataWatcherMixin = {
 
   methods: {
     __refreshFromGameData() {
-      if (typeof this.initializeVariables === "function") {
-        this.initializeVariables();
-        return;
-      }
+      try {
+        let result = null;
 
-      if (typeof this.reload === "function") {
-        this.reload();
+        if (typeof this.initializeVariables === "function") {
+          result = this.initializeVariables();
+        } else if (typeof this.reload === "function") {
+          result = this.reload();
+        }
+
+        // 面板的 initializeVariables / reload 可能是 async；同步 try/catch
+        // 抓不到 rejection，这里补一层 warn，避免未处理的 Promise 异常。
+        if (result && typeof result.catch === "function") {
+          result.catch((error) => {
+            console.warn("[cheat plugin] 游戏数据变化后刷新面板失败", error);
+          });
+        }
+      } catch (error) {
+        console.warn("[cheat plugin] 游戏数据变化后刷新面板失败", error);
       }
     },
   },
