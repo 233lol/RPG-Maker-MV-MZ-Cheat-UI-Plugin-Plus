@@ -520,6 +520,17 @@ class GlobalShortcut {
     for (const shortcutConfig of Object.values(this.shortcutConfig)) {
       const shortcutSetting = this.shortcutSettings[shortcutConfig.id];
 
+      // 配置文件里可能有两个动作绑定同一个键（手改 / 旧默认值冲突）。
+      // 先注册者生效，避免后注册者静默覆盖前者后 UI 仍显示两者都已绑定。
+      const occupied = this.shortcutMap.getValue(shortcutSetting.shortcut);
+
+      if (occupied && occupied !== shortcutConfig) {
+        console.warn(
+          `快捷键冲突，已忽略: ${shortcutConfig.name} - ${shortcutSetting.shortcut.asDisplayString()}`,
+        );
+        continue;
+      }
+
       this.shortcutMap.register(
         shortcutSetting.shortcut,
         shortcutConfig,
@@ -678,8 +689,11 @@ class GlobalShortcut {
       );
     }
 
-    // remove prev key binding if prev key exists
-    this.shortcutMap.remove(prevKey);
+    // 只删除「确实属于当前动作」的旧绑定。配置里存在重复绑定时，
+    // 这个槽位可能已经被另一个动作占用，直接 remove 会让它静默失效。
+    if (this.shortcutMap.getValue(prevKey) === this.getConfig(shortcutId)) {
+      this.shortcutMap.remove(prevKey);
+    }
 
     // bind key
     const currValue = this.getConfig(shortcutId);
