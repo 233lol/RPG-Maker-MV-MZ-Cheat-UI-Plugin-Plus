@@ -7,6 +7,7 @@ export default {
     reloadGameData: "重新加载游戏数据",
     cheatWindow: "作弊窗口",
     close: "关闭",
+    cancel: "取消",
     reloadTarget: "重新加载{target}",
   },
 

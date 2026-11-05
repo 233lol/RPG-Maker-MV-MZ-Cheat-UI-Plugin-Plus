@@ -7,6 +7,7 @@ export default {
     reloadGameData: "Reload game data",
     cheatWindow: "Cheat Window",
     close: "Close",
+    cancel: "Cancel",
     reloadTarget: "Reload {target}",
   },
 

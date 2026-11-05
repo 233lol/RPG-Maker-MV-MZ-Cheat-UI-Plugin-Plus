@@ -1,4 +1,5 @@
 import { ConfirmDialog } from "../js/DialogHelper.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "ConfirmDialog",
@@ -51,6 +52,17 @@ export default {
     ConfirmDialog.close = this.close;
   },
 
+  beforeUnmount() {
+    // 卸载后静态方法仍指向已销毁的实例，之后的调用不会弹对话框。
+    if (ConfirmDialog.show === this.show) {
+      ConfirmDialog.show = () => {};
+    }
+
+    if (ConfirmDialog.close === this.close) {
+      ConfirmDialog.close = () => {};
+    }
+  },
+
   computed: {
     messageArray() {
       if (this.options) {
@@ -69,7 +81,7 @@ export default {
           {
             icon: "mdi-close",
             iconRight: false,
-            label: "取消",
+            label: t("common.cancel"),
             color: "red",
             action: this.close,
           },

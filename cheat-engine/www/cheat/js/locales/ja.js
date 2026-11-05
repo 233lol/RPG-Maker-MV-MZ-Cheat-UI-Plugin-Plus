@@ -7,6 +7,7 @@ export default {
     reloadGameData: "ゲームデータを再読み込み",
     cheatWindow: "チートウィンドウ",
     close: "閉じる",
+    cancel: "キャンセル",
     reloadTarget: "{target}を再読み込み",
   },
 
