@@ -591,18 +591,19 @@ export default {
 
   watch: {
     search() {
-      this.scheduleSearch();
+      this.scheduleSearch(!this.__restoringPanelState);
     },
 
     deepSearch() {
       this.deepSearchResults = [];
       this.deepSearchTruncated = false;
       this.deepSearchLimitReason = "";
-      this.scheduleSearch();
+      this.scheduleSearch(!this.__restoringPanelState);
     },
 
     rootFilter() {
-      if (this.isRoot) {
+      // 恢复面板状态时不要用 navigateTo 清掉刚恢复的搜索词 / 分页
+      if (this.isRoot && !this.__restoringPanelState) {
         this.navigateTo([], {});
       }
     },
@@ -1141,8 +1142,11 @@ export default {
       this.deepSearch = !this.deepSearch;
     },
 
-    scheduleSearch() {
-      this.pagination.page = 1;
+    scheduleSearch(resetPage = true) {
+      if (resetPage) {
+        this.pagination.page = 1;
+      }
+
       this.clearSearchTimer();
 
       if (!this.searchActive) {

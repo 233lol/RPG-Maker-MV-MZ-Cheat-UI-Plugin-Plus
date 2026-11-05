@@ -175,7 +175,19 @@ export const panelStateMixin = {
     }
 
     const defaults = this.getPanelStateSnapshot();
-    this.applyPanelState(loadPanelState(panelId, defaults));
+
+    // 恢复状态期间置标记：带 watcher 的面板（例如全局变量面板）不要在
+    // 恢复 search / rootFilter 时顺手把分页重置到第 1 页或清空搜索词。
+    // watcher 在 pre-flush 阶段执行，早于 $nextTick 回调，标记仍然有效。
+    this.__restoringPanelState = true;
+
+    try {
+      this.applyPanelState(loadPanelState(panelId, defaults));
+    } finally {
+      this.$nextTick(() => {
+        this.__restoringPanelState = false;
+      });
+    }
 
     this.__panelStateUnwatch = this.$watch(
       () => this.getPanelStateSnapshot(),
