@@ -99,7 +99,10 @@ export default {
       visibilityObserver: null, // IntersectionObserver instance (if any)
       needsRedraw: true, // dirty flag: only redraw canvas when game state changed
       renderIntervalId: null, // id returned from setInterval for periodic updates
-      readInterval: this.loadSetting("mapEventPanel_readInterval", 500), // Interval in ms for reading game data
+      // Interval in ms for reading game data
+      readInterval: this.normalizeReadInterval(
+        this.loadSetting("mapEventPanel_readInterval", 500),
+      ),
     };
   },
 
@@ -216,10 +219,21 @@ export default {
       }, this.readInterval);
     },
 
+    // localStorage 里的值可能是旧版本 / 手改 / 空串，直接进 setInterval
+    // 会变成 0ms 忙循环，必须先按界面允许的范围收敛。
+    normalizeReadInterval(value) {
+      const parsed = parseInt(value, 10);
+
+      if (!Number.isFinite(parsed)) {
+        return 500;
+      }
+
+      return Math.min(1000, Math.max(100, parsed));
+    },
+
     onReadIntervalChange() {
-      let valid = parseInt(this.readInterval);
-      if (isNaN(valid) || valid < 100) valid = 100;
-      if (valid > 1000) valid = 1000;
+      const valid = this.normalizeReadInterval(this.readInterval);
+
       if (valid !== this.readInterval) {
         this.readInterval = valid;
       }
@@ -345,6 +359,12 @@ export default {
         disconnect() {
           window.removeEventListener("scroll", throttledCheck, true);
           window.removeEventListener("resize", throttledCheck);
+
+          // 组件卸载时取消尚未执行的节流回调，避免访问已销毁的 canvas
+          if (timeout) {
+            clearTimeout(timeout);
+            timeout = null;
+          }
         },
       };
 
