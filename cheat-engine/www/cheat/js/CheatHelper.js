@@ -286,6 +286,18 @@ export class GameSpeedCheat {
   }
 
   static setGameSpeed(rate, sceneOption) {
+    // 损坏的配置 / 缺失的 param 可能传进 NaN、0 或非函数，
+    // 直接进入 updateScene 包装器会让 currStep 恒为 NaN，游戏一帧都不再更新。
+    rate = Number(rate);
+
+    if (!Number.isFinite(rate) || rate <= 0) {
+      rate = 1;
+    }
+
+    if (typeof sceneOption !== "function") {
+      sceneOption = GameSpeedCheat.sceneOptions().all;
+    }
+
     // backup original functions
     if (!this.origin_SceneManager_updateScene) {
       this.origin_SceneManager_updateScene = SceneManager.updateScene;
@@ -297,10 +309,6 @@ export class GameSpeedCheat {
 
     if (!this.origin_Spriteset_Base_update) {
       this.origin_Spriteset_Base_update = Spriteset_Base.prototype.update;
-    }
-
-    if (!sceneOption) {
-      sceneOption = GameSpeedCheat.sceneOptions().all;
     }
 
     this.rate = rate;
@@ -387,10 +395,17 @@ export class GameSpeedCheat {
       return;
     }
 
-    GameSpeedCheat.setGameSpeed(
-      data.rate,
-      GameSpeedCheat.sceneOptions()[data.sceneOption],
-    );
+    // 白名单校验：__proto__ / 不存在的方法名会取到 Object.prototype，
+    // 之后包装器每帧调用 sceneOption() 都会抛错，表现为游戏卡死。
+    const options = GameSpeedCheat.sceneOptions();
+    const sceneOption = Object.prototype.hasOwnProperty.call(
+      options,
+      data.sceneOption,
+    )
+      ? options[data.sceneOption]
+      : options.all;
+
+    GameSpeedCheat.setGameSpeed(data.rate, sceneOption);
   }
 }
 
@@ -909,7 +924,11 @@ export class MessageCheat {
   }
 
   static startSkip(gameSpeed) {
-    if (gameSpeed === 1) {
+    const rate = Number(gameSpeed);
+
+    // 旧配置可能缺少 accelerate（undefined）或被改成 0 / NaN。
+    // 这种情况只跳过消息、不加速，不能把 NaN 传给 setGameSpeed。
+    if (!Number.isFinite(rate) || rate <= 1) {
       this.gameSpeedBackup = null;
     } else {
       this.gameSpeedBackup = {
@@ -917,7 +936,7 @@ export class MessageCheat {
         sceneOption: GameSpeedCheat.getSceneOption(),
       };
 
-      GameSpeedCheat.setGameSpeed(gameSpeed, GameSpeedCheat.sceneOptions().all);
+      GameSpeedCheat.setGameSpeed(rate, GameSpeedCheat.sceneOptions().all);
     }
 
     this.skip = true;
