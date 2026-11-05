@@ -7,6 +7,7 @@ import {
 } from "../js/CheatHelper.js";
 
 import RefreshButton from "../components/RefreshButton.js";
+import { Alert } from "../js/AlertHelper.js";
 import interpretCodes from "../js/eventCodes.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { saveLocale } from "../js/LocaleService.js";
