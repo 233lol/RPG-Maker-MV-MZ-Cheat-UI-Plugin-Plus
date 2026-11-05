@@ -2,20 +2,20 @@ export default {
   interpretCodes(code) {
     switch (code) {
       case 101:
-        return "set text";
-      case 401:
         return "show text";
+      case 401:
+        return "text line";
 
       case 102:
-        return "begin case";
+        return "show choices";
       case 402:
         return "when";
       case 403:
-        return "otherwise";
+        return "when cancel";
       case 0:
         return "nop";
       case 404:
-        return "end case";
+        return "end choices";
 
       case 103:
         return "input numbers";
@@ -45,10 +45,14 @@ export default {
         return "end if";
       case 112:
         return "loop";
+      case 413:
+        return "repeat above";
       case 113:
         return "loop break";
       case 115:
         return "exit event";
+      case 116:
+        return "erase event";
       case 117:
         return "common event";
       case 118:
@@ -70,33 +74,33 @@ export default {
         return "set party member";
 
       case 311:
-        return "set HP";
+        return "change HP";
       case 312:
-        return "set MP";
+        return "change MP";
       case 326:
-        return "set TP";
+        return "change TP";
       case 313:
-        return "set buffs";
+        return "change state";
       case 314:
-        return "heal all";
+        return "recover all";
       case 315:
-        return "set EXP";
+        return "change EXP";
       case 316:
-        return "set LV";
+        return "change level";
       case 317:
-        return "set Param";
+        return "change parameters";
       case 318:
-        return "set Skill";
+        return "change skills";
       case 319:
-        return "set Equipments";
+        return "change equipment";
       case 320:
-        return "set Name";
+        return "change name";
       case 321:
-        return "set Class";
+        return "change class";
       case 324:
-        return "set Nickname";
+        return "change nickname";
       case 325:
-        return "set Profile";
+        return "change profile";
 
       case 201:
         return "set coord";
