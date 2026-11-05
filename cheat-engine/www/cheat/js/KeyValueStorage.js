@@ -70,7 +70,19 @@ export class KeyValueStorage {
     this.__setItemToFile(key, value);
   }
 
+  // 构造时可能还没有 Utils（模块在引擎初始化前被 import），
+  // 之后环境变成 nw.js 时再按需补上 fs，避免 fileSystem 为 undefined。
+  __ensureFileSystem() {
+    if (!this.fileSystem) {
+      this.fileEncoding = "utf-8";
+      this.fileSystem = require("fs");
+      this.pathModule = require("path");
+    }
+  }
+
   __readFile() {
+    this.__ensureFileSystem();
+
     const cached = fileCache.get(this.filePath);
     if (cached !== undefined) {
       return cached;
