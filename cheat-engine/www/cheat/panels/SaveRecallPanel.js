@@ -3,18 +3,14 @@ import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
 import { KEY_VALUE_STORAGE } from "../js/KeyValueStorage.js";
 import { isGameReady, requireGameReady } from "../js/GameState.js";
-import {
-  ITEMS_PER_PAGE_OPTIONS,
-  getPageCount,
-  paginationWatcherMixin,
-} from "../js/PaginationHelper.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
-import { panelStateMixin } from "../js/PanelState.js";
+import { filterByKeyword } from "../js/SearchFilter.js";
+import { tablePanelMixin } from "../js/TablePanelMixin.js";
 
 export default {
   name: "SaveRecallPanel",
 
-  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
+  mixins: [tablePanelMixin, gameDataWatcherMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -128,8 +124,6 @@ export default {
     return {
       locationAliasInput: "",
 
-      search: "",
-
       locations: [],
 
       currentMapName: "",
@@ -152,8 +146,6 @@ export default {
           key: "actions",
         },
       ],
-      pagination: { page: 1, itemsPerPage: 5 },
-      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
     };
   },
 
@@ -190,48 +182,14 @@ export default {
     },
 
     filteredTableItems() {
-      let items = this.tableItems;
-      if (this.search && this.search.trim()) {
-        const s = this.search.toLowerCase();
-        items = items.filter(
-          (item) =>
-            String(item.name ?? "")
-              .toLowerCase()
-              .includes(s) ||
-            String(item.mapName ?? "")
-              .toLowerCase()
-              .includes(s),
-        );
-      }
-      return items;
-    },
-
-    totalCount() {
-      return this.filteredTableItems.length;
-    },
-
-    pageCount() {
-      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
+      return filterByKeyword(this.tableItems, this.search, (item) => [
+        item.name,
+        item.mapName,
+      ]);
     },
   },
 
   methods: {
-    getPanelStateSnapshot() {
-      return {
-        search: this.search,
-        pagination: this.pagination,
-      };
-    },
-
-    applyPanelState(state) {
-      this.search = state.search;
-      this.pagination = { ...this.pagination, ...state.pagination };
-    },
-
-    jumpToPage(page) {
-      this.pagination.page = page;
-    },
-
     async initializeVariables() {
       this.loadLocations();
 

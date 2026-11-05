@@ -1,5 +1,6 @@
 import { Alert } from "./AlertHelper.js";
 import { ConfirmDialog } from "./DialogHelper.js";
+import { isMZEngine } from "./SettingsPath.js";
 
 import {
   BACKUP_KIND_AUTO,
@@ -53,24 +54,9 @@ export class SaveBackupCheat {
   // MZ 与 MV 的存档 API 不同：
   //   MV：savefileId -> fileN.rpgsave，StorageManager.saveToLocalFile(id, json) 内部 LZString
   //   MZ：saveName  -> fileN.rmmzsave，StorageManager.saveToLocalFile(name, zip) 要求 pako 压缩后的数据
-  // 这里只做能力探测，不依赖 Utils 是否已经加载。
+  // 引擎判定统一走 SettingsPath.isMZEngine()，避免两处探测逻辑漂移。
   static isMZ() {
-    try {
-      if (typeof Utils !== "undefined" && Utils.RPGMAKER_NAME) {
-        return Utils.RPGMAKER_NAME === "MZ";
-      }
-    } catch (error) {
-      // 继续按 API 探测
-    }
-
-    try {
-      return (
-        typeof DataManager !== "undefined" &&
-        typeof DataManager.makeSavename === "function"
-      );
-    } catch (error) {
-      return false;
-    }
+    return isMZEngine();
   }
 
   static getSaveName(slot) {
@@ -278,61 +264,20 @@ export class SaveBackupCheat {
   // 把引擎存档文件内容解成明文 JSON：
   //   MV  ：LZString base64（个别游戏 / 旧版本是裸 base64 或明文）
   //   MZ  ：pako 压缩后的二进制字符串
-  // 只有解出来确实像 JSON 才认，避免把乱码当成存档。
+  // 解码实现复用 save-backup/codec.js：按 JSON 特征依次尝试明文 / pako /
+  // LZString / 裸 base64，只有解出来确实像 JSON 才认。
   static decodeEngineSaveText(raw) {
     if (raw === null || raw === undefined || raw === "") {
       return null;
     }
 
-    const looksLikeJson = (text) => {
-      if (typeof text !== "string") {
-        return false;
-      }
-      const trimmed = text.trimStart();
-      return trimmed.startsWith("{") || trimmed.startsWith("[");
-    };
+    const text = this.decodePayloadText(raw, null, "存档数据");
 
-    if (looksLikeJson(raw)) {
-      return raw;
+    if (text === null) {
+      console.warn("[cheat plugin] 无法识别的存档压缩格式，快照元数据将不完整");
     }
 
-    const lz = this.getLZString();
-    if (lz && typeof lz.decompressFromBase64 === "function") {
-      try {
-        const text = lz.decompressFromBase64(raw);
-        if (looksLikeJson(text)) {
-          return text;
-        }
-      } catch (error) {
-        // 不是 LZString 压缩的，继续试下一种
-      }
-    }
-
-    try {
-      const pakoLib = this.getPako();
-      if (pakoLib && typeof pakoLib.inflate === "function") {
-        const text = pakoLib.inflate(raw, { to: "string" });
-        if (looksLikeJson(text)) {
-          return text;
-        }
-      }
-    } catch (error) {
-      // 不是 pako 压缩的，继续试下一种
-    }
-
-    try {
-      const text = new TextDecoder().decode(
-        Uint8Array.from(atob(raw), (c) => c.charCodeAt(0)),
-      );
-      if (looksLikeJson(text)) {
-        return text;
-      }
-    } catch (error) {
-      // 也不是裸 base64
-    }
-
-    console.warn("[cheat plugin] 无法识别的存档压缩格式，快照元数据将不完整");
-    return null;
+    return text;
   }
 
   // jsonText 必须是 readSaveText / readPayload 得到的明文 JSON 文本
@@ -350,12 +295,13 @@ export class SaveBackupCheat {
     // MZ 的 saveToLocalFile 要求传入 pako 压缩后的 zip，MV 则要求明文 JSON。
     if (this.isLocalMode()) {
       if (this.isMZ()) {
-        const pakoLib = this.getPako();
-        if (!pakoLib || typeof pakoLib.deflate !== "function") {
+        // 与快照文件同一套编码实现（codec.js），避免两边压缩参数漂移
+        const zip = this.encodePayloadText(jsonText, "pako");
+
+        if (zip === null) {
           throw new Error("当前游戏未提供 pako，无法写入 MZ 存档");
         }
 
-        const zip = pakoLib.deflate(jsonText, { to: "string", level: 1 });
         StorageManager.saveToLocalFile(this.getSaveName(slot), zip);
         return;
       }

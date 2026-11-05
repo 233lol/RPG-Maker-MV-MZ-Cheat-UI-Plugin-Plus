@@ -56,6 +56,9 @@ Code style: `pnpm run lint` (ESLint flat config), `pnpm run format` (Prettier), 
 | `cheat-engine/www/cheat/js/AtomicFile.js` | Atomic JSON/text file writes |
 | `cheat-engine/www/cheat/js/GameState.js` | Game-data readiness checks for panels and shortcuts |
 | `cheat-engine/www/cheat/js/PaginationHelper.js` | Shared pagination math (including the `All` option) |
+| `cheat-engine/www/cheat/js/TablePanelMixin.js` | Shared search / pagination / panel-state mixin for table panels (`panelStateExtraKeys`) |
+| `cheat-engine/www/cheat/js/LockTableMixin.js` | Shared switch/variable table logic: rows, locking, persisted lock map |
+| `cheat-engine/www/cheat/js/SearchFilter.js` | Shared keyword matching (`matchesKeyword`, `filterByKeyword`) |
 | `cheat-engine/www/cheat/js/strings.js` | Shared UI copy (`t("common.search")`, nav names, ...) |
 | `cheat-engine/www/cheat/js/ClickGuard.js` | Ignore game input when clicking cheat UI / overlays |
 | `cheat-engine/www/cheat/components/` | Shared UI (`SearchField`, `RefreshButton`, `PaginationFooter`, `PageJump`, ...) |

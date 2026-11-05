@@ -1,18 +1,14 @@
 import PaginationFooter from "../components/PaginationFooter.js";
 import SearchField from "../components/SearchField.js";
 import { Alert } from "../js/AlertHelper.js";
-import {
-  ITEMS_PER_PAGE_OPTIONS,
-  getPageCount,
-  paginationWatcherMixin,
-} from "../js/PaginationHelper.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
-import { panelStateMixin } from "../js/PanelState.js";
+import { filterByKeyword } from "../js/SearchFilter.js";
+import { tablePanelMixin } from "../js/TablePanelMixin.js";
 
 export default {
   name: "TeleportPanel",
 
-  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
+  mixins: [tablePanelMixin, gameDataWatcherMixin],
 
   components: { PaginationFooter, SearchField },
 
@@ -148,13 +144,11 @@ export default {
       currentMapName: "",
       updateTimer: null,
 
-      search: "",
       excludeFullPath: false,
 
       maps: [],
 
-      pagination: { page: 1, itemsPerPage: 5 },
-      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
+      panelStateExtraKeys: ["excludeFullPath"],
 
       tableHeaders: [
         {
@@ -205,50 +199,19 @@ export default {
     },
 
     filteredMaps() {
-      if (!this.search || !this.search.trim()) return this.maps;
-      const s = this.search.toLowerCase();
-      return this.maps.filter(
-        (item) =>
-          String(item.name ?? "")
-            .toLowerCase()
-            .includes(s) ||
-          String(item.fullPathJoin ?? "")
-            .toLowerCase()
-            .includes(s) ||
-          String(item.id ?? "")
-            .toLowerCase()
-            .includes(s),
-      );
+      return filterByKeyword(this.maps, this.search, (item) => [
+        item.name,
+        item.fullPathJoin,
+        item.id,
+      ]);
     },
 
     totalCount() {
       return this.filteredMaps.length;
     },
-
-    pageCount() {
-      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
-    },
   },
 
   methods: {
-    getPanelStateSnapshot() {
-      return {
-        search: this.search,
-        excludeFullPath: this.excludeFullPath,
-        pagination: this.pagination,
-      };
-    },
-
-    applyPanelState(state) {
-      this.search = state.search;
-      this.excludeFullPath = state.excludeFullPath;
-      this.pagination = { ...this.pagination, ...state.pagination };
-    },
-
-    jumpToPage(page) {
-      this.pagination.page = page;
-    },
-
     async initializeVariables() {
       if (
         typeof $dataMapInfos === "undefined" ||

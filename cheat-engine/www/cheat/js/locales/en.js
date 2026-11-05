@@ -5,7 +5,6 @@ export default {
     perPage: "Per page",
     all: "All",
     reloadGameData: "Reload game data",
-    reloadSaveData: "Reload save data",
     cheatWindow: "Cheat Window",
     close: "Close",
     reloadTarget: "Reload {target}",

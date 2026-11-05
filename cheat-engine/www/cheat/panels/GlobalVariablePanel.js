@@ -5,12 +5,8 @@ import { Alert } from "../js/AlertHelper.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
 import { getCheatSettingsPath } from "../js/SettingsPath.js";
-import {
-  getPageCount,
-  paginate,
-  paginationWatcherMixin,
-} from "../js/PaginationHelper.js";
-import { panelStateMixin } from "../js/PanelState.js";
+import { paginate } from "../js/PaginationHelper.js";
+import { tablePanelMixin } from "../js/TablePanelMixin.js";
 import { markRaw } from "../libs/vue.js";
 import {
   ROOT_FILTERS,
@@ -68,7 +64,7 @@ function measureFrom(name, startMs) {
 export default {
   name: "GlobalVariablePanel",
 
-  mixins: [paginationWatcherMixin, panelStateMixin],
+  mixins: [tablePanelMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -492,7 +488,6 @@ export default {
   data() {
     return {
       // 搜索
-      search: "",
       deepSearch: false,
       searchTimer: null,
       deepSearchResults: [],
@@ -538,6 +533,7 @@ export default {
       // 分页
       pagination: { page: 1, itemsPerPage: 50 },
       itemsPerPageOptions: [10, 20, 50, 100, { title: "全部", value: -1 }],
+      panelStateExtraKeys: ["rootFilter", "autoRefresh", "refreshIntervalMs"],
 
       // JSON 编辑对话框
       jsonDialog: {
@@ -615,12 +611,6 @@ export default {
     refreshIntervalMs() {
       this.restartAutoRefresh();
     },
-
-    pageCount(value) {
-      if (this.pagination.page > value) {
-        this.pagination.page = value;
-      }
-    },
   },
 
   computed: {
@@ -663,10 +653,6 @@ export default {
       return this.filteredEntries.length;
     },
 
-    pageCount() {
-      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
-    },
-
     pagedEntries() {
       return paginate(
         this.filteredEntries,
@@ -681,24 +667,6 @@ export default {
   },
 
   methods: {
-    getPanelStateSnapshot() {
-      return {
-        search: this.search,
-        rootFilter: this.rootFilter,
-        autoRefresh: this.autoRefresh,
-        refreshIntervalMs: this.refreshIntervalMs,
-        pagination: this.pagination,
-      };
-    },
-
-    applyPanelState(state) {
-      this.search = state.search;
-      this.rootFilter = state.rootFilter;
-      this.autoRefresh = state.autoRefresh;
-      this.refreshIntervalMs = state.refreshIntervalMs;
-      this.pagination = { ...this.pagination, ...state.pagination };
-    },
-
     // ---------- 初始加载（推迟到首帧之后） ----------
 
     // 用空闲回调把「读设置文件 + 扫描 window + 构建列表」挪出点击关键路径：
@@ -1335,10 +1303,6 @@ export default {
     },
 
     // ---------- 分页 / 列表行辅助 ----------
-
-    jumpToPage(page) {
-      this.pagination.page = page;
-    },
 
     findPageOfKey(key) {
       return findEntryPage(

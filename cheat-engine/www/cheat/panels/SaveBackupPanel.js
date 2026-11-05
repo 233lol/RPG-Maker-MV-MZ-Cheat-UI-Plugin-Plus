@@ -4,13 +4,9 @@ import SearchField from "../components/SearchField.js";
 import { Alert } from "../js/AlertHelper.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { SaveBackupCheat } from "../js/SaveBackupHelper.js";
-import {
-  ITEMS_PER_PAGE_OPTIONS,
-  getPageCount,
-  paginationWatcherMixin,
-} from "../js/PaginationHelper.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
-import { panelStateMixin } from "../js/PanelState.js";
+import { filterByKeyword } from "../js/SearchFilter.js";
+import { tablePanelMixin } from "../js/TablePanelMixin.js";
 import { markRaw } from "../libs/vue.js";
 
 // 存档时间机器面板：手动/自动快照、一键回滚、导入导出。
@@ -18,7 +14,7 @@ import { markRaw } from "../libs/vue.js";
 export default {
   name: "SaveBackupPanel",
 
-  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
+  mixins: [tablePanelMixin, gameDataWatcherMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -316,11 +312,8 @@ export default {
         sizeText: "-",
       },
 
-      search: "",
       slotFilter: "all",
-
-      pagination: { page: 1, itemsPerPage: 5 },
-      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
+      panelStateExtraKeys: ["slotFilter"],
 
       // 面板只有 ~600px 宽：三列就够，表头纵向换行的坑见 css/main.css 的
       // .cheat-save-backup-table。槽位列既要放 #N 也要放存档次数，给宽一点。
@@ -419,65 +412,25 @@ export default {
     },
 
     filteredTableItems() {
-      let items = this.backups;
-
-      if (this.slotFilter !== "all") {
-        items = items.filter(
-          (item) => Number(item.slot) === Number(this.slotFilter),
-        );
-      }
+      const items =
+        this.slotFilter === "all"
+          ? this.backups
+          : this.backups.filter(
+              (item) => Number(item.slot) === Number(this.slotFilter),
+            );
 
       // 备注已不是主标识，但历史快照 / 导入的快照里可能还有，一并参与搜索
-      const keyword = String(this.search || "")
-        .trim()
-        .toLowerCase();
-      if (keyword) {
-        items = items.filter((item) => {
-          const haystack = [
-            item.label,
-            item.mapName,
-            item.createdText,
-            item.savefileTimeText,
-            String(item.slot),
-          ]
-            .map((value) => String(value || "").toLowerCase())
-            .join(" ");
-
-          return haystack.includes(keyword);
-        });
-      }
-
-      return items;
-    },
-
-    totalCount() {
-      return this.filteredTableItems.length;
-    },
-
-    pageCount() {
-      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
+      return filterByKeyword(items, this.search, (item) => [
+        item.label,
+        item.mapName,
+        item.createdText,
+        item.savefileTimeText,
+        item.slot,
+      ]);
     },
   },
 
   methods: {
-    getPanelStateSnapshot() {
-      return {
-        search: this.search,
-        slotFilter: this.slotFilter,
-        pagination: this.pagination,
-      };
-    },
-
-    applyPanelState(state) {
-      this.search = state.search;
-      this.slotFilter = state.slotFilter;
-      this.pagination = { ...this.pagination, ...state.pagination };
-    },
-
-    jumpToPage(page) {
-      this.pagination.page = page;
-    },
-
     reload() {
       this.available = SaveBackupCheat.isLocalMode();
       this.settings = SaveBackupCheat.getSettings();

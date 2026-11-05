@@ -159,22 +159,6 @@ export function savePanelState(panelId, state) {
 }
 
 /**
- * 重置某个面板的状态。
- *
- * @param {string} panelId
- */
-export function resetPanelState(panelId) {
-  const all = readAll();
-
-  if (!panelId || !Object.hasOwnProperty.call(all, panelId)) {
-    return;
-  }
-
-  delete all[panelId];
-  scheduleWrite();
-}
-
-/**
  * 面板 mixin：mounted 时恢复，之后深度监听快照并自动保存。
  *
  * 组件需要提供：

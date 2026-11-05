@@ -24,7 +24,3 @@ export function isCheatUiTarget(target) {
     return false;
   }
 }
-
-export function shouldIgnoreTouchEvent(event) {
-  return isCheatUiTarget(event && event.target);
-}

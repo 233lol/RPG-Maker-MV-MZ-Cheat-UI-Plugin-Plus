@@ -2,20 +2,15 @@ import PaginationFooter from "../components/PaginationFooter.js";
 import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
-import { LockService } from "../js/LockService.js";
-import {
-  ITEMS_PER_PAGE_OPTIONS,
-  getPageCount,
-  paginationWatcherMixin,
-} from "../js/PaginationHelper.js";
+import { lockTableMixin } from "../js/LockTableMixin.js";
 import { isSwitchesReady, requireSwitchesReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
-import { panelStateMixin } from "../js/PanelState.js";
+import { matchesKeyword } from "../js/SearchFilter.js";
 
 export default {
   name: "SwitchSettingPanel",
 
-  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
+  mixins: [lockTableMixin, gameDataWatcherMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -111,10 +106,8 @@ export default {
 
   data() {
     return {
-      search: "",
-      excludeNameless: true,
-
-      switchNames: [],
+      lockKind: "switch",
+      lockLabel: "开关",
 
       tableHeaders: [
         {
@@ -132,17 +125,7 @@ export default {
           width: 72,
         },
       ],
-      tableItems: [],
-      pagination: { page: 1, itemsPerPage: 5 },
-      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
-      persistedLockMap: {},
     };
-  },
-
-  created() {
-    LockService.ensureLoaded();
-    this.readPersistedLocks();
-    this.initializeVariables();
   },
 
   computed: {
@@ -150,18 +133,18 @@ export default {
       return "switches";
     },
 
-    filteredTableItems() {
-      return this.tableItems.filter((item) => {
-        if (
-          item.id === 0 ||
-          (this.excludeNameless && !item.name) ||
-          !this.tableItemFilter(item.name, this.search, item)
-        ) {
-          return false;
-        }
+    // e2e / 调试用：引擎里的开关名表
+    switchNames() {
+      return this.names;
+    },
 
-        return true;
-      });
+    filteredTableItems() {
+      return this.tableItems.filter(
+        (item) =>
+          item.id !== 0 &&
+          !(this.excludeNameless && !item.name) &&
+          matchesKeyword(this.search, item.name),
+      );
     },
 
     allSwitchOn() {
@@ -174,194 +157,44 @@ export default {
     allSwitchIcon() {
       return this.allSwitchOn ? "mdi-toggle-switch-off" : "mdi-toggle-switch";
     },
-
-    allFilteredLocked() {
-      const lockableItems = this.filteredTableItems.filter(
-        (item) => item.id > 0,
-      );
-      if (lockableItems.length === 0) {
-        return false;
-      }
-
-      return lockableItems.every((item) => !!item.lockEnabled);
-    },
-
-    totalCount() {
-      return this.filteredTableItems.length;
-    },
-
-    pageCount() {
-      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
-    },
   },
 
   methods: {
-    getPanelStateSnapshot() {
-      return {
-        search: this.search,
-        excludeNameless: this.excludeNameless,
-        pagination: this.pagination,
-      };
+    /* ------------------------- lockTableMixin 适配 ------------------------- */
+
+    isDataReady() {
+      return isSwitchesReady();
     },
 
-    applyPanelState(state) {
-      this.search = state.search;
-      this.excludeNameless = state.excludeNameless;
-      this.pagination = { ...this.pagination, ...state.pagination };
+    requireDataReady(feature) {
+      return requireSwitchesReady(feature);
     },
 
-    async initializeVariables() {
-      if (!isSwitchesReady() || typeof $dataSystem === "undefined") {
-        this.tableItems = [];
-        return;
-      }
-
-      const previousLockMap = this.getLockMapById();
-      this.switchNames = await this.getSwitchNames();
-
-      this.tableItems = this.switchNames.map((switchName, idx) => {
-        const savedLock = previousLockMap.get(idx);
-        return {
-          id: idx,
-          name: switchName,
-          value: $gameSwitches.value(idx),
-          lockEnabled: savedLock ? savedLock.lockEnabled : false,
-          lockValue:
-            savedLock && typeof savedLock.lockValue === "boolean"
-              ? savedLock.lockValue
-              : $gameSwitches.value(idx),
-        };
-      });
-    },
-
-    async getSwitchNames() {
+    getNames() {
       return Array.isArray($dataSystem?.switches)
         ? $dataSystem.switches.slice()
         : [];
     },
 
-    readPersistedLocks() {
-      this.persistedLockMap = LockService.getSwitchLocks();
+    readValue(id) {
+      return $gameSwitches.value(id);
     },
 
-    writePersistedLocks() {
-      const payload = {};
-      this.tableItems.forEach((item) => {
-        if (!item.lockEnabled || item.id <= 0) {
-          return;
-        }
-
-        payload[item.id] = {
-          lockEnabled: true,
-          lockValue: !!item.lockValue,
-        };
-      });
-
-      this.persistedLockMap = payload;
-      LockService.setSwitchLocks(payload);
+    writeValue(id, value) {
+      $gameSwitches.setValue(id, value);
     },
+
+    normalizeValue(value) {
+      return !!value;
+    },
+
+    /* ------------------------------ 面板操作 ------------------------------ */
 
     onItemChange(item) {
       if (!requireSwitchesReady("修改开关")) return;
 
-      // modify value
-      $gameSwitches.setValue(item.id, item.value);
-
-      // refresh
-      item.value = $gameSwitches.value(item.id);
-      if (item.lockEnabled) {
-        item.lockValue = item.value;
-        this.writePersistedLocks();
-      }
-    },
-
-    toggleItemLock(item) {
-      if (!requireSwitchesReady("锁定开关")) return;
-
-      item.lockEnabled = !item.lockEnabled;
-      if (item.lockEnabled) {
-        item.lockValue = !!$gameSwitches.value(item.id);
-        this.applySwitchLock(item);
-      }
-
-      this.writePersistedLocks();
-    },
-
-    toggleAllFilteredLocks() {
-      if (!requireSwitchesReady("批量锁定开关")) return;
-
-      const targetLockEnabled = !this.allFilteredLocked;
-
-      this.filteredTableItems.forEach((item) => {
-        if (item.id <= 0) {
-          return;
-        }
-
-        item.lockEnabled = targetLockEnabled;
-        if (targetLockEnabled) {
-          item.lockValue = !!$gameSwitches.value(item.id);
-          this.applySwitchLock(item);
-        }
-      });
-
-      this.writePersistedLocks();
-    },
-
-    applySwitchLock(item) {
-      if (!item || !item.lockEnabled) {
-        return;
-      }
-
-      LockService.applySwitchLock(item.id);
-      item.value = !!$gameSwitches.value(item.id);
-    },
-
-    applyAllSwitchLocks() {
-      LockService.applySwitchLocks();
-    },
-
-    getLockMapById() {
-      const map = new Map();
-
-      if (this.tableItems.length > 0) {
-        this.tableItems.forEach((item) => {
-          map.set(item.id, {
-            lockEnabled: !!item.lockEnabled,
-            lockValue: !!item.lockValue,
-          });
-        });
-        return map;
-      }
-
-      Object.keys(this.persistedLockMap || {}).forEach((idText) => {
-        const id = Number(idText);
-        if (!Number.isInteger(id)) {
-          return;
-        }
-
-        const lockItem = this.persistedLockMap[idText] || {};
-        map.set(id, {
-          lockEnabled: !!lockItem.lockEnabled,
-          lockValue: !!lockItem.lockValue,
-        });
-      });
-
-      return map;
-    },
-
-    tableItemFilter(value, search, item) {
-      if (search === null || search.trim() === "") {
-        return true;
-      }
-
-      const target = item.raw || item;
-      return String(target.name || "")
-        .toLowerCase()
-        .includes(search.toLowerCase());
-    },
-
-    jumpToPage(page) {
-      this.pagination.page = page;
+      this.writeValue(item.id, item.value);
+      this.afterValueChange(item);
     },
 
     toggleAllSwitches() {

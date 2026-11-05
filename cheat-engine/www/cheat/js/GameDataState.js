@@ -35,15 +35,6 @@ export function subscribeGameData(listener) {
 }
 
 /**
- * 当前数据版本号。每次通知递增，便于调试 / 面板做轻量比较。
- *
- * @returns {number}
- */
-export function getGameDataVersion() {
-  return version;
-}
-
-/**
  * 主动通知游戏数据已变化。
  *
  * @param {string} reason
@@ -84,42 +75,37 @@ function wrapMethod(target, name, after) {
 
 /**
  * 安装引擎钩子。重复调用是幂等的。
+ *
+ * 引擎全局对象还没创建时（例如在被延迟加载的模块里调用）返回 false，
+ * 之后任意一次调用都会补装，不会出现「先调一次就永久放弃」的情况。
  */
 export function installGameDataHooks() {
   if (installed) {
     return true;
   }
 
-  installed = true;
+  let wrappedAny = false;
+
+  const wrap = (target, name, reason) => {
+    if (wrapMethod(target, name, () => notifyGameDataChanged(reason))) {
+      wrappedAny = true;
+    }
+  };
 
   if (typeof DataManager !== "undefined" && DataManager) {
-    wrapMethod(DataManager, "setupNewGame", () =>
-      notifyGameDataChanged("new-game"),
-    );
-    wrapMethod(DataManager, "extractSaveContents", () =>
-      notifyGameDataChanged("load-game"),
-    );
+    wrap(DataManager, "setupNewGame", "new-game");
+    wrap(DataManager, "extractSaveContents", "load-game");
   }
 
-  if (
-    typeof BattleManager !== "undefined" &&
-    BattleManager &&
-    typeof BattleManager.endBattle === "function"
-  ) {
-    wrapMethod(BattleManager, "endBattle", () =>
-      notifyGameDataChanged("battle-end"),
-    );
+  if (typeof BattleManager !== "undefined" && BattleManager) {
+    wrap(BattleManager, "endBattle", "battle-end");
   }
 
-  if (
-    typeof Scene_Map !== "undefined" &&
-    Scene_Map.prototype &&
-    typeof Scene_Map.prototype.onMapLoaded === "function"
-  ) {
-    wrapMethod(Scene_Map.prototype, "onMapLoaded", () =>
-      notifyGameDataChanged("map-loaded"),
-    );
+  if (typeof Scene_Map !== "undefined" && Scene_Map.prototype) {
+    wrap(Scene_Map.prototype, "onMapLoaded", "map-loaded");
   }
 
-  return installed;
+  installed = wrappedAny;
+
+  return wrappedAny;
 }

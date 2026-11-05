@@ -46,10 +46,6 @@ export function getGameVariables() {
   return readGlobal("$gameVariables") || null;
 }
 
-export function getGameActors() {
-  return readGlobal("$gameActors") || null;
-}
-
 export function isGameReady() {
   return !!(
     getGamePlayer() &&

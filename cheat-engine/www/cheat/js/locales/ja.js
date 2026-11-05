@@ -5,7 +5,6 @@ export default {
     perPage: "1ページ",
     all: "すべて",
     reloadGameData: "ゲームデータを再読み込み",
-    reloadSaveData: "セーブデータを再読み込み",
     cheatWindow: "チートウィンドウ",
     close: "閉じる",
     reloadTarget: "{target}を再読み込み",

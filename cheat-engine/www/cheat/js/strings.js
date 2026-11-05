@@ -25,21 +25,9 @@ const LOCALE_TITLES = {
   ja: "日本語",
 };
 
-// 保持向后兼容：测试和旧代码可以通过 STRINGS 读取默认中文表。
-export const STRINGS = zhCN;
-
-let currentLocale = loadSavedLocale();
-
-function normalizeLocale(locale) {
-  return Object.hasOwnProperty.call(DICTIONARIES, locale) ? locale : "zh-CN";
-}
+const currentLocale = loadSavedLocale();
 
 export function getLocale() {
-  return currentLocale;
-}
-
-export function setLocale(locale) {
-  currentLocale = normalizeLocale(locale);
   return currentLocale;
 }
 

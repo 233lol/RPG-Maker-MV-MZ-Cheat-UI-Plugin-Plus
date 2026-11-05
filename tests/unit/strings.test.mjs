@@ -2,12 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  STRINGS,
   getAvailableLocales,
   getLocale,
-  setLocale,
   t,
 } from "../../cheat-engine/www/cheat/js/strings.js";
+import {
+  detectLocale,
+  loadSavedLocale,
+} from "../../cheat-engine/www/cheat/js/LocaleService.js";
+import zhCN from "../../cheat-engine/www/cheat/js/locales/zh-CN.js";
 import en from "../../cheat-engine/www/cheat/js/locales/en.js";
 import ja from "../../cheat-engine/www/cheat/js/locales/ja.js";
 
@@ -32,7 +35,7 @@ test("t：支持 {name} 占位符", () => {
 });
 
 test("导航文案完整且不重复", () => {
-  const names = Object.values(STRINGS.nav);
+  const names = Object.values(zhCN.nav);
 
   assert.ok(names.length >= 15);
   assert.equal(new Set(names).size, names.length, "导航文案不应重复");
@@ -55,30 +58,26 @@ function collectKeys(value, prefix = "") {
 }
 
 test("各语言文案表的 key 与中文表一致", () => {
-  const expected = collectKeys(STRINGS);
+  const expected = collectKeys(zhCN);
 
   assert.deepEqual(collectKeys(en), expected);
   assert.deepEqual(collectKeys(ja), expected);
 });
 
-test("setLocale：切换语言并支持未知语言回退", () => {
-  const original = getLocale();
+test("getLocale / getAvailableLocales：默认语言与支持列表", () => {
+  assert.equal(getLocale(), "zh-CN");
 
-  try {
-    assert.deepEqual(
-      getAvailableLocales().map((item) => item.value),
-      ["zh-CN", "en", "ja"],
-    );
+  assert.deepEqual(
+    getAvailableLocales().map((item) => item.value),
+    ["zh-CN", "en", "ja"],
+  );
+  assert.deepEqual(
+    getAvailableLocales().map((item) => item.title),
+    ["简体中文", "English", "日本語"],
+  );
+});
 
-    assert.equal(setLocale("en"), "en");
-    assert.equal(t("common.search"), "Search...");
-
-    assert.equal(setLocale("ja"), "ja");
-    assert.equal(t("general.noClip"), "壁抜け");
-
-    assert.equal(setLocale("fr"), "zh-CN");
-    assert.equal(t("common.search"), "搜索...");
-  } finally {
-    setLocale(original);
-  }
+test("LocaleService：没有窗口环境时回退到默认中文", () => {
+  assert.equal(detectLocale(), "zh-CN");
+  assert.equal(loadSavedLocale(), "zh-CN");
 });

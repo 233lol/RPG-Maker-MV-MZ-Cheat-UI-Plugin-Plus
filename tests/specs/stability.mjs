@@ -833,7 +833,7 @@ export function registerStability({ test, page }) {
 
   test("点击守卫：菜单 / snackbar / tooltip 与异常 target", async () => {
     const result = await page.evaluate(async () => {
-      const { isCheatUiTarget, shouldIgnoreTouchEvent } = await import(
+      const { isCheatUiTarget } = await import(
         new URL("cheat/js/ClickGuard.js", document.baseURI).href
       );
 
@@ -861,9 +861,9 @@ export function registerStability({ test, page }) {
           menu: isCheatUiTarget(menu.child),
           snackbar: isCheatUiTarget(snackbar.child),
           tooltip: isCheatUiTarget(tooltip.child),
-          menuEvent: shouldIgnoreTouchEvent({ target: menu.child }),
-          nullEvent: shouldIgnoreTouchEvent(null),
-          emptyEvent: shouldIgnoreTouchEvent({}),
+          nullTarget: isCheatUiTarget(null),
+          undefinedTarget: isCheatUiTarget(undefined),
+          emptyTarget: isCheatUiTarget({}),
           weirdTarget: isCheatUiTarget(weird),
           nonElement: isCheatUiTarget({ closest: 1 }),
         };
@@ -877,9 +877,9 @@ export function registerStability({ test, page }) {
     assert.equal(result.menu, true, ".v-menu 内的点击没有拦截");
     assert.equal(result.snackbar, true, ".v-snackbar 内的点击没有拦截");
     assert.equal(result.tooltip, true, ".v-tooltip 内的点击没有拦截");
-    assert.equal(result.menuEvent, true, "事件形式的菜单点击没有拦截");
-    assert.equal(result.nullEvent, false);
-    assert.equal(result.emptyEvent, false);
+    assert.equal(result.nullTarget, false);
+    assert.equal(result.undefinedTarget, false);
+    assert.equal(result.emptyTarget, false);
     assert.equal(result.weirdTarget, false, "closest 抛错时应安全返回 false");
     assert.equal(result.nonElement, false);
   });

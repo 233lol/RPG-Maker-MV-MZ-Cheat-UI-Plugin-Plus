@@ -2,19 +2,15 @@ import PaginationFooter from "../components/PaginationFooter.js";
 import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
 import { markRaw, toRaw } from "../libs/vue.js";
-import {
-  ITEMS_PER_PAGE_OPTIONS,
-  getPageCount,
-  paginationWatcherMixin,
-} from "../js/PaginationHelper.js";
 import { isPartyReady, requirePartyReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
-import { panelStateMixin } from "../js/PanelState.js";
+import { filterByKeyword } from "../js/SearchFilter.js";
+import { tablePanelMixin } from "../js/TablePanelMixin.js";
 
 export default {
   name: "ItemTableTab",
 
-  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
+  mixins: [tablePanelMixin, gameDataWatcherMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -93,13 +89,11 @@ export default {
 
   data() {
     return {
-      search: "",
       excludeNameless: true,
       onlyOwnedItems: false,
       tableHeaders: [],
       tableItems: [],
-      pagination: { page: 1, itemsPerPage: 5 },
-      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
+      panelStateExtraKeys: ["excludeNameless", "onlyOwnedItems"],
     };
   },
 
@@ -140,7 +134,7 @@ export default {
     },
 
     filteredTableItems() {
-      let items = this.tableItems.filter((item) => {
+      const items = this.tableItems.filter((item) => {
         if (this.excludeNameless && !item.name) {
           return false;
         }
@@ -151,50 +145,16 @@ export default {
 
         return true;
       });
-      if (this.search && this.search.trim()) {
-        const s = this.search.toLowerCase();
-        items = items.filter((item) => {
-          for (const attr of this.searchableAttrs) {
-            // 改版游戏数据里 description 等字段可能为 undefined/null，
-            // 直接调 .toLowerCase() 会让整个面板崩溃
-            if (
-              String(item[attr] ?? "")
-                .toLowerCase()
-                .includes(s)
-            )
-              return true;
-          }
-          return false;
-        });
-      }
-      return items;
-    },
-    totalCount() {
-      return this.filteredTableItems.length;
-    },
 
-    pageCount() {
-      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
+      // 改版游戏数据里 description 等字段可能为 undefined / null，
+      // filterByKeyword 内部统一转成字符串再比较
+      return filterByKeyword(items, this.search, (item) =>
+        this.searchableAttrs.map((attr) => item[attr]),
+      );
     },
   },
 
   methods: {
-    getPanelStateSnapshot() {
-      return {
-        search: this.search,
-        excludeNameless: this.excludeNameless,
-        onlyOwnedItems: this.onlyOwnedItems,
-        pagination: this.pagination,
-      };
-    },
-
-    applyPanelState(state) {
-      this.search = state.search;
-      this.excludeNameless = state.excludeNameless;
-      this.onlyOwnedItems = state.onlyOwnedItems;
-      this.pagination = { ...this.pagination, ...state.pagination };
-    },
-
     initializeVariables() {
       this.tableHeaders = this.headers.slice(0);
       this.tableHeaders.push({
@@ -233,10 +193,6 @@ export default {
       $gameParty.gainItem(rawItem, diff);
 
       item.amount = $gameParty.numItems(rawItem);
-    },
-
-    jumpToPage(page) {
-      this.pagination.page = page;
     },
   },
 };

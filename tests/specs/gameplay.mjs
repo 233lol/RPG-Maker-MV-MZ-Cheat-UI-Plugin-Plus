@@ -338,7 +338,7 @@ export function registerGameplay({ test, page, type, state }) {
         switchItem.lockEnabled = true;
         switchItem.lockValue = !oldSwitch;
         switchPanel.writePersistedLocks();
-        switchPanel.applySwitchLock(switchItem);
+        switchPanel.applyLock(switchItem);
 
         const switchLockedImmediately =
           $gameSwitches.value(switchItem.id) === !oldSwitch;
@@ -362,7 +362,7 @@ export function registerGameplay({ test, page, type, state }) {
         variableItem.lockEnabled = true;
         variableItem.lockValue = lockedVariableValue;
         variablePanel.writePersistedLocks();
-        variablePanel.applyVariableLock(variableItem);
+        variablePanel.applyLock(variableItem);
 
         const variableLockedImmediately =
           $gameVariables.value(variableItem.id) === lockedVariableValue;

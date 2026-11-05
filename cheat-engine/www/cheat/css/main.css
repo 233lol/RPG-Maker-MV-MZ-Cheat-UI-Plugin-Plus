@@ -225,18 +225,6 @@ body::-webkit-scrollbar {
   z-index: 1010 !important;
 }
 
-.z-index-cheat-2 {
-  z-index: 1020 !important;
-}
-
-.z-index-cheat-3 {
-  z-index: 1030 !important;
-}
-
-.z-index-cheat-4 {
-  z-index: 1040 !important;
-}
-
 /* force all Vuetify overlays above cheat cards */
 .v-overlay-container,
 body > .v-overlay-container,

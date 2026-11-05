@@ -2,6 +2,7 @@ import { Alert } from "./AlertHelper.js";
 import { KeyValueStorage } from "./KeyValueStorage.js";
 import { getCheatSettingsPath } from "./SettingsPath.js";
 import { requireGameReady } from "./GameState.js";
+import { subscribeGameData } from "./GameDataState.js";
 
 export class GeneralCheat {
   // will be replaced from main component
@@ -816,37 +817,17 @@ export class BattleCheat {
     }
   }
 
+  // 读档 / 新游戏 / 地图切换 / 战斗结束都通过 GameDataState 统一通知，
+  // 不再各自包一层 DataManager.setupNewGame（两套猴补丁会互相嵌套）。
   static installGameStateHooks() {
     if (this.gameStateHooksInstalled) {
       return true;
     }
 
-    if (
-      typeof DataManager === "undefined" ||
-      typeof DataManager.setupNewGame !== "function"
-    ) {
-      return false;
-    }
-
-    const sync = () => BattleCheat.syncAfterGameChange();
-
-    const originalSetupNewGame = DataManager.setupNewGame;
-    DataManager.setupNewGame = function () {
-      const result = originalSetupNewGame.apply(this, arguments);
-      sync();
-      return result;
-    };
-
-    if (typeof DataManager.extractSaveContents === "function") {
-      const originalExtractSaveContents = DataManager.extractSaveContents;
-      DataManager.extractSaveContents = function () {
-        const result = originalExtractSaveContents.apply(this, arguments);
-        sync();
-        return result;
-      };
-    }
-
     this.gameStateHooksInstalled = true;
+    subscribeGameData(() => {
+      this.syncAfterGameChange();
+    });
 
     return true;
   }

@@ -4,17 +4,13 @@ import SearchField from "../components/SearchField.js";
 import { GLOBAL_SHORTCUT } from "../js/GlobalShortcut.js";
 import { Key } from "../js/KeyCodes.js";
 import { Alert } from "../js/AlertHelper.js";
-import {
-  ITEMS_PER_PAGE_OPTIONS,
-  getPageCount,
-  paginationWatcherMixin,
-} from "../js/PaginationHelper.js";
-import { panelStateMixin } from "../js/PanelState.js";
+import { filterByKeyword } from "../js/SearchFilter.js";
+import { tablePanelMixin } from "../js/TablePanelMixin.js";
 
 export default {
   name: "ShortcutPanel",
 
-  mixins: [paginationWatcherMixin, panelStateMixin],
+  mixins: [tablePanelMixin],
 
   components: {
     KeyInputField,
@@ -173,7 +169,6 @@ export default {
       tableExpanded: [],
 
       hideDesc: true,
-      search: "",
       shortcutSearch: Key.createEmpty(),
 
       tableHeaders: [
@@ -194,8 +189,7 @@ export default {
           key: "param",
         },
       ],
-      pagination: { page: 1, itemsPerPage: 5 },
-      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
+      panelStateExtraKeys: ["hideDesc"],
     };
   },
 
@@ -215,52 +209,25 @@ export default {
     },
 
     filteredShortcuts() {
-      let items = this.shortcuts.filter((item) => {
-        return (
+      const items = this.shortcuts.filter(
+        (item) =>
           this.shortcutSearch.isEmpty() ||
-          item.shortcut.contains(this.shortcutSearch)
-        );
-      });
-      if (this.search && this.search.trim()) {
-        const s = this.search.toLowerCase();
-        items = items.filter(
-          (item) =>
-            item.name.toLowerCase().includes(s) ||
-            item.desc.toLowerCase().includes(s) ||
-            item.shortcut.asDisplayString().toLowerCase().includes(s),
-        );
-      }
-      return items;
+          item.shortcut.contains(this.shortcutSearch),
+      );
+
+      return filterByKeyword(items, this.search, (item) => [
+        item.name,
+        item.desc,
+        item.shortcut.asDisplayString(),
+      ]);
     },
 
     totalCount() {
       return this.filteredShortcuts.length;
     },
-
-    pageCount() {
-      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
-    },
   },
 
   methods: {
-    getPanelStateSnapshot() {
-      return {
-        search: this.search,
-        hideDesc: this.hideDesc,
-        pagination: this.pagination,
-      };
-    },
-
-    applyPanelState(state) {
-      this.search = state.search;
-      this.hideDesc = state.hideDesc;
-      this.pagination = { ...this.pagination, ...state.pagination };
-    },
-
-    jumpToPage(page) {
-      this.pagination.page = page;
-    },
-
     restoreToDefault() {
       GLOBAL_SHORTCUT.restoreDefaultSettings();
       this.initializeVariables();

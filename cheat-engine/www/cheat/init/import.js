@@ -17,17 +17,14 @@ function validateNwjsVersion() {
     }) < 0;
 
   if (lowVersion) {
-    let msg;
-    let docsUrl;
-
-    msg = `Node Webkit version of game is too low to using cheat
+    const msg = `Node Webkit version of game is too low to using cheat
   - version=${nwjsVersion}, minimum required version=${minRequiredNwjsVersion}
 Cheat may not work properly.
 
 Click "OK" button to see the solution.
 `;
-    docsUrl =
-      "https://github.com/paramonos/RPG-Maker-MV-MZ-Cheat-UI-Plugin#if-embeded-nwjs-version-of-game-is-lower-than-0264";
+    const docsUrl =
+      "https://github.com/233lol/RPG-Maker-MV-MZ-Cheat-UI-Plugin-Plus#readme";
 
     if (window.confirm(msg)) {
       window.open(docsUrl, "_blank");
@@ -40,7 +37,7 @@ Click "OK" button to see the solution.
 
 function applyCheat() {
   function __addScript(type, src) {
-    var cheatScript = document.createElement("script");
+    const cheatScript = document.createElement("script");
     cheatScript.type = type;
     cheatScript.src = src;
 

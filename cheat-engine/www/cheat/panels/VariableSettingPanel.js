@@ -1,21 +1,16 @@
 import PaginationFooter from "../components/PaginationFooter.js";
 import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
-import { LockService } from "../js/LockService.js";
-import {
-  ITEMS_PER_PAGE_OPTIONS,
-  getPageCount,
-  paginationWatcherMixin,
-} from "../js/PaginationHelper.js";
+import { lockTableMixin } from "../js/LockTableMixin.js";
 import { isVariablesReady, requireVariablesReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
-import { panelStateMixin } from "../js/PanelState.js";
+import { matchesKeyword } from "../js/SearchFilter.js";
 import { markRaw } from "../libs/vue.js";
 
 export default {
   name: "VariableSettingPanel",
 
-  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
+  mixins: [lockTableMixin, gameDataWatcherMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -152,10 +147,8 @@ export default {
 
   data() {
     return {
-      search: "",
-      excludeNameless: true,
-
-      variableNames: [],
+      lockKind: "variable",
+      lockLabel: "变量",
 
       tableHeaders: [
         {
@@ -173,10 +166,6 @@ export default {
           width: 72,
         },
       ],
-      tableItems: [],
-      pagination: { page: 1, itemsPerPage: 5 },
-      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
-      persistedLockMap: {},
       jsonDialog: {
         show: false,
         id: 0,
@@ -187,149 +176,82 @@ export default {
     };
   },
 
-  created() {
-    LockService.ensureLoaded();
-    this.readPersistedLocks();
-    this.initializeVariables();
-  },
-
   computed: {
     panelStateId() {
       return "variables";
     },
 
+    // e2e / 调试用：引擎里的变量名表
+    variableNames() {
+      return this.names;
+    },
+
     filteredTableItems() {
-      let items = this.tableItems.filter((item) => {
-        if (this.excludeNameless && !item.name) {
-          return false;
-        }
-
-        return true;
-      });
-      if (this.search && this.search.trim()) {
-        const s = this.search.toLowerCase();
-        items = items.filter(
-          (item) =>
-            String(item.name || "")
-              .toLowerCase()
-              .includes(s) || this.formatValueForSearch(item.value).includes(s),
-        );
-      }
-      return items;
-    },
-
-    allFilteredLocked() {
-      const lockableItems = this.filteredTableItems.filter(
-        (item) => item.id > 0,
+      return this.tableItems.filter(
+        (item) =>
+          !(this.excludeNameless && !item.name) &&
+          matchesKeyword(
+            this.search,
+            item.name,
+            this.formatValueForSearch(item.value),
+          ),
       );
-      if (lockableItems.length === 0) {
-        return false;
-      }
-
-      return lockableItems.every((item) => !!item.lockEnabled);
-    },
-
-    totalCount() {
-      return this.filteredTableItems.length;
-    },
-
-    pageCount() {
-      return getPageCount(this.totalCount, this.pagination.itemsPerPage);
     },
   },
 
   methods: {
-    getPanelStateSnapshot() {
-      return {
-        search: this.search,
-        excludeNameless: this.excludeNameless,
-        pagination: this.pagination,
-      };
+    /* ------------------------- lockTableMixin 适配 ------------------------- */
+
+    isDataReady() {
+      return isVariablesReady();
     },
 
-    applyPanelState(state) {
-      this.search = state.search;
-      this.excludeNameless = state.excludeNameless;
-      this.pagination = { ...this.pagination, ...state.pagination };
+    requireDataReady(feature) {
+      return requireVariablesReady(feature);
     },
 
-    async initializeVariables() {
-      if (!isVariablesReady() || typeof $dataSystem === "undefined") {
-        this.tableItems = [];
-        return;
-      }
-
-      const previousLockMap = this.getLockMapById();
-      this.variableNames = await this.getVariableNames();
-
-      this.tableItems = this.variableNames.map((varName, idx) => {
-        const savedLock = previousLockMap.get(idx);
-        const currentValue = $gameVariables.value(idx);
-        return {
-          id: idx,
-          name: varName,
-          value: this.markValueForDisplay(currentValue),
-          lockEnabled: savedLock ? savedLock.lockEnabled : false,
-          lockValue: savedLock
-            ? savedLock.lockValue
-            : this.markValueForDisplay(currentValue),
-        };
-      });
-    },
-
-    async getVariableNames() {
+    getNames() {
       return Array.isArray($dataSystem?.variables)
         ? $dataSystem.variables.slice()
         : [];
     },
 
-    readPersistedLocks() {
-      this.persistedLockMap = LockService.getVariableLocks();
+    readValue(id) {
+      return $gameVariables.value(id);
     },
 
-    writePersistedLocks() {
-      const payload = {};
-      this.tableItems.forEach((item) => {
-        if (!item.lockEnabled || item.id <= 0) {
-          return;
-        }
-
-        payload[item.id] = {
-          lockEnabled: true,
-          lockValue: item.lockValue,
-        };
-      });
-
-      this.persistedLockMap = payload;
-      LockService.setVariableLocks(payload);
+    writeValue(id, value) {
+      $gameVariables.setValue(id, value);
     },
+
+    normalizeValue(value) {
+      return this.markValueForDisplay(value);
+    },
+
+    /* ------------------------------ 面板操作 ------------------------------ */
 
     onItemChange(item, newValue) {
       if (!requireVariablesReady("修改变量")) return;
 
-      const v = $gameVariables.value(item.id);
+      const currentValue = this.readValue(item.id);
 
-      if (this.isComplexValue(v)) {
+      if (this.isComplexValue(currentValue)) {
         this.openJsonEditor(item);
         return;
       }
 
-      if (typeof v === "number") {
+      if (typeof currentValue === "number") {
         const num = Number(newValue);
         if (!Number.isFinite(num)) {
-          item.value = v;
+          item.value = currentValue;
           return;
         }
-        $gameVariables.setValue(item.id, num);
+        this.writeValue(item.id, num);
       } else {
-        $gameVariables.setValue(item.id, newValue);
+        this.writeValue(item.id, newValue);
       }
 
-      item.value = this.markValueForDisplay($gameVariables.value(item.id));
-      if (item.lockEnabled) {
-        item.lockValue = item.value;
-        this.writePersistedLocks();
-      }
+      this.afterValueChange(item);
     },
 
     isComplexValue(value) {
@@ -405,96 +327,14 @@ export default {
         return;
       }
 
-      $gameVariables.setValue(dialog.id, parsed);
+      this.writeValue(dialog.id, parsed);
 
       const item = this.tableItems.find((entry) => entry.id === dialog.id);
       if (item) {
-        item.value = this.markValueForDisplay($gameVariables.value(dialog.id));
-        if (item.lockEnabled) {
-          item.lockValue = item.value;
-          this.writePersistedLocks();
-        }
+        this.afterValueChange(item);
       }
 
       this.closeJsonEditor();
-    },
-
-    toggleItemLock(item) {
-      if (!requireVariablesReady("锁定变量")) return;
-
-      item.lockEnabled = !item.lockEnabled;
-      if (item.lockEnabled) {
-        item.lockValue = $gameVariables.value(item.id);
-        this.applyVariableLock(item);
-      }
-
-      this.writePersistedLocks();
-    },
-
-    toggleAllFilteredLocks() {
-      if (!requireVariablesReady("批量锁定变量")) return;
-
-      const targetLockEnabled = !this.allFilteredLocked;
-
-      this.filteredTableItems.forEach((item) => {
-        if (item.id <= 0) {
-          return;
-        }
-
-        item.lockEnabled = targetLockEnabled;
-        if (targetLockEnabled) {
-          item.lockValue = $gameVariables.value(item.id);
-          this.applyVariableLock(item);
-        }
-      });
-
-      this.writePersistedLocks();
-    },
-
-    applyVariableLock(item) {
-      if (!item || !item.lockEnabled) {
-        return;
-      }
-
-      LockService.applyVariableLock(item.id);
-      item.value = $gameVariables.value(item.id);
-    },
-
-    applyAllVariableLocks() {
-      LockService.applyVariableLocks();
-    },
-
-    jumpToPage(page) {
-      this.pagination.page = page;
-    },
-
-    getLockMapById() {
-      const map = new Map();
-
-      if (this.tableItems.length > 0) {
-        this.tableItems.forEach((item) => {
-          map.set(item.id, {
-            lockEnabled: !!item.lockEnabled,
-            lockValue: item.lockValue,
-          });
-        });
-        return map;
-      }
-
-      Object.keys(this.persistedLockMap || {}).forEach((idText) => {
-        const id = Number(idText);
-        if (!Number.isInteger(id)) {
-          return;
-        }
-
-        const lockItem = this.persistedLockMap[idText] || {};
-        map.set(id, {
-          lockEnabled: !!lockItem.lockEnabled,
-          lockValue: lockItem.lockValue,
-        });
-      });
-
-      return map;
     },
   },
 };

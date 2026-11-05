@@ -4,11 +4,9 @@ import assert from "node:assert/strict";
 import {
   flushPanelState,
   loadPanelState,
-  resetPanelState,
   savePanelState,
 } from "../../cheat-engine/www/cheat/js/PanelState.js";
 import {
-  getGameDataVersion,
   notifyGameDataChanged,
   subscribeGameData,
 } from "../../cheat-engine/www/cheat/js/GameDataState.js";
@@ -49,25 +47,28 @@ test("PanelState：保存后可以读回，并清理防抖定时器", () => {
       pagination: { page: 2, itemsPerPage: 10 },
     });
   } finally {
-    resetPanelState(panelId);
     flushPanelState();
   }
 });
 
 test("GameDataState：订阅、通知与取消订阅", () => {
   const reasons = [];
-  const unsubscribe = subscribeGameData((reason) => reasons.push(reason));
+  const versions = [];
+  const unsubscribe = subscribeGameData((reason, version) => {
+    reasons.push(reason);
+    versions.push(version);
+  });
 
   try {
-    const before = getGameDataVersion();
     notifyGameDataChanged("unit-test");
+    notifyGameDataChanged("unit-test-2");
 
-    assert.deepEqual(reasons, ["unit-test"]);
-    assert.equal(getGameDataVersion(), before + 1);
+    assert.deepEqual(reasons, ["unit-test", "unit-test-2"]);
+    assert.ok(versions[1] > versions[0], "版本号应随通知递增");
   } finally {
     unsubscribe();
   }
 
   notifyGameDataChanged("after-unsubscribe");
-  assert.deepEqual(reasons, ["unit-test"]);
+  assert.deepEqual(reasons, ["unit-test", "unit-test-2"]);
 });
