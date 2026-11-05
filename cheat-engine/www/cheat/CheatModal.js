@@ -261,6 +261,8 @@ export default {
   },
 
   methods: {
+    t,
+
     getRootElement() {
       const root = this.$refs.cardRoot;
       return root && (root.$el || root);
