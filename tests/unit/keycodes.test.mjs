@@ -45,6 +45,34 @@ test("Key.fromString：非法写法会抛错", () => {
   assert.throws(() => Key.fromString("ctrl not-a-key"), /未知的按键/);
 });
 
+test("Key.fromString：容忍旧配置里的空 token / 尾随空格", () => {
+  const key = Key.fromString("ctrl ");
+
+  assert.equal(key.asString(), "ctrl");
+  assert.equal(key.isCombiningKey(), true);
+});
+
+test("未登记 keyCode 不会让 asDisplayString 崩溃", () => {
+  const key = new Key(226, true, false, false, false);
+
+  assert.equal(key.isRepresentable(), false);
+  assert.equal(key.asString(), "ctrl");
+  assert.doesNotThrow(() => key.asDisplayString());
+});
+
+test("右侧 Meta（keyCode 92）按组合键处理", () => {
+  const key = Key.fromEvent({
+    keyCode: 92,
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    metaKey: true,
+  });
+
+  assert.equal(key.isCombiningKey(), true);
+  assert.equal(key.asString(), "meta");
+});
+
 test("Key.contains：组合键包含关系", () => {
   const ctrlC = Key.fromString("ctrl c");
   const ctrl = Key.fromString("ctrl");
