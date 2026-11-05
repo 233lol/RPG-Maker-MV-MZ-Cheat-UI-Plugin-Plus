@@ -6,6 +6,7 @@ import { isGameReady, requireGameReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { filterByKeyword } from "../js/SearchFilter.js";
 import { tablePanelMixin } from "../js/TablePanelMixin.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "SaveRecallPanel",
@@ -16,11 +17,11 @@ export default {
 
   template: `
 <v-card flat class="ma-0 pa-0">
-    <v-card-subtitle class="ma-0 pa-0">保存当前位置</v-card-subtitle>
-    <span class="text-body-medium text-green-darken-1">地图 : {{currentMapName}}</span>
+    <v-card-subtitle class="ma-0 pa-0">{{ t("saveRecall.saveCurrent") }}</v-card-subtitle>
+    <span class="text-body-medium text-green-darken-1">{{ t("saveRecall.mapLabel") }} : {{ currentMapName }}</span>
     <v-text-field
         ref="locationAliasField"
-        label="位置别名"
+        :label="t('saveRecall.alias')"
         variant="solo"
         bg-color="grey-darken-3"
         v-model="locationAliasInput"
@@ -43,12 +44,12 @@ export default {
                         <v-icon>mdi-plus</v-icon>
                     </v-btn>
                 </template>
-                <span>保存当前位置</span>
+                <span>{{ t("saveRecall.saveCurrent") }}</span>
             </v-tooltip>
         </template>
     </v-text-field>
 
-    <v-card-subtitle class="ma-0 pa-0 mt-5">搜索保存的位置</v-card-subtitle>
+    <v-card-subtitle class="ma-0 pa-0 mt-5">{{ t("saveRecall.searchSaved") }}</v-card-subtitle>
     <v-data-table
         v-if="tableHeaders"
         class="mt-2"
@@ -86,7 +87,7 @@ export default {
                         <v-icon size="small">mdi-map-marker</v-icon>
                     </v-btn>
                 </template>
-                <span>传送</span>
+                <span>{{ t("saveRecall.teleport") }}</span>
             </v-tooltip>
             
             
@@ -103,7 +104,7 @@ export default {
                         <v-icon size="small">mdi-delete</v-icon>
                     </v-btn>
                 </template>
-                <span>删除</span>
+                <span>{{ t("saveRecall.delete") }}</span>
             </v-tooltip>
         </template>
          <template #bottom>
@@ -130,19 +131,19 @@ export default {
 
       tableHeaders: [
         {
-          title: "别名",
+          title: t("saveRecall.aliasHeader"),
           key: "name",
         },
         {
-          title: "地图名",
+          title: t("saveRecall.mapNameHeader"),
           key: "mapName",
         },
         {
-          title: "坐标",
+          title: t("saveRecall.coordHeader"),
           key: "coord",
         },
         {
-          title: "操作",
+          title: t("saveRecall.actionsHeader"),
           key: "actions",
         },
       ],
@@ -190,6 +191,8 @@ export default {
   },
 
   methods: {
+    t,
+
     async initializeVariables() {
       this.loadLocations();
 
@@ -302,7 +305,7 @@ export default {
     },
 
     addLocation(locationAlias) {
-      if (!requireGameReady("保存当前位置")) return;
+      if (!requireGameReady(t("saveRecall.saveFeature"))) return;
 
       this.locations.push({
         name: locationAlias,
@@ -319,7 +322,7 @@ export default {
     },
 
     teleportLocation(mapId, x, y) {
-      if (!requireGameReady("传送到保存位置")) return;
+      if (!requireGameReady(t("saveRecall.teleportFeature"))) return;
 
       if (!Number.isFinite(x) || !Number.isFinite(y)) {
         return;

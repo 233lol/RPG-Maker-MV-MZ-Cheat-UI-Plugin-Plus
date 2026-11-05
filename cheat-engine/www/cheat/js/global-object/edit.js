@@ -12,6 +12,7 @@ import {
   formatValuePreview,
   formatValueText,
 } from "./format.js";
+import { t } from "../strings.js";
 
 // 单个容器最多枚举多少个键（避免对超大数组 / 对象调用 Object.keys 时撑爆内存）
 const MAX_ENUMERATED_KEYS = 10000;
@@ -119,7 +120,10 @@ const PROTOTYPE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 function checkPrototypeKey(key) {
   if (PROTOTYPE_KEYS.has(key)) {
-    return { ok: false, message: `禁止操作键名 ${key}（会改变对象原型）` };
+    return {
+      ok: false,
+      message: t("objectKind.prototypeKey", { key }),
+    };
   }
   return null;
 }
@@ -148,7 +152,7 @@ export function deleteChildValue(container, key) {
     if (Array.isArray(container)) {
       const index = Number(key);
       if (!Number.isInteger(index) || index < 0 || index >= container.length) {
-        return { ok: false, message: `数组下标 ${key} 不存在` };
+        return { ok: false, message: t("objectKind.indexMissing", { key }) };
       }
 
       container.splice(index, 1);
@@ -221,16 +225,16 @@ export function toJsonText(value) {
     );
 
     if (text === undefined) {
-      return { ok: false, message: "该值无法转换为 JSON" };
+      return { ok: false, message: t("objectKind.notJson") };
     }
 
     return { ok: true, text };
   } catch (error) {
     return {
       ok: false,
-      message: `无法转换为 JSON（可能存在循环引用）: ${String(
-        (error && error.message) || error,
-      )}`,
+      message: t("objectKind.notJsonCircular", {
+        message: String((error && error.message) || error),
+      }),
     };
   }
 }

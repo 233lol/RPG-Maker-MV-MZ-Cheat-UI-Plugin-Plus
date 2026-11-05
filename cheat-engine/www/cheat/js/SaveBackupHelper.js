@@ -1,6 +1,7 @@
 import { Alert } from "./AlertHelper.js";
 import { ConfirmDialog } from "./DialogHelper.js";
 import { isMZEngine } from "./SettingsPath.js";
+import { t } from "./strings.js";
 
 import {
   BACKUP_KIND_AUTO,
@@ -271,7 +272,7 @@ export class SaveBackupCheat {
       return null;
     }
 
-    const text = this.decodePayloadText(raw, null, "存档数据");
+    const text = this.decodePayloadText(raw, null, t("saveBackup.saveData"));
 
     if (text === null) {
       console.warn("[cheat plugin] 无法识别的存档压缩格式，快照元数据将不完整");
@@ -284,11 +285,11 @@ export class SaveBackupCheat {
   static writeSaveText(slot, jsonText) {
     slot = Number(slot);
     if (!Number.isInteger(slot) || slot < 1) {
-      throw new Error("存档槽必须是正整数");
+      throw new Error(t("saveBackup.invalidSlot"));
     }
 
     if (typeof jsonText !== "string" || jsonText.length === 0) {
-      throw new Error("存档数据为空");
+      throw new Error(t("saveBackup.emptySaveData"));
     }
 
     // MV 的 saveToLocalFile 是同步的，继续交给引擎。
@@ -301,13 +302,13 @@ export class SaveBackupCheat {
         const zip = this.encodePayloadText(jsonText, "pako");
 
         if (zip === null) {
-          throw new Error("当前游戏未提供 pako，无法写入 MZ 存档");
+          throw new Error(t("saveBackup.pakoMissing"));
         }
 
         const filePath = this.getSaveFilePath(slot);
 
         if (!filePath) {
-          throw new Error("无法确定当前游戏的 MZ 存档路径");
+          throw new Error(t("saveBackup.unknownSavePath"));
         }
 
         const fs = this.requireFs();
@@ -337,7 +338,7 @@ export class SaveBackupCheat {
     }
 
     if (this.isMZ()) {
-      throw new Error("MZ 浏览器模式暂不支持写入存档");
+      throw new Error(t("saveBackup.browserUnsupported"));
     }
 
     StorageManager.saveToWebStorage(slot, jsonText);
@@ -432,10 +433,15 @@ export class SaveBackupCheat {
             payloadFile: payloadFile,
             exists: present,
             size: size,
-            sizeText: present ? this.formatBytes(size) : "文件丢失",
+            sizeText: present
+              ? this.formatBytes(size)
+              : t("saveBackup.fileMissing"),
             createdText: this.formatTime(entry.createdAt),
             relativeText: this.formatRelative(entry.createdAt),
-            kindText: entry.kind === BACKUP_KIND_AUTO ? "自动" : "手动",
+            kindText:
+              entry.kind === BACKUP_KIND_AUTO
+                ? t("saveBackup.kindAuto")
+                : t("saveBackup.kindManual"),
             // 存档头里的时间优先，其次退回快照里记的字符串
             savefileTimeText: this.getSaveTimeText(entry),
             playtimeText: playtimeText,
@@ -736,12 +742,12 @@ export class SaveBackupCheat {
     }
 
     if (!Number.isInteger(slot) || slot < 1) {
-      throw new Error("存档槽必须是正整数");
+      throw new Error(t("saveBackup.invalidSlot"));
     }
 
     const text = this.readSaveText(slot);
     if (!text) {
-      throw new Error(`存档 ${slot} 不存在或无法读取`);
+      throw new Error(t("saveBackup.saveSlotUnreadable", { slot }));
     }
 
     const saveMeta = this.parseSaveMeta(slot);
@@ -865,7 +871,7 @@ export class SaveBackupCheat {
     const entry = entries.find((item) => item.id === id);
 
     if (!entry) {
-      throw new Error("快照不存在");
+      throw new Error(t("saveBackup.snapshotMissing"));
     }
 
     entry.label = label;
@@ -894,7 +900,7 @@ export class SaveBackupCheat {
     const entry = entries.find((item) => item.id === id);
 
     if (!entry) {
-      throw new Error("快照不存在");
+      throw new Error(t("saveBackup.snapshotMissing"));
     }
 
     this.removeSnapshotFiles(entry);
@@ -1049,12 +1055,12 @@ export class SaveBackupCheat {
     const meta = this.readMeta(id);
 
     if (!meta) {
-      throw new Error("快照不存在");
+      throw new Error(t("saveBackup.snapshotMissing"));
     }
 
     const sourceSlot = Number(meta.slot);
     if (!Number.isInteger(sourceSlot) || sourceSlot < 1) {
-      throw new Error("快照记录的存档槽无效");
+      throw new Error(t("saveBackup.snapshotSlotInvalid"));
     }
 
     const slot =
@@ -1063,19 +1069,19 @@ export class SaveBackupCheat {
         : Number(targetSlot);
 
     if (!Number.isInteger(slot) || slot < 1) {
-      throw new Error("目标存档槽必须是正整数");
+      throw new Error(t("saveBackup.targetInvalid"));
     }
 
     const maxSavefiles = this.maxSavefiles();
     if (maxSavefiles > 0 && slot > maxSavefiles) {
-      throw new Error(`目标槽位超出本游戏上限（最大 ${maxSavefiles}）`);
+      throw new Error(t("saveBackup.targetTooLarge", { max: maxSavefiles }));
     }
 
     const isSameSlot = slot === sourceSlot;
     const jsonText = this.readPayload(meta);
 
     // 损坏 / 被替换的快照绝不能写回存档，先校验再备份。
-    this.validateSaveText(jsonText, "快照数据");
+    this.validateSaveText(jsonText);
 
     // 只在「会覆盖已有存档」时才留退路。写到空槽位不用备份，
     // 尤其不能去备份目标槽位 —— 那会凭空造出一份空快照。
@@ -1086,9 +1092,7 @@ export class SaveBackupCheat {
 
       // 备份失败就不能继续覆盖：否则玩家唯一的回退路径也没了。
       if (backupResult.status === "failed") {
-        throw new Error(
-          "覆盖前自动留快照失败，已中止还原。请检查存档目录与 cheat-settings 目录是否可写。",
-        );
+        throw new Error(t("saveBackup.restoreAborted"));
       }
     }
 
@@ -1102,13 +1106,11 @@ export class SaveBackupCheat {
     if (this.getLoadedSlot() === slot) {
       ConfirmDialog.show({
         width: 480,
-        message:
-          `存档 ${slot} 已还原到磁盘。\n\n但游戏内存里还是你正在玩的旧进度：\n` +
-          "请在游戏内保存一次（或切到别的存档槽读取），再读取这个存档，改动才会生效。",
+        message: t("saveBackup.restoredDiskOnly", { slot }),
         actions: [
           {
             icon: "mdi-check",
-            label: "知道了",
+            label: t("saveBackup.gotIt"),
             color: "green",
             action: ConfirmDialog.close,
           },
@@ -1117,14 +1119,18 @@ export class SaveBackupCheat {
     } else if (isSameSlot) {
       const backupNote =
         backupResult.status === "created"
-          ? "（覆盖前已自动留了一份快照）"
+          ? t("saveBackup.noteAutoBackup")
           : backupResult.reason === "deduped"
-            ? "（该存档已有最新快照）"
+            ? t("saveBackup.noteUpToDate")
             : "";
 
-      Alert.success(`已还原存档 ${slot}${backupNote}`);
+      Alert.success(
+        t("saveBackup.restoredSameSlot", { slot, note: backupNote }),
+      );
     } else {
-      Alert.success(`已还原到存档 ${slot}（来自存档 ${sourceSlot} 的快照）`);
+      Alert.success(
+        t("saveBackup.restoredFromSlot", { slot, source: sourceSlot }),
+      );
     }
 
     return {
@@ -1173,7 +1179,7 @@ export class SaveBackupCheat {
     const source = this.getSaveFilePath(slot);
 
     if (!source || !fs.existsSync(source)) {
-      throw new Error(`存档 ${slot} 的文件不存在`);
+      throw new Error(t("saveBackup.saveFileMissing", { slot }));
     }
 
     const stamp = this.formatFileTimestamp(Date.now());

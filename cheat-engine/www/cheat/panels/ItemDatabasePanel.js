@@ -1,4 +1,5 @@
 import ItemTableTab from "./ItemTableTab.js";
+import { t } from "../js/strings.js";
 import { markRaw } from "../libs/vue.js";
 
 /**
@@ -16,7 +17,7 @@ export function createItemDatabasePanel({
   name,
   stateKey,
   getItems,
-  descTitle,
+  descTitleKey,
 }) {
   return {
     name,
@@ -41,11 +42,11 @@ export function createItemDatabasePanel({
         items: [],
         headers: [
           {
-            title: "名称",
+            title: t("items.name"),
             key: "name",
           },
           {
-            title: descTitle,
+            title: t(descTitleKey),
             key: "desc",
           },
         ],

@@ -6,6 +6,7 @@ import { Key } from "../js/KeyCodes.js";
 import { Alert } from "../js/AlertHelper.js";
 import { filterByKeyword } from "../js/SearchFilter.js";
 import { tablePanelMixin } from "../js/TablePanelMixin.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "ShortcutPanel",
@@ -35,7 +36,7 @@ export default {
             md="4">
             <key-input-field
                 v-model="shortcutSearch"
-                label="快捷键"
+                :label="t('shortcut.label')"
                 solo
                 density="compact"
                 bg-color="grey-darken-3"
@@ -52,7 +53,7 @@ export default {
             v-model="hideDesc"
             density="compact"
             hide-details
-            label="隐藏描述">
+            :label="t('shortcut.hideDesc')">
         </v-checkbox>
         <v-tooltip
             location="bottom">
@@ -66,7 +67,7 @@ export default {
                     <v-icon size="small">mdi-restore</v-icon>
                 </v-btn>
             </template>
-            <span>恢复默认设置</span>
+            <span>{{ t("shortcut.restoreTooltip") }}</span>
         </v-tooltip>
     </v-card-text>
     <v-data-table
@@ -85,7 +86,7 @@ export default {
                 style="width: 220px;"
                 v-model="item.shortcut"
                 :deletable="!item.necessary"
-                :label="item.shortcut.isEmpty() ? '未分配快捷键' : '快捷键'"
+                :label="item.shortcut.isEmpty() ? t('shortcut.unassigned') : t('shortcut.label')"
                 solo
                 density="compact"
                 bg-color="grey-darken-3"
@@ -113,7 +114,7 @@ export default {
                     v-if="Object.keys(item.paramDesc).length > 0">
                     <v-card-subtitle
                         class="py-0 mb-1">
-                        参数
+                        {{ t("shortcut.params") }}
                     </v-card-subtitle>
                     <v-card-text
                         class="py-0 my-0 mb-1"
@@ -173,19 +174,19 @@ export default {
 
       tableHeaders: [
         {
-          title: "名称",
+          title: t("shortcut.nameHeader"),
           key: "name",
         },
         {
-          title: "描述",
+          title: t("shortcut.descHeader"),
           key: "desc",
         },
         {
-          title: "快捷键",
+          title: t("shortcut.shortcutHeader"),
           key: "shortcut",
         },
         {
-          title: "参数",
+          title: t("shortcut.paramHeader"),
           key: "param",
         },
       ],
@@ -228,6 +229,8 @@ export default {
   },
 
   methods: {
+    t,
+
     restoreToDefault() {
       GLOBAL_SHORTCUT.restoreDefaultSettings();
       this.initializeVariables();

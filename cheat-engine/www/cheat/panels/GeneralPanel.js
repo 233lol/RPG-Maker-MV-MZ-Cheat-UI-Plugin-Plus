@@ -169,7 +169,7 @@ export default {
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
                 <v-spacer></v-spacer>
-                <span class="text-title-large">Event ID: {{ inspectedEventId === null ? '-' : inspectedEventId }}</span>
+                <span class="text-title-large">{{ t("general.inspector.title", { id: inspectedEventId === null ? '-' : inspectedEventId }) }}</span>
             </v-card-title>
             <v-card-text>
               <v-sheet
@@ -179,15 +179,15 @@ export default {
                 <div
                   v-if="inspectedEventRows.length === 0"
                   class="pa-4 text-grey-lighten-1">
-                  {{ inspectedEventMessage || '(empty event list)' }}
+                  {{ inspectedEventMessage || t("general.inspector.empty") }}
                 </div>
                 <div v-else>
                   <div
                     class="d-flex px-3 py-1 font-weight-bold"
                     style="border-bottom: 1px solid rgba(255,255,255,0.18); position: sticky; top: 0; z-index: 1;">
-                    <div style="width: 60px;">Index</div>
-                    <div style="width: 70px;">Code</div>
-                    <div class="flex-grow-1">Command / Params</div>
+                    <div style="width: 60px;">{{ t("general.inspector.index") }}</div>
+                    <div style="width: 70px;">{{ t("general.inspector.code") }}</div>
+                    <div class="flex-grow-1">{{ t("general.inspector.command") }}</div>
                   </div>
                   <div
                     v-for="row in inspectedEventRows"
@@ -222,16 +222,16 @@ export default {
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
                 <v-card-actions>
-                    <v-btn size="small" color="primary" @click="runRepl">执行 (⌘/Ctrl+Enter)</v-btn>
-                    <v-btn size="small" variant="text" @click="clearReplOutput">清空输出</v-btn>
+                    <v-btn size="small" color="primary" @click="runRepl">{{ t("general.repl.run") }}</v-btn>
+                    <v-btn size="small" variant="text" @click="clearReplOutput">{{ t("general.repl.clearOutput") }}</v-btn>
                 </v-card-actions>
                 <v-spacer></v-spacer>
-                <span class="text-title-large">调试 REPL</span>
+                <span class="text-title-large">{{ t("general.repl.title") }}</span>
             </v-card-title>
             <v-card-text>
                 <v-textarea
                     v-model="replInput"
-                    label="输入"
+                    :label="t('general.repl.input')"
                     variant="outlined"
                     auto-grow
                     rows="10"
@@ -244,7 +244,7 @@ export default {
                     style="font-family: monospace; font-size: 12px;">
                 </v-textarea>
 
-                <div class="mt-3 mb-1 text-body-small">输出</div>
+                <div class="mt-3 mb-1 text-body-small">{{ t("general.repl.output") }}</div>
                 <v-textarea
                     :model-value="replOutputText"
                     variant="outlined"
@@ -428,7 +428,7 @@ export default {
       }
 
       if (!$gameParty) {
-        Alert.warn("队伍数据尚未初始化，无法修改金钱");
+        Alert.warn(t("general.partyNotReady"));
         this.initializeVariables();
         return;
       }
@@ -487,7 +487,7 @@ export default {
           }
 
           this.inspectedEventRows = [];
-          this.inspectedEventMessage = "当前没有正在执行的地图事件";
+          this.inspectedEventMessage = t("general.inspector.noEvent");
           this.showEventInspectDialog = true;
           return;
         }
@@ -507,14 +507,18 @@ export default {
 
         this.inspectedEventRows = rows;
         this.inspectedEventMessage =
-          this.inspectedEventRows.length === 0 ? "(empty event list)" : "";
+          this.inspectedEventRows.length === 0
+            ? t("general.inspector.empty")
+            : "";
       } catch (error) {
         if (token !== this.__eventInspectToken) {
           return;
         }
 
         this.inspectedEventRows = [];
-        this.inspectedEventMessage = `error: ${String(error)}`;
+        this.inspectedEventMessage = t("general.inspector.error", {
+          message: String(error),
+        });
       }
 
       if (token !== this.__eventInspectToken) {
@@ -729,7 +733,7 @@ export default {
     runRepl() {
       const code = String(this.replInput || "");
       if (!code) {
-        this.appendReplOutput("warn", "请输入要执行的 JavaScript 代码");
+        this.appendReplOutput("warn", t("general.repl.emptyCode"));
         return;
       }
 

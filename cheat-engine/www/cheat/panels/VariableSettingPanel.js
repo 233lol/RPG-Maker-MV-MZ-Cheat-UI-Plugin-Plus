@@ -6,6 +6,7 @@ import { isVariablesReady, requireVariablesReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { matchesKeyword } from "../js/SearchFilter.js";
 import { markRaw } from "../libs/vue.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "VariableSettingPanel",
@@ -37,7 +38,7 @@ export default {
                     v-model="excludeNameless"
                     density="compact"
                     hide-details
-                    label="隐藏无名变量">
+                    :label="t('variable.hideNameless')">
                 </v-checkbox>
                 <v-spacer></v-spacer>
                 <v-tooltip location="bottom">
@@ -51,7 +52,7 @@ export default {
                             <v-icon>{{ allFilteredLocked ? 'mdi-lock-open-variant' : 'mdi-lock' }}</v-icon>
                         </v-btn>
                     </template>
-                    <span>{{ allFilteredLocked ? '解锁所有过滤项' : '锁定所有过滤项' }}</span>
+                    <span>{{ allFilteredLocked ? t("variable.unlockAll") : t("variable.lockAll") }}</span>
                 </v-tooltip>
             </div>
         </template>
@@ -113,7 +114,7 @@ export default {
     <v-dialog v-model="jsonDialog.show" max-width="720" persistent>
         <v-card>
             <v-card-title class="d-flex align-center">
-                <span class="text-title-medium">编辑变量 {{ jsonDialog.name || jsonDialog.id }}（JSON）</span>
+                <span class="text-title-medium">{{ t("variable.editTitle", { name: jsonDialog.name || jsonDialog.id }) }}</span>
                 <v-spacer></v-spacer>
                 <v-btn icon size="small" @click="closeJsonEditor">
                     <v-icon>mdi-close</v-icon>
@@ -137,8 +138,8 @@ export default {
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn variant="text" @click="closeJsonEditor">取消</v-btn>
-                <v-btn color="primary" @click="saveJsonEditor">保存</v-btn>
+                <v-btn variant="text" @click="closeJsonEditor">{{ t("common.cancel") }}</v-btn>
+                <v-btn color="primary" @click="saveJsonEditor">{{ t("common.save") }}</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -148,19 +149,19 @@ export default {
   data() {
     return {
       lockKind: "variable",
-      lockLabel: "变量",
+      lockLabel: t("variable.label"),
 
       tableHeaders: [
         {
-          title: "变量名",
+          title: t("variable.name"),
           key: "name",
         },
         {
-          title: "值",
+          title: t("variable.value"),
           key: "value",
         },
         {
-          title: "锁定",
+          title: t("variable.lock"),
           key: "lock",
           sortable: false,
           width: 72,
@@ -200,6 +201,8 @@ export default {
   },
 
   methods: {
+    t,
+
     /* ------------------------- lockTableMixin 适配 ------------------------- */
 
     isDataReady() {
@@ -231,7 +234,7 @@ export default {
     /* ------------------------------ 面板操作 ------------------------------ */
 
     onItemChange(item, newValue) {
-      if (!requireVariablesReady("修改变量")) return;
+      if (!requireVariablesReady(t("features.modifyVariable"))) return;
 
       const currentValue = this.readValue(item.id);
 
@@ -315,7 +318,7 @@ export default {
     },
 
     saveJsonEditor() {
-      if (!requireVariablesReady("修改变量")) return;
+      if (!requireVariablesReady(t("features.modifyVariable"))) return;
 
       const dialog = this.jsonDialog;
       let parsed;
@@ -323,7 +326,9 @@ export default {
       try {
         parsed = JSON.parse(dialog.text);
       } catch (error) {
-        dialog.error = `JSON 解析失败: ${String(error.message || error)}`;
+        dialog.error = t("variable.jsonError", {
+          message: String(error.message || error),
+        });
         return;
       }
 

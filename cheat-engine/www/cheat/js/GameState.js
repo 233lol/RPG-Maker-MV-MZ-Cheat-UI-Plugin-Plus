@@ -1,4 +1,5 @@
 import { Alert } from "./AlertHelper.js";
+import { t } from "./strings.js";
 
 // 统一的游戏数据就绪检查。
 //
@@ -97,8 +98,11 @@ export function isVariablesReady() {
 }
 
 function notifyNotReady(feature) {
-  const suffix = feature ? `，暂时无法${feature}` : "";
-  Alert.warn(`游戏尚未加载完成${suffix}`);
+  Alert.warn(
+    feature
+      ? t("gameState.notReadyFeature", { feature })
+      : t("gameState.notReady"),
+  );
 }
 
 export function requireGameReady(feature = "") {

@@ -9,6 +9,7 @@ import {
 import { isPartyReady, requirePartyReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { panelStateMixin } from "../js/PanelState.js";
+import { t } from "../js/strings.js";
 
 // 模块级缓存：getFilteredSkills 每轮渲染被调用 5 次（表格 items + 4 个分页方法），
 // 缓存过滤结果避免重复全量 map+filter；搜索/过滤开关/已学技能/刷新数据任一变化即失效。
@@ -50,7 +51,7 @@ export default {
                         v-model="actor.onlyLearned"
                         density="compact"
                         hide-details
-                        label="只显示已学习技能"
+                        :label="t('skill.onlyLearned')"
                         @update:model-value="clampActorPage(actor)">
                     </v-checkbox>
                     <v-spacer></v-spacer>
@@ -62,7 +63,7 @@ export default {
 
                 <search-field
                     v-model="actor.skillSearch"
-                    label="搜索技能..."
+                    :label="t('skill.searchPlaceholder')"
                     field-class=""
                     @update:model-value="clampActorPage(actor)">
                 </search-field>
@@ -74,7 +75,7 @@ export default {
                     v-model:page="actor.pagination.page"
                     v-model:items-per-page="actor.pagination.itemsPerPage"
                     :items-per-page-options="itemsPerPageOptions"
-                    no-data-text="没有匹配的技能"
+                    :no-data-text="t('skill.noMatch')"
                     class="mt-2">
                     <template #header.isLearned="{ column }">
                         <span class="text-no-wrap">{{ column.title }}</span>
@@ -94,7 +95,7 @@ export default {
                             @click="removeSkill(actor, item)"
                             class="ma-0">
                             <v-icon size="small">mdi-close</v-icon>
-                            <span class="ml-1">移除</span>
+                            <span class="ml-1">{{ t("skill.remove") }}</span>
                         </v-btn>
                         <v-btn
                             v-else
@@ -103,7 +104,7 @@ export default {
                             @click="addSkill(actor, item)"
                             class="ma-0">
                             <v-icon size="small">mdi-plus</v-icon>
-                            <span class="ml-1">添加</span>
+                            <span class="ml-1">{{ t("skill.add") }}</span>
                         </v-btn>
                     </template>
                     <template #bottom>
@@ -131,24 +132,24 @@ export default {
       itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
       skillHeaders: [
         {
-          title: "已学",
+          title: t("skill.learned"),
           key: "isLearned",
           sortable: false,
           align: "center",
           width: 50,
         },
         {
-          title: "名称",
+          title: t("skill.name"),
           key: "name",
           sortable: true,
         },
         {
-          title: "描述",
+          title: t("skill.description"),
           key: "description",
           sortable: false,
         },
         {
-          title: "操作",
+          title: t("skill.actions"),
           key: "actions",
           sortable: false,
           align: "center",
@@ -168,6 +169,8 @@ export default {
   },
 
   methods: {
+    t,
+
     getPanelStateSnapshot() {
       return {
         selectedTab: this.selectedTab,
@@ -369,7 +372,7 @@ export default {
     },
 
     addSkill(actor, skillItem) {
-      if (!requirePartyReady("添加技能")) return;
+      if (!requirePartyReady(t("features.addSkill"))) return;
 
       const actorObj = actor._actor;
       const skill = skillItem._skill;
@@ -392,7 +395,7 @@ export default {
     },
 
     removeSkill(actor, skillItem) {
-      if (!requirePartyReady("移除技能")) return;
+      if (!requirePartyReady(t("features.removeSkill"))) return;
 
       const actorObj = actor._actor;
       const skill = skillItem._skill;

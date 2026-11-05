@@ -4,5 +4,5 @@ export default createItemDatabasePanel({
   name: "WeaponSettingPanel",
   stateKey: "weapon",
   getItems: () => $dataWeapons,
-  descTitle: "介绍",
+  descTitleKey: "items.weaponDesc",
 });

@@ -4,6 +4,7 @@ import { isPartyReady, requirePartyReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { panelStateMixin } from "../js/PanelState.js";
 import { markRaw } from "../libs/vue.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "StatsSettingPanel",
@@ -40,7 +41,7 @@ export default {
                         v-model="actor.godMode"
                         density="compact"
                         hide-details
-                        label="无敌模式"
+                        :label="t('stats.godMode')"
                         @change="onGodModeChange(actor)">
                     </v-checkbox>
                     <v-spacer></v-spacer>
@@ -49,7 +50,7 @@ export default {
                         @click="initializeVariables">
                     </refresh-button>
                 </v-card-actions>
-                <v-card-subtitle class="pa-0">等级 / 经验</v-card-subtitle>
+                <v-card-subtitle class="pa-0">{{ t("stats.levelExp") }}</v-card-subtitle>
                 <v-row class="mt-0 pt-3">
                     <v-col>
                         <v-text-field
@@ -75,7 +76,7 @@ export default {
                     </v-col>
                 </v-row>
 
-                <v-card-subtitle class="pa-0 mt-4">属性</v-card-subtitle>
+                <v-card-subtitle class="pa-0 mt-4">{{ t("stats.params") }}</v-card-subtitle>
                 <v-row class="mt-0 pt-3">
                     <v-col
                         v-for="(_, paramIdx) in actor.param.length"
@@ -118,6 +119,8 @@ export default {
   },
 
   methods: {
+    t,
+
     getPanelStateSnapshot() {
       return {
         selectedTab: this.selectedTab,
@@ -169,7 +172,7 @@ export default {
     },
 
     onLevelChange(item) {
-      if (!requirePartyReady("修改角色等级")) return;
+      if (!requirePartyReady(t("features.modifyLevel"))) return;
 
       const level = Number(item.level);
       if (Number.isFinite(level) && level >= 1) {
@@ -179,7 +182,7 @@ export default {
     },
 
     onExpChange(item) {
-      if (!requirePartyReady("修改角色经验")) return;
+      if (!requirePartyReady(t("features.modifyExp"))) return;
 
       const exp = Number(item.exp);
       if (Number.isFinite(exp) && exp >= 0) {
@@ -189,7 +192,7 @@ export default {
     },
 
     onParamChange(item, paramIndex) {
-      if (!requirePartyReady("修改角色属性")) return;
+      if (!requirePartyReady(t("features.modifyParam"))) return;
 
       const newVal = Number(item.param[paramIndex]);
       if (!Number.isFinite(newVal)) {

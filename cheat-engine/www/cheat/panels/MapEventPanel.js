@@ -1,5 +1,6 @@
 import { MapEventClassifier } from "../js/map-event/classifier.js";
 import { markRaw } from "../libs/vue.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "MapEventPanel",
@@ -21,13 +22,13 @@ export default {
     <v-row class="mb-0 pa-0">
         <v-col cols="12">
             <div class="text-body-small">
-                <v-chip size="x-small" color="grey">灰色: 可行走</v-chip>
-                <v-chip size="x-small" color="grey-darken-3" class="ml-2">深灰: 不可行走</v-chip>
-                <v-chip size="x-small" color="red" class="ml-2">红点: 角色位置</v-chip>
-                <v-chip size="x-small" color="yellow" class="ml-2 text-black">EV: 事件位置</v-chip>
-                <v-chip size="x-small" color="white" class="ml-2 text-black">白线: 地图边界</v-chip>
-                <v-chip size="x-small" color="orange" class="ml-2">橙点: 敌人/可移动的事件位置</v-chip>
-                <v-chip size="x-small" color="blue" class="ml-2">蓝点: 宝箱/道具变化的事件位置</v-chip>
+                <v-chip size="x-small" color="grey">{{ t("mapEvent.walkable") }}</v-chip>
+                <v-chip size="x-small" color="grey-darken-3" class="ml-2">{{ t("mapEvent.blocked") }}</v-chip>
+                <v-chip size="x-small" color="red" class="ml-2">{{ t("mapEvent.player") }}</v-chip>
+                <v-chip size="x-small" color="yellow" class="ml-2 text-black">{{ t("mapEvent.event") }}</v-chip>
+                <v-chip size="x-small" color="white" class="ml-2 text-black">{{ t("mapEvent.border") }}</v-chip>
+                <v-chip size="x-small" color="orange" class="ml-2">{{ t("mapEvent.enemy") }}</v-chip>
+                <v-chip size="x-small" color="blue" class="ml-2">{{ t("mapEvent.treasure") }}</v-chip>
             </div>
         </v-col>
     </v-row>
@@ -36,7 +37,7 @@ export default {
         <v-col cols="12" md="4">
             <v-switch
                 v-model="limitedView"
-                label="25x25 视图"
+                :label="t('mapEvent.limitedView')"
                 color="primary"
                 hide-details>
             </v-switch>
@@ -44,7 +45,7 @@ export default {
         <v-col cols="12" md="4">
             <v-text-field
                 v-model="currentMapId"
-                label="当前地图 ID"
+                :label="t('mapEvent.currentMapId')"
                 density="compact"
                 readonly
                 bg-color="grey-darken-3"
@@ -55,7 +56,7 @@ export default {
         <v-col cols="12" md="4">
             <v-text-field
                 v-model="readInterval"
-                label="读取间隔 (100-1000ms)"
+                :label="t('mapEvent.readInterval')"
                 density="compact"
                 bg-color="grey-darken-3"
                 hide-details
@@ -181,6 +182,8 @@ export default {
   },
 
   methods: {
+    t,
+
     // localStorage helper methods
     loadSetting(key, defaultValue) {
       try {

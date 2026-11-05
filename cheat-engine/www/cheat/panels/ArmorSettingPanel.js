@@ -4,5 +4,5 @@ export default createItemDatabasePanel({
   name: "ArmorSettingPanel",
   stateKey: "armor",
   getItems: () => $dataArmors,
-  descTitle: "描述",
+  descTitleKey: "items.armorDesc",
 });

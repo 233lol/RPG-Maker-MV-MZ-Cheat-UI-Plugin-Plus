@@ -6,6 +6,7 @@ import { lockTableMixin } from "../js/LockTableMixin.js";
 import { isSwitchesReady, requireSwitchesReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { matchesKeyword } from "../js/SearchFilter.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "SwitchSettingPanel",
@@ -37,7 +38,7 @@ export default {
                     v-model="excludeNameless"
                     density="compact"
                     hide-details
-                    label="隐藏无名开关">
+                    :label="t('switch.hideNameless')">
                 </v-checkbox>
                 <v-spacer></v-spacer>
                 <v-tooltip
@@ -52,7 +53,7 @@ export default {
                             <v-icon>{{ allSwitchIcon }}</v-icon>
                         </v-btn>
                     </template>
-                    <span>{{ allSwitchOn ? '关闭所有过滤的开关' : '打开所有过滤的开关' }}</span>
+                    <span>{{ allSwitchOn ? t("switch.turnOffAll") : t("switch.turnOnAll") }}</span>
                 </v-tooltip>
                       <v-tooltip location="bottom">
                         <template #activator="{ props }">
@@ -66,7 +67,7 @@ export default {
                             <v-icon>{{ allFilteredLocked ? 'mdi-lock-open-variant' : 'mdi-lock' }}</v-icon>
                           </v-btn>
                         </template>
-                        <span>{{ allFilteredLocked ? '解锁所有过滤项' : '锁定所有过滤项' }}</span>
+                        <span>{{ allFilteredLocked ? t("switch.unlockAll") : t("switch.lockAll") }}</span>
                       </v-tooltip>
             </div>
         </template>
@@ -107,19 +108,19 @@ export default {
   data() {
     return {
       lockKind: "switch",
-      lockLabel: "开关",
+      lockLabel: t("switch.label"),
 
       tableHeaders: [
         {
-          title: "开关名",
+          title: t("switch.name"),
           key: "name",
         },
         {
-          title: "值",
+          title: t("switch.value"),
           key: "value",
         },
         {
-          title: "锁定",
+          title: t("switch.lock"),
           key: "lock",
           sortable: false,
           width: 72,
@@ -160,6 +161,8 @@ export default {
   },
 
   methods: {
+    t,
+
     /* ------------------------- lockTableMixin 适配 ------------------------- */
 
     isDataReady() {
@@ -191,7 +194,7 @@ export default {
     /* ------------------------------ 面板操作 ------------------------------ */
 
     onItemChange(item) {
-      if (!requireSwitchesReady("修改开关")) return;
+      if (!requireSwitchesReady(t("features.modifySwitch"))) return;
 
       this.writeValue(item.id, item.value);
       this.afterValueChange(item);
@@ -202,23 +205,23 @@ export default {
       ConfirmDialog.show({
         width: 450,
         message:
-          (this.allSwitchOn
-            ? "Turn off all filtered switches?"
-            : "Turn on all filtered switches?") +
-          "\n(CAUTION: Potential to give fatal errors to save data)",
+          (this.allSwitchOn ? t("switch.confirmOff") : t("switch.confirmOn")) +
+          "\n" +
+          t("switch.confirmCaution"),
         actions: [
           {
             icon: "mdi-close",
-            label: "cancel",
+            label: t("common.cancel"),
             color: "white",
             action: ConfirmDialog.close,
           },
           {
             icon: this.allSwitchIcon,
             color: "green",
-            label: this.allSwitchOn ? "Turn Off" : "Turn On",
+            label: this.allSwitchOn ? t("switch.turnOff") : t("switch.turnOn"),
             async action() {
-              if (!requireSwitchesReady("批量修改开关")) return;
+              if (!requireSwitchesReady(t("features.batchModifySwitch")))
+                return;
 
               const value = !self.allSwitchOn;
               self.filteredTableItems.forEach((item) => {

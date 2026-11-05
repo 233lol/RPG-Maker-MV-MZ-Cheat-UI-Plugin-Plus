@@ -3,6 +3,7 @@
  */
 
 import { writeTextAtomic } from "../AtomicFile.js";
+import { t } from "../strings.js";
 import {
   BACKUP_KIND_AUTO,
   BACKUP_KIND_MANUAL,
@@ -66,8 +67,10 @@ export class SaveBackupTransfer {
 
     if (byteLength > MAX_IMPORT_BYTES) {
       throw new Error(
-        `导入文件过大（${Math.ceil(byteLength / 1024 / 1024)} MB，` +
-          `上限 ${MAX_IMPORT_BYTES / 1024 / 1024} MB）`,
+        t("saveBackup.importTooLarge", {
+          size: Math.ceil(byteLength / 1024 / 1024),
+          max: MAX_IMPORT_BYTES / 1024 / 1024,
+        }),
       );
     }
 
@@ -76,7 +79,7 @@ export class SaveBackupTransfer {
     try {
       parsed = JSON.parse(textValue);
     } catch (error) {
-      throw new Error("文件不是合法的 JSON", { cause: error });
+      throw new Error(t("saveBackup.invalidJsonFile"), { cause: error });
     }
 
     if (
@@ -84,18 +87,24 @@ export class SaveBackupTransfer {
       parsed.format !== IMPORT_EXPORT_FORMAT ||
       !Array.isArray(parsed.backups)
     ) {
-      throw new Error("不是本插件导出的存档快照文件");
+      throw new Error(t("saveBackup.notPluginFile"));
     }
 
     if (parsed.version !== IMPORT_EXPORT_VERSION) {
       throw new Error(
-        `不支持的快照文件版本：${parsed.version}（当前支持 ${IMPORT_EXPORT_VERSION}）`,
+        t("saveBackup.unsupportedVersion", {
+          version: parsed.version,
+          current: IMPORT_EXPORT_VERSION,
+        }),
       );
     }
 
     if (parsed.backups.length > MAX_IMPORT_BACKUPS) {
       throw new Error(
-        `快照数量过多（${parsed.backups.length}，上限 ${MAX_IMPORT_BACKUPS}）`,
+        t("saveBackup.tooManyBackups", {
+          count: parsed.backups.length,
+          max: MAX_IMPORT_BACKUPS,
+        }),
       );
     }
 
@@ -120,7 +129,10 @@ export class SaveBackupTransfer {
         // 导入文件可能来自别处 / 被手工改坏，校验不过就跳过这一条，
         // 不要写出一份读档必崩的快照。
         try {
-          this.validateSaveText(item.data, "导入的快照数据");
+          this.validateSaveText(
+            item.data,
+            t("saveBackup.importedSnapshotData"),
+          );
         } catch (error) {
           console.warn("[cheat plugin] 跳过无效的导入快照", slot, error);
           skipped++;

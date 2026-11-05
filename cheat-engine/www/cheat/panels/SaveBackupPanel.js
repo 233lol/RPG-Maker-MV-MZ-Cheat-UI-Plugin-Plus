@@ -8,6 +8,7 @@ import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { filterByKeyword } from "../js/SearchFilter.js";
 import { tablePanelMixin } from "../js/TablePanelMixin.js";
 import { markRaw } from "../libs/vue.js";
+import { t } from "../js/strings.js";
 
 // 存档时间机器面板：手动/自动快照、一键回滚、导入导出。
 // 核心逻辑全在 js/SaveBackupHelper.js，这里只负责展示与二次确认。
@@ -25,7 +26,7 @@ export default {
         <div class="d-flex align-center">
             <div class="flex-grow-1 cheat-save-backup-status text-body-small">
                 <div>
-                    <span class="text-grey-lighten-1">当前</span>
+                    <span class="text-grey-lighten-1">{{ t("saveBackup.current") }}</span>
                     <b class="text-green-darken-1">{{ currentSummary }}</b>
                 </div>
                 <div class="text-grey-lighten-1">{{ currentSaveLine }}</div>
@@ -34,7 +35,7 @@ export default {
                 size="x-small"
                 icon-size="small"
                 variant="text"
-                tooltip="重新加载存档数据"
+                :tooltip="t('saveBackup.reloadTooltip')"
                 @click="reload">
             </refresh-button>
         </div>
@@ -56,11 +57,11 @@ export default {
                 :disabled="!available"
                 @change="onSettingsChange">
                 <template #label>
-                    <span class="text-body-small">存档时自动快照</span>
+                    <span class="text-body-small">{{ t("saveBackup.autoOnSave") }}</span>
                 </template>
             </v-checkbox>
             <div class="d-flex align-center ga-1">
-                <span class="text-body-small text-grey-lighten-1">每</span>
+                <span class="text-body-small text-grey-lighten-1">{{ t("saveBackup.every") }}</span>
                 <v-text-field
                     v-model="intervalText"
                     variant="outlined"
@@ -77,10 +78,10 @@ export default {
                     @focus="$event.target.select()"
                     @keydown.stop>
                 </v-text-field>
-                <span class="text-body-small text-grey-lighten-1">次存档留一份</span>
+                <span class="text-body-small text-grey-lighten-1">{{ t("saveBackup.saveTimesKeep") }}</span>
             </div>
             <div class="d-flex align-center ga-1">
-                <span class="text-body-small text-grey-lighten-1">每槽保留</span>
+                <span class="text-body-small text-grey-lighten-1">{{ t("saveBackup.keepPerSlot") }}</span>
                 <v-text-field
                     v-model="keepText"
                     variant="outlined"
@@ -97,7 +98,7 @@ export default {
                     @focus="$event.target.select()"
                     @keydown.stop>
                 </v-text-field>
-                <span class="text-body-small text-grey-lighten-1">份</span>
+                <span class="text-body-small text-grey-lighten-1">{{ t("saveBackup.unit") }}</span>
             </div>
         </div>
 
@@ -113,7 +114,7 @@ export default {
                 :disabled="!available || stats.count === 0"
                 @click="exportBackups">
                 <v-icon start size="small">mdi-export</v-icon>
-                导出全部
+                {{ t("saveBackup.exportAll") }}
             </v-btn>
             <v-btn
                 size="small"
@@ -122,7 +123,7 @@ export default {
                 :disabled="!available"
                 @click="importBackups">
                 <v-icon start size="small">mdi-import</v-icon>
-                导入
+                {{ t("saveBackup.import") }}
             </v-btn>
             <v-btn
                 size="small"
@@ -131,7 +132,7 @@ export default {
                 :disabled="!available || stats.count === 0"
                 @click="clearAllBackups">
                 <v-icon start size="small">mdi-delete-sweep</v-icon>
-                清空全部
+                {{ t("saveBackup.clearAll") }}
             </v-btn>
         </div>
     </v-sheet>
@@ -142,7 +143,7 @@ export default {
         density="compact"
         variant="tonal"
         class="mb-1">
-        当前环境不是 nw.js（file:// 启动的游戏），无法写入快照文件，时间机器不可用。
+        {{ t("saveBackup.unavailable") }}
     </v-alert>
 
     <input
@@ -160,17 +161,17 @@ export default {
         v-model:page="pagination.page"
         v-model:items-per-page="pagination.itemsPerPage"
         :items-per-page-options="itemsPerPageOptions"
-        no-data-text="还没有快照。游戏内存一次档就会自动生成。">
+        :no-data-text="t('saveBackup.noData')">
         <template #top>
             <div class="d-flex align-center flex-wrap ga-2 pb-1">
                 <search-field
                     v-model="search"
-                    label="搜索地图 / 时间..."
+                    :label="t('saveBackup.searchPlaceholder')"
                     clearable
                     field-style="min-width: 150px;">
                 </search-field>
                 <v-select
-                    label="槽位"
+                    :label="t('saveBackup.slot')"
                     variant="solo"
                     bg-color="grey-darken-3"
                     v-model="slotFilter"
@@ -210,7 +211,7 @@ export default {
             <div class="text-body-small cheat-save-backup-ellipsis">{{ item.createdText.slice(5) }}</div>
             <div class="text-body-small text-grey-lighten-1 cheat-save-backup-ellipsis">{{ item.relativeText }}</div>
             <div v-if="item.restoredAt" class="text-body-small text-amber-lighten-2 cheat-save-backup-ellipsis">
-                已还原 {{ item.restoreCount }} 次
+                {{ t("saveBackup.restoredTimes", { count: item.restoreCount }) }}
             </div>
         </template>
 
@@ -233,8 +234,8 @@ export default {
                         <template #prepend>
                             <v-icon size="small" color="green">mdi-restore</v-icon>
                         </template>
-                        <v-list-item-title>还原到原槽位 {{ item.slot }}</v-list-item-title>
-                        <v-list-item-subtitle>覆盖前会自动留一份快照</v-list-item-subtitle>
+                        <v-list-item-title>{{ t("saveBackup.restoreSameSlot", { slot: item.slot }) }}</v-list-item-title>
+                        <v-list-item-subtitle>{{ t("saveBackup.restoreSameHint") }}</v-list-item-subtitle>
                     </v-list-item>
                     <v-list-item
                         :disabled="!available || !item.exists"
@@ -242,8 +243,8 @@ export default {
                         <template #prepend>
                             <v-icon size="small" color="teal">mdi-content-copy</v-icon>
                         </template>
-                        <v-list-item-title>还原到其他槽位…</v-list-item-title>
-                        <v-list-item-subtitle>指定槽位，原存档不受影响</v-list-item-subtitle>
+                        <v-list-item-title>{{ t("saveBackup.restoreOtherSlot") }}</v-list-item-title>
+                        <v-list-item-subtitle>{{ t("saveBackup.restoreOtherHint") }}</v-list-item-subtitle>
                     </v-list-item>
                     <v-list-item
                         :disabled="!available"
@@ -251,7 +252,7 @@ export default {
                         <template #prepend>
                             <v-icon size="small" color="red">mdi-delete</v-icon>
                         </template>
-                        <v-list-item-title>删除快照</v-list-item-title>
+                        <v-list-item-title>{{ t("saveBackup.deleteSnapshot") }}</v-list-item-title>
                     </v-list-item>
                 </v-list>
             </v-menu>
@@ -273,7 +274,7 @@ export default {
     </v-data-table>
 
     <v-card-text class="pt-1 pb-0 text-body-small text-grey-lighten-1">
-        全自动：<b>游戏内存档后</b>（可开关）与<b>每次还原前</b>。每槽最多 {{ settings.autoKeep }} 份。
+        {{ t("saveBackup.footerPrefix") }}<b>{{ t("saveBackup.footerAfterSave") }}</b>{{ t("saveBackup.footerMiddle") }}<b>{{ t("saveBackup.footerBeforeRestore") }}</b>{{ t("saveBackup.footerSuffix", { count: settings.autoKeep }) }}
     </v-card-text>
 </v-card>
     `,
@@ -318,11 +319,24 @@ export default {
       // 面板只有 ~600px 宽：三列就够，表头纵向换行的坑见 css/main.css 的
       // .cheat-save-backup-table。槽位列既要放 #N 也要放存档次数，给宽一点。
       tableHeaders: [
-        { title: "槽位", key: "slot", width: "19%" },
-        { title: "存档内进度", key: "progress", sortable: false, width: "47%" },
-        { title: "快照时间", key: "createdText", width: "34%" },
         {
-          title: "操作",
+          title: t("saveBackup.slot"),
+          key: "slot",
+          width: "19%",
+        },
+        {
+          title: t("saveBackup.progressHeader"),
+          key: "progress",
+          sortable: false,
+          width: "47%",
+        },
+        {
+          title: t("saveBackup.createdHeader"),
+          key: "createdText",
+          width: "34%",
+        },
+        {
+          title: t("saveBackup.actionsHeader"),
           key: "actions",
           sortable: false,
           width: 60,
@@ -345,7 +359,9 @@ export default {
     // 逐条换行会把表格挤到屏幕外，得不偿失。
     currentSummary() {
       const slot =
-        this.loadedSlot > 0 ? `存档 ${this.loadedSlot}` : "未检测到槽位";
+        this.loadedSlot > 0
+          ? t("saveBackup.statusSaveSlot", { slot: this.loadedSlot })
+          : t("saveBackup.statusNoSlot");
 
       const parts = [slot];
 
@@ -353,10 +369,12 @@ export default {
         parts.push(this.currentMapName);
       }
 
-      parts.push(`快照 ${this.stats.count} 份`);
+      parts.push(t("saveBackup.snapshotCount", { count: this.stats.count }));
 
       if (this.stats.missingCount > 0) {
-        parts.push(`${this.stats.missingCount} 份丢失`);
+        parts.push(
+          t("saveBackup.missingCount", { count: this.stats.missingCount }),
+        );
       } else {
         parts.push(this.stats.sizeText);
       }
@@ -376,15 +394,19 @@ export default {
       const playtime = this.currentPlaytimeText;
       const savedAt = info ? info.timestampText : "";
 
-      return `时长 ${playtime || "未记录"}${
-        savedAt ? ` · 存档于 ${savedAt}` : ""
-      }`;
+      const playtimeText = t("saveBackup.playtime", {
+        playtime: playtime || t("common.notRecorded"),
+      });
+
+      return savedAt
+        ? `${playtimeText} · ${t("saveBackup.savedAt", { time: savedAt })}`
+        : playtimeText;
     },
 
     // 开关说明放在 tooltip 里，不再单独占一行高度
     autoSettingHint() {
       if (!this.settings.autoOnSave) {
-        return "当前关闭：只在每次还原前留快照（不受开关影响）。";
+        return t("saveBackup.autoOff");
       }
 
       // 用编辑框里的文本即可：它跟着输入实时更新，不需要另一个格式化函数
@@ -392,10 +414,10 @@ export default {
 
       // 保留份数已经在输入框里写着，这里只说触发时机，避免同一句话看两遍
       if (Number(interval) > 1) {
-        return `启用中：存档次数是 ${interval} 的倍数时留一份。`;
+        return t("saveBackup.autoOnInterval", { interval });
       }
 
-      return "启用中：每次游戏内存档留一份。";
+      return t("saveBackup.autoOnEvery");
     },
 
     slotOptions() {
@@ -404,10 +426,13 @@ export default {
       );
 
       return [
-        { title: "全部槽位", value: "all" },
+        { title: t("saveBackup.slotAll"), value: "all" },
         ...[...slots]
           .sort((a, b) => a - b)
-          .map((slot) => ({ title: `存档 ${slot}`, value: slot })),
+          .map((slot) => ({
+            title: t("saveBackup.slotN", { slot }),
+            value: slot,
+          })),
       ];
     },
 
@@ -431,6 +456,8 @@ export default {
   },
 
   methods: {
+    t,
+
     reload() {
       this.available = SaveBackupCheat.isLocalMode();
       this.settings = SaveBackupCheat.getSettings();
@@ -545,7 +572,10 @@ export default {
           autoKeep: this.settings.autoKeep,
         });
       } catch (error) {
-        Alert.error(`保存设置失败：${error.message}`, error);
+        Alert.error(
+          t("saveBackup.settingsSaveFailed", { message: error.message }),
+          error,
+        );
         this.settings = SaveBackupCheat.getSettings();
       }
     },
@@ -583,20 +613,22 @@ export default {
       }
 
       if (item.mapId) {
-        return `地图 #${item.mapId}`;
+        return t("saveBackup.mapWithId", { id: item.mapId });
       }
 
-      return this.getLivePlaytimeText(item) || "无记录";
+      return this.getLivePlaytimeText(item) || t("saveBackup.noRecord");
     },
 
     progressSecondary(item) {
       const parts = [];
 
       if (item.mapName || item.mapId) {
-        parts.push(this.getLivePlaytimeText(item) || "无时长记录");
+        parts.push(
+          this.getLivePlaytimeText(item) || t("saveBackup.noPlaytime"),
+        );
       }
 
-      parts.push(item.exists ? item.sizeText : "数据丢失");
+      parts.push(item.exists ? item.sizeText : t("saveBackup.dataMissing"));
 
       return parts.join(" · ");
     },
@@ -608,7 +640,9 @@ export default {
         return "";
       }
 
-      return `档 ${item.savefileTimeText.slice(0, 11)}`;
+      return t("saveBackup.savefileTime", {
+        time: item.savefileTimeText.slice(0, 11),
+      });
     },
 
     // 该快照的时长文案：先自己的元数据，再该槽位当前的存档头
@@ -642,7 +676,7 @@ export default {
         return "";
       }
 
-      return `第 ${count} 次存档`;
+      return t("saveBackup.saveCount", { count });
     },
 
     // 还原的两种目标槽位都走同一个确认框，把「会覆盖什么」讲清楚：
@@ -655,7 +689,7 @@ export default {
     restoreBackupOtherSlot(item) {
       const suggested = this.getSuggestedTargetSlot(item.slot);
       const input = window.prompt(
-        `把「存档 ${item.slot}」的这份快照还原到哪个槽位？\n（原存档 ${item.slot} 不会被改动）`,
+        t("saveBackup.restoreTargetPrompt", { slot: item.slot }),
         String(suggested),
       );
 
@@ -666,13 +700,13 @@ export default {
       const target = Math.floor(Number(input));
 
       if (!Number.isInteger(target) || target < 1) {
-        Alert.warn("目标槽位必须是正整数");
+        Alert.warn(t("saveBackup.targetInvalid"));
         return;
       }
 
       const max = SaveBackupCheat.maxSavefiles();
       if (max > 0 && target > max) {
-        Alert.warn(`目标槽位超出本游戏上限（最大 ${max}）`);
+        Alert.warn(t("saveBackup.targetTooLarge", { max }));
         return;
       }
 
@@ -714,38 +748,52 @@ export default {
 
       let consequence;
       if (isSameSlot && hasTarget) {
-        consequence =
-          "覆盖前会自动为存档 " + targetSlot + " 留一份快照，可以再还原回去。";
+        consequence = t("saveBackup.consequenceSameWithTarget", {
+          slot: targetSlot,
+        });
       } else if (isSameSlot) {
-        consequence = `存档 ${targetSlot} 当前为空，将直接写入。`;
+        consequence = t("saveBackup.consequenceSameEmpty", {
+          slot: targetSlot,
+        });
       } else if (hasTarget) {
-        consequence = `存档 ${targetSlot} 已有内容，覆盖前会自动留一份快照；原存档 ${sourceSlot} 不受影响。`;
+        consequence = t("saveBackup.consequenceOtherWithTarget", {
+          slot: targetSlot,
+          source: sourceSlot,
+        });
       } else {
-        consequence = `存档 ${targetSlot} 当前为空，将直接写入；原存档 ${sourceSlot} 不受影响。`;
+        consequence = t("saveBackup.consequenceOtherEmpty", {
+          slot: targetSlot,
+          source: sourceSlot,
+        });
       }
 
       // 覆盖「内存里正在玩的那份」时必须提醒先存档，否则看起来像没生效
       const warnLoaded =
         this.loadedSlot === targetSlot
-          ? `\n\n注意：${targetSlot} 是你正在玩的存档，还原后需要在游戏内存一次档（或切槽读档）才会生效。`
+          ? t("saveBackup.warnLoaded", { slot: targetSlot })
           : "";
 
       ConfirmDialog.show({
         width: 520,
-        message:
-          `要用这份快照还原到存档 ${targetSlot} 吗？\n\n` +
-          `快照来源：存档 ${sourceSlot} · ${item.createdText}（${item.relativeText}）\n` +
-          `存档内进度：${progress}\n\n${consequence}${warnLoaded}`,
+        message: t("saveBackup.restoreConfirm", {
+          slot: targetSlot,
+          source: sourceSlot,
+          time: item.createdText,
+          relative: item.relativeText,
+          progress,
+          consequence,
+          warnLoaded,
+        }),
         actions: [
           {
             icon: "mdi-close",
-            label: "取消",
+            label: t("common.cancel"),
             color: "white",
             action: ConfirmDialog.close,
           },
           {
             icon: isSameSlot ? "mdi-restore" : "mdi-content-copy",
-            label: `还原到 ${targetSlot}`,
+            label: t("saveBackup.restoreAction", { slot: targetSlot }),
             color: "green",
             action: () => {
               ConfirmDialog.close();
@@ -761,24 +809,30 @@ export default {
         SaveBackupCheat.restoreBackup(item.id, targetSlot);
         this.reload();
       } catch (error) {
-        Alert.error(`还原失败：${error.message}`, error);
+        Alert.error(
+          t("saveBackup.restoreFailed", { message: error.message }),
+          error,
+        );
       }
     },
 
     deleteBackup(item) {
       ConfirmDialog.show({
         width: 420,
-        message: `删除这份快照？删除后无法恢复。\n\n${item.createdText} · 存档 ${item.slot}`,
+        message: t("saveBackup.deleteConfirm", {
+          time: item.createdText,
+          slot: item.slot,
+        }),
         actions: [
           {
             icon: "mdi-close",
-            label: "取消",
+            label: t("common.cancel"),
             color: "white",
             action: ConfirmDialog.close,
           },
           {
             icon: "mdi-delete",
-            label: "删除",
+            label: t("common.delete"),
             color: "red",
             action: () => {
               ConfirmDialog.close();
@@ -787,7 +841,10 @@ export default {
                 SaveBackupCheat.deleteBackup(item.id);
                 this.reload();
               } catch (error) {
-                Alert.error(`删除失败：${error.message}`, error);
+                Alert.error(
+                  t("saveBackup.deleteFailed", { message: error.message }),
+                  error,
+                );
               }
             },
           },
@@ -796,7 +853,7 @@ export default {
     },
 
     clearAllBackups() {
-      this.confirmClearBackups(null, "清空全部快照？删除后无法恢复。");
+      this.confirmClearBackups(null, t("saveBackup.clearConfirm"));
     },
 
     confirmClearBackups(kind, message) {
@@ -806,23 +863,26 @@ export default {
         actions: [
           {
             icon: "mdi-close",
-            label: "取消",
+            label: t("common.cancel"),
             color: "white",
             action: ConfirmDialog.close,
           },
           {
             icon: "mdi-delete-sweep",
-            label: "清空",
+            label: t("saveBackup.clearAction"),
             color: "red",
             action: () => {
               ConfirmDialog.close();
 
               try {
                 const count = SaveBackupCheat.clearBackups(kind);
-                Alert.success(`已删除 ${count} 份快照`);
+                Alert.success(t("saveBackup.clearedCount", { count }));
                 this.reload();
               } catch (error) {
-                Alert.error(`清空失败：${error.message}`, error);
+                Alert.error(
+                  t("saveBackup.clearFailed", { message: error.message }),
+                  error,
+                );
               }
             },
           },
@@ -832,15 +892,18 @@ export default {
 
     exportBackups() {
       if (this.backups.length === 0) {
-        Alert.warn("还没有快照可以导出");
+        Alert.warn(t("saveBackup.exportEmpty"));
         return;
       }
 
       try {
         const file = SaveBackupCheat.exportAll();
-        Alert.success(`已导出到 ${file}`);
+        Alert.success(t("saveBackup.exportedTo", { file }));
       } catch (error) {
-        Alert.error(`导出失败：${error.message}`, error);
+        Alert.error(
+          t("saveBackup.exportFailed", { message: error.message }),
+          error,
+        );
       }
     },
 
@@ -864,8 +927,10 @@ export default {
       const maxBytes = SaveBackupCheat.getMaxImportBytes();
       if (file.size > maxBytes) {
         Alert.error(
-          `导入文件过大（${Math.ceil(file.size / 1024 / 1024)} MB，` +
-            `上限 ${maxBytes / 1024 / 1024} MB）`,
+          t("saveBackup.importTooLarge", {
+            size: Math.ceil(file.size / 1024 / 1024),
+            max: maxBytes / 1024 / 1024,
+          }),
         );
         return;
       }
@@ -876,16 +941,22 @@ export default {
         try {
           const result = SaveBackupCheat.importFromJson(String(reader.result));
           Alert.success(
-            `导入完成：新增 ${result.added} 份，跳过 ${result.skipped} 份`,
+            t("saveBackup.importDone", {
+              added: result.added,
+              skipped: result.skipped,
+            }),
           );
           this.reload();
         } catch (error) {
-          Alert.error(`导入失败：${error.message}`, error);
+          Alert.error(
+            t("saveBackup.importFailed", { message: error.message }),
+            error,
+          );
         }
       };
 
       reader.onerror = () => {
-        Alert.error("读取文件失败");
+        Alert.error(t("saveBackup.fileReadFailed"));
       };
 
       reader.readAsText(file);

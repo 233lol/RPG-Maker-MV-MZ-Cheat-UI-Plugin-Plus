@@ -1,4 +1,5 @@
 import { getCheatSettingsPath } from "../SettingsPath.js";
+import { t } from "../strings.js";
 
 // 存档时间机器拆分为多个模块后共享的常量与路径。
 
@@ -19,7 +20,7 @@ export const MAX_IMPORT_BYTES = 64 * 1024 * 1024;
 export const MAX_IMPORT_BACKUPS = 5000;
 
 // 时间机器自身出问题时不静默：这些只是提示文案，不参与控制流
-export const WARN_NO_NWJS = "当前环境不是 nw.js，无法读写快照文件";
+export const WARN_NO_NWJS = t("saveBackup.noNwjs");
 
 export function getBackupDir() {
   return getCheatSettingsPath("save-backups");

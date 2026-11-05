@@ -3,6 +3,7 @@ import { KeyValueStorage } from "./KeyValueStorage.js";
 import { getCheatSettingsPath } from "./SettingsPath.js";
 import { requireGameReady } from "./GameState.js";
 import { subscribeGameData } from "./GameDataState.js";
+import { t } from "./strings.js";
 
 export class GeneralCheat {
   // will be replaced from main component
@@ -13,14 +14,14 @@ export class GeneralCheat {
   static toggleNoClip(notify = false) {
     // 键盘监听在 app 挂载时就绑定了，读档 / 加载转圈（MZ 还要初始化 effekseer
     // WASM）这段窗口里 $gamePlayer 还不存在，直接取属性会抛错。
-    if (!requireGameReady("切换穿墙状态")) {
+    if (!requireGameReady(t("features.toggleNoClip"))) {
       return;
     }
 
     $gamePlayer._through = !$gamePlayer._through;
 
     if (notify) {
-      Alert.success(`穿墙状态: ${$gamePlayer._through}`);
+      Alert.success(t("alerts.noClipState", { value: $gamePlayer._through }));
     }
   }
 
@@ -143,7 +144,7 @@ export class GeneralCheat {
       return;
     }
 
-    if (!requireGameReady("切换无敌模式")) {
+    if (!requireGameReady(t("features.toggleGodMode"))) {
       return;
     }
 
@@ -199,7 +200,7 @@ export class GeneralCheat {
       return;
     }
 
-    if (!requireGameReady("切换无敌模式")) {
+    if (!requireGameReady(t("features.toggleGodMode"))) {
       return;
     }
 
@@ -433,7 +434,7 @@ export class SpeedCheat {
   }
 
   static setSpeed(speed, fixed = false) {
-    if (!requireGameReady("修改移动速度")) {
+    if (!requireGameReady(t("features.modifyMoveSpeed"))) {
       return;
     }
 
@@ -517,7 +518,7 @@ export class SceneCheat {
   }
 
   static async quickSave(slot = 1) {
-    if (!requireGameReady("快速保存")) {
+    if (!requireGameReady(t("features.quickSave"))) {
       return false;
     }
 
@@ -526,14 +527,14 @@ export class SceneCheat {
       const result = await DataManager.saveGame(slot);
 
       if (result === false) {
-        throw new Error("游戏拒绝了本次存档");
+        throw new Error(t("alerts.saveRejected"));
       }
 
-      Alert.success(`保存进度到存档 ${slot}`);
+      Alert.success(t("alerts.quickSaved", { slot }));
       return true;
     } catch (error) {
       console.warn("[cheat plugin] 快速保存失败", error);
-      Alert.error(`保存到存档 ${slot} 失败`, error);
+      Alert.error(t("alerts.quickSaveFailed", { slot }), error);
       return false;
     }
   }
@@ -598,15 +599,15 @@ export class SceneCheat {
       const result = await DataManager.loadGame(slot);
 
       if (result === false) {
-        throw new Error("游戏拒绝了本次读档");
+        throw new Error(t("alerts.loadRejected"));
       }
 
       this.finishLoadIntoMap();
-      Alert.success(`从存档 ${slot} 加载游戏`);
+      Alert.success(t("alerts.quickLoaded", { slot }));
       return true;
     } catch (error) {
       console.warn("[cheat plugin] 快速加载失败", error);
-      Alert.error(`从存档 ${slot} 加载失败`, error);
+      Alert.error(t("alerts.quickLoadFailed", { slot }), error);
       return false;
     }
   }
@@ -621,63 +622,63 @@ export class BattleCheat {
   }
 
   static recoverAllEnemy() {
-    if (!requireGameReady("恢复敌人生命值")) return;
+    if (!requireGameReady(t("features.recoverEnemy"))) return;
 
     for (const member of $gameTroop.members()) {
       this.recover(member);
     }
 
-    Alert.success("恢复所有敌人的生命值");
+    Alert.success(t("alerts.recoveredEnemies"));
   }
 
   static recoverAllParty() {
-    if (!requireGameReady("恢复己方成员")) return;
+    if (!requireGameReady(t("features.recoverParty"))) return;
 
     for (const member of $gameParty.members()) {
       this.recover(member);
     }
 
-    Alert.success("恢复所有己方成员");
+    Alert.success(t("alerts.recoveredParty"));
   }
 
   static fillTpAllEnemy() {
-    if (!requireGameReady("补满敌人 TP")) return;
+    if (!requireGameReady(t("features.fillEnemyTp"))) return;
 
     for (const member of $gameTroop.members()) {
       member.setTp(member.maxTp());
     }
 
-    Alert.success("补满所有敌人的TP");
+    Alert.success(t("alerts.filledEnemyTp"));
   }
 
   static fillTpAllParty() {
-    if (!requireGameReady("补满己方成员 TP")) return;
+    if (!requireGameReady(t("features.fillPartyTp"))) return;
 
     for (const member of $gameParty.members()) {
       member.setTp(member.maxTp());
     }
 
-    Alert.success("补满所有己方成员的TP");
+    Alert.success(t("alerts.filledPartyTp"));
   }
 
   static changeAllEnemyHealth(newHp) {
-    if (!requireGameReady("修改敌人 HP")) return;
+    if (!requireGameReady(t("features.modifyEnemyHp"))) return;
 
     for (const member of $gameTroop.members()) {
       member.setHp(newHp);
     }
 
-    Alert.success(`设定所有敌人HP为 ${newHp}`);
+    Alert.success(t("alerts.enemyHpSet", { hp: newHp }));
   }
 
   static changeAllPartyHealth(newHp) {
-    if (!requireGameReady("修改队员 HP")) return;
+    if (!requireGameReady(t("features.modifyPartyHp"))) return;
 
     for (const member of $gameParty.members()) {
       member.setHp(newHp);
     }
 
-    Alert.success(`设定所有队员HP为 ${newHp}`);
+    Alert.success(t("alerts.partyHpSet", { hp: newHp }));
   }
 
   static canExecuteBattleEndProcess() {
@@ -689,7 +690,7 @@ export class BattleCheat {
   }
 
   static encounterBattle() {
-    if (!requireGameReady("触发遇敌")) return;
+    if (!requireGameReady(t("features.encounterBattle"))) return;
 
     $gamePlayer._encounterCount = 0;
   }
@@ -700,7 +701,7 @@ export class BattleCheat {
         enemy.addNewState(enemy.deathStateId());
       });
       BattleManager.processVictory();
-      Alert.success("强制胜利!");
+      Alert.success(t("alerts.victory"));
       return true;
     }
     return false;
@@ -712,7 +713,7 @@ export class BattleCheat {
         actor.addNewState(actor.deathStateId());
       });
       BattleManager.processDefeat();
-      Alert.success("强制失败...");
+      Alert.success(t("alerts.defeat"));
       return true;
     }
     return false;
@@ -734,7 +735,7 @@ export class BattleCheat {
         BattleManager._preemptive = previousPreemptive;
       }
 
-      Alert.success("强制逃跑...");
+      Alert.success(t("alerts.escape"));
       return true;
     }
     return false;
@@ -744,7 +745,7 @@ export class BattleCheat {
     if (this.canExecuteBattleEndProcess()) {
       // processAbort 内部同样会播放逃跑音效并设置 _escaped
       BattleManager.processAbort();
-      Alert.success("强制结束战斗");
+      Alert.success(t("alerts.abort"));
       return true;
     }
     return false;
@@ -799,7 +800,7 @@ export class BattleCheat {
   }
 
   static setDisableRandomEncounter(disabled) {
-    if (!requireGameReady("切换随机遇敌")) {
+    if (!requireGameReady(t("features.toggleRandomEncounter"))) {
       return false;
     }
 

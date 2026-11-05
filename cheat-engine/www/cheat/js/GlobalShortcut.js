@@ -11,6 +11,7 @@ import {
   MessageCheat,
 } from "./CheatHelper.js";
 import { ShortcutMap } from "./ShortcutHelper.js";
+import { t } from "./strings.js";
 
 // default shortcut settings
 const defaultShortcutSettings = {
@@ -107,15 +108,18 @@ export function isInValueInRange(value, lowerBound, upperBound) {
   try {
     value = Number(value);
   } catch (err) {
-    return "Value must be a number";
+    return t("shortcut.valueNotNumber");
   }
 
   if (isNaN(value) || !Number.isInteger(value)) {
-    return "Value must be a number";
+    return t("shortcut.valueNotNumber");
   }
 
   if (value < lowerBound || upperBound < value) {
-    return `Value must be between [${lowerBound}, ${upperBound}]`;
+    return t("shortcut.valueOutOfRange", {
+      min: lowerBound,
+      max: upperBound,
+    });
   }
 
   return false;
@@ -124,8 +128,8 @@ export function isInValueInRange(value, lowerBound, upperBound) {
 // immutable
 const shortcutConfig = {
   toggleCheatModal: {
-    name: "切换作弊窗口",
-    desc: "必须项",
+    name: t("shortcutAction.toggleCheatModal"),
+    desc: t("shortcut.necessary"),
     necessary: true,
     enterAction(param) {
       GeneralCheat.toggleCheatModal();
@@ -133,7 +137,7 @@ const shortcutConfig = {
   },
 
   toggleCheatModalToSaveLocationComponent: {
-    name: "切换“保存位置”窗口",
+    name: t("shortcutAction.toggleCheatModalToSaveLocationComponent"),
     desc: "",
     enterAction(param) {
       GeneralCheat.toggleCheatModal("save-recall-panel");
@@ -141,20 +145,20 @@ const shortcutConfig = {
   },
 
   toggleCheatModalToSaveBackupComponent: {
-    name: "切换“存档时间机器”窗口",
-    desc: "快速打开存档快照面板",
+    name: t("shortcutAction.toggleCheatModalToSaveBackupComponent"),
+    desc: t("shortcutAction.toggleCheatModalToSaveBackupComponentDesc"),
     enterAction(param) {
       GeneralCheat.toggleCheatModal("save-backup-panel");
     },
   },
 
   quickSave: {
-    name: "快速保存",
-    desc: "快速保存到指定槽",
+    name: t("shortcutAction.quickSave"),
+    desc: t("shortcutAction.quickSaveDesc"),
     param: {
       slot: {
-        name: "存档槽",
-        desc: "保存的槽",
+        name: t("shortcutAction.slotParam"),
+        desc: t("shortcutAction.slotSaveDesc"),
         isInvalidValue(value) {
           return isInValueInRange(value, 1, DataManager.maxSavefiles());
         },
@@ -169,12 +173,12 @@ const shortcutConfig = {
   },
 
   quickLoad: {
-    name: "快速加载",
-    desc: "从指定存档快速加载",
+    name: t("shortcutAction.quickLoad"),
+    desc: t("shortcutAction.quickLoadDesc"),
     param: {
       slot: {
-        name: "存档槽",
-        desc: "加载的槽",
+        name: t("shortcutAction.slotParam"),
+        desc: t("shortcutAction.slotLoadDesc"),
         isInvalidValue(value) {
           return isInValueInRange(value, 1, DataManager.maxSavefiles());
         },
@@ -189,7 +193,7 @@ const shortcutConfig = {
   },
 
   openSaveScene: {
-    name: "打开存档页面",
+    name: t("shortcutAction.openSaveScene"),
     desc: "",
     enterAction(param) {
       SceneCheat.toggleSaveScene();
@@ -197,7 +201,7 @@ const shortcutConfig = {
   },
 
   openLoadScene: {
-    name: "打开加载页面",
+    name: t("shortcutAction.openLoadScene"),
     desc: "",
     enterAction(param) {
       SceneCheat.toggleLoadScene();
@@ -205,7 +209,7 @@ const shortcutConfig = {
   },
 
   gotoTitle: {
-    name: "返回标题",
+    name: t("shortcutAction.gotoTitle"),
     desc: "",
     enterAction(param) {
       SceneCheat.gotoTitle();
@@ -213,7 +217,7 @@ const shortcutConfig = {
   },
 
   forceVictory: {
-    name: "强制胜利",
+    name: t("shortcutAction.forceVictory"),
     desc: "",
     enterAction(param) {
       BattleCheat.victory();
@@ -221,7 +225,7 @@ const shortcutConfig = {
   },
 
   forceDefeat: {
-    name: "强制失败",
+    name: t("shortcutAction.forceDefeat"),
     desc: "",
     enterAction(param) {
       BattleCheat.defeat();
@@ -229,7 +233,7 @@ const shortcutConfig = {
   },
 
   forceEscape: {
-    name: "强制逃跑",
+    name: t("shortcutAction.forceEscape"),
     desc: "",
     enterAction(param) {
       BattleCheat.escape();
@@ -237,7 +241,7 @@ const shortcutConfig = {
   },
 
   toggleNoClip: {
-    name: "切换无碰撞（穿墙）",
+    name: t("shortcutAction.toggleNoClip"),
     desc: "",
     enterAction(param) {
       GeneralCheat.toggleNoClip(true);
@@ -245,7 +249,7 @@ const shortcutConfig = {
   },
 
   enemyWound: {
-    name: "设置敌人 HP 为 1",
+    name: t("shortcutAction.enemyWound"),
     desc: "",
     enterAction(param) {
       BattleCheat.changeAllEnemyHealth(1);
@@ -253,15 +257,15 @@ const shortcutConfig = {
   },
 
   enemyRecovery: {
-    name: "恢复所有敌人",
-    desc: "填充 HP/MP 到最大",
+    name: t("shortcutAction.enemyRecovery"),
+    desc: t("shortcutAction.enemyRecoveryDesc"),
     enterAction(param) {
       BattleCheat.recoverAllEnemy();
     },
   },
 
   partyWound: {
-    name: "设置队伍 HP 为 1",
+    name: t("shortcutAction.partyWound"),
     desc: "",
     enterAction(param) {
       BattleCheat.changeAllPartyHealth(1);
@@ -269,20 +273,20 @@ const shortcutConfig = {
   },
 
   partyRecovery: {
-    name: "恢复所有己方成员",
-    desc: "填充 HP/MP 到最大",
+    name: t("shortcutAction.partyRecovery"),
+    desc: t("shortcutAction.partyRecoveryDesc"),
     enterAction(param) {
       BattleCheat.recoverAllParty();
     },
   },
 
   setSpeed: {
-    name: "设置速度",
-    desc: "设置速度为某个值",
+    name: t("shortcutAction.setSpeed"),
+    desc: t("shortcutAction.setSpeedDesc"),
     param: {
       speed: {
-        name: "速度",
-        desc: "设置的速度（1-10）",
+        name: t("shortcutAction.speedParam"),
+        desc: t("shortcutAction.speedParamDesc"),
         isInvalidValue(value) {
           return isInValueInRange(value, 1, 10);
         },
@@ -298,13 +302,13 @@ const shortcutConfig = {
   },
 
   skipMessage: {
-    name: "跳过消息",
+    name: t("shortcutAction.skipMessage"),
     desc: "",
     combiningKeyAlone: true,
     param: {
       accelerate: {
-        name: "加速游戏速度",
-        desc: "在跳过消息时加速游戏速度",
+        name: t("shortcutAction.accelerateParam"),
+        desc: t("shortcutAction.accelerateParamDesc"),
         isInvalidValue(value) {
           return isInValueInRange(value, 1, 50);
         },
@@ -323,8 +327,8 @@ const shortcutConfig = {
   },
 
   openDevTool: {
-    name: "打开开发者工具",
-    desc: "打开 Chromium 开发者工具",
+    name: t("shortcutAction.openDevTool"),
+    desc: t("shortcutAction.openDevToolDesc"),
     enterAction(param) {
       // `require("nw.gui")` 是 nwjs 0.12 时代的 API，0.13 起已被 `nw.Window` 取代；
       // 本项目 init/import.js 要求 nwjs >= 0.44.0，走新 API（与 mz/main.js 一致）。
@@ -669,11 +673,11 @@ class GlobalShortcut {
 
   setShortcut(shortcutId, newKey) {
     if (!newKey || typeof newKey.isRepresentable !== "function") {
-      throw Error("无效的快捷键");
+      throw Error(t("shortcut.invalidKey"));
     }
 
     if (!newKey.isRepresentable()) {
-      throw Error("这个按键无法保存为快捷键");
+      throw Error(t("shortcut.unrepresentable"));
     }
 
     // not need to change shortcut
@@ -685,7 +689,10 @@ class GlobalShortcut {
     const existingValue = this.shortcutMap.getValue(newKey);
     if (existingValue) {
       throw Error(
-        `Conflict with existing shortcut : [${newKey.asDisplayString()}] ${existingValue.name}`,
+        t("shortcut.conflict", {
+          key: newKey.asDisplayString(),
+          name: existingValue.name,
+        }),
       );
     }
 

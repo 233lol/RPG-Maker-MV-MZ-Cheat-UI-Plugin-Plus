@@ -2,6 +2,8 @@
  * 存档数据解析、元数据整理与校验。
  */
 
+import { t } from "../strings.js";
+
 export class SaveBackupMetadata {
   /* --------------------------------------------------------- 元数据展示 */
 
@@ -161,15 +163,16 @@ export class SaveBackupMetadata {
   // 写回存档 / 导入快照前的最后一道校验：宁可报错，也不要把损坏数据
   // 覆盖到玩家的存档上。RPG Maker 的存档一定包含 system / party / actors
   // 等对象，这里只要求至少命中一个，避免误伤改过结构的游戏。
-  static validateSaveText(jsonText, label = "存档数据") {
+  static validateSaveText(jsonText, label = null) {
+    label = label || t("saveBackup.saveData");
     if (typeof jsonText !== "string" || jsonText.trim() === "") {
-      throw new Error(`${label}为空`);
+      throw new Error(t("saveBackup.labelEmpty", { label }));
     }
 
     const data = this.parseAnySaveData(jsonText);
 
     if (!data || typeof data !== "object" || Array.isArray(data)) {
-      throw new Error(`${label}不是有效的存档 JSON`);
+      throw new Error(t("saveBackup.labelInvalidJson", { label }));
     }
 
     // system / party 是引擎读档的必需对象。只看 key 是否存在会让
@@ -177,13 +180,13 @@ export class SaveBackupMetadata {
     // 置空，读档必崩。
     for (const key of ["system", "party"]) {
       if (!Object.prototype.hasOwnProperty.call(data, key)) {
-        throw new Error(`${label}缺少 ${key} 字段`);
+        throw new Error(t("saveBackup.fieldEmpty", { label, key }));
       }
 
       const value = data[key];
 
       if (!value || typeof value !== "object" || Array.isArray(value)) {
-        throw new Error(`${label}的 ${key} 字段为空或格式错误`);
+        throw new Error(t("saveBackup.fieldInvalid", { label, key }));
       }
     }
 
@@ -193,9 +196,7 @@ export class SaveBackupMetadata {
     );
 
     if (!hasSaveShape) {
-      throw new Error(
-        `${label}缺少存档结构（actors / switches / variables 等）`,
-      );
+      throw new Error(t("saveBackup.saveStructureMissing", { label }));
     }
 
     return data;

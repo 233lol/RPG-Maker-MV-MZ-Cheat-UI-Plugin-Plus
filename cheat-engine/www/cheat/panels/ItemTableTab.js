@@ -1,4 +1,5 @@
 import PaginationFooter from "../components/PaginationFooter.js";
+import { t } from "../js/strings.js";
 import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
 import { markRaw, toRaw } from "../libs/vue.js";
@@ -41,7 +42,7 @@ export default {
                             v-model="excludeNameless"
                             density="compact"
                             hide-details
-                            label="隐藏无名物品">
+                            :label="t('items.hideNameless')">
                         
                         </v-checkbox>
                     </v-col>
@@ -52,7 +53,7 @@ export default {
                             v-model="onlyOwnedItems"
                             density="compact"
                             hide-details
-                            label="只显示拥有的物品">
+                            :label="t('items.onlyOwned')">
                         
                         </v-checkbox>
                     </v-col>
@@ -155,10 +156,12 @@ export default {
   },
 
   methods: {
+    t,
+
     initializeVariables() {
       this.tableHeaders = this.headers.slice(0);
       this.tableHeaders.push({
-        title: "数量",
+        title: t("items.amount"),
         key: "amount",
       });
 
@@ -180,7 +183,7 @@ export default {
     },
 
     onItemChange(item) {
-      if (!requirePartyReady("修改物品数量")) return;
+      if (!requirePartyReady(t("features.modifyItemAmount"))) return;
 
       const amount = Number(item.amount);
       if (!Number.isFinite(amount)) {

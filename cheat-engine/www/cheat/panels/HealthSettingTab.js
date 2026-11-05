@@ -1,4 +1,5 @@
 import { markRaw } from "../libs/vue.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "HealthSettingTab",
@@ -56,7 +57,7 @@ export default {
     return {
       tableHeaders: [
         {
-          title: "名字",
+          title: t("battle.memberName"),
           key: "name",
         },
         {

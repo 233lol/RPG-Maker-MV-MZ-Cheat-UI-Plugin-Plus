@@ -11,6 +11,7 @@
 //   normalizeValue(value) 展示 / 存锁定表前的归一化（变量需要 markRaw）
 import { LockService } from "./LockService.js";
 import { tablePanelMixin } from "./TablePanelMixin.js";
+import { t } from "./strings.js";
 
 /**
  * 由表格行构造要写盘的锁定表（纯函数，便于单测）。
@@ -63,7 +64,7 @@ export const lockTableMixin = {
   data() {
     return {
       lockKind: "switch",
-      lockLabel: "开关",
+      lockLabel: t("switch.label"),
       excludeNameless: true,
       // e2e / 调试读取的名字表（面板通过 computed 暴露成 switchNames 等）
       names: [],
@@ -193,7 +194,10 @@ export const lockTableMixin = {
     },
 
     toggleItemLock(item) {
-      if (!this.requireDataReady(`锁定${this.lockLabel}`)) return;
+      if (
+        !this.requireDataReady(t("features.lockItem", { kind: this.lockLabel }))
+      )
+        return;
 
       // buildLockPayload / LockService 都会跳过 id <= 0（第 0 号是占位），
       // 这里不拦就会得到「图标显示已锁定但实际不生效」的假状态。
@@ -211,7 +215,12 @@ export const lockTableMixin = {
     },
 
     toggleAllFilteredLocks() {
-      if (!this.requireDataReady(`批量锁定${this.lockLabel}`)) return;
+      if (
+        !this.requireDataReady(
+          t("features.lockAllItems", { kind: this.lockLabel }),
+        )
+      )
+        return;
 
       const targetLockEnabled = !this.allFilteredLocked;
 

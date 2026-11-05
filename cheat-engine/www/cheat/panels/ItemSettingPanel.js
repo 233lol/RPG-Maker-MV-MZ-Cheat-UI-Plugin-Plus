@@ -4,5 +4,5 @@ export default createItemDatabasePanel({
   name: "ItemSettingPanel",
   stateKey: "item",
   getItems: () => $dataItems,
-  descTitle: "描述",
+  descTitleKey: "items.itemDesc",
 });

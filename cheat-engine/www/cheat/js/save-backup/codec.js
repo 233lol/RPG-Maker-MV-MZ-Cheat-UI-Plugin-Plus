@@ -2,6 +2,8 @@
  * 存档 / 快照的压缩与解码（MV LZString、MZ pako）。
  */
 
+import { t } from "../strings.js";
+
 export class SaveBackupCodec {
   /* --------------------------------------------------------- 压缩 / 工具 */
 
@@ -152,7 +154,7 @@ export class SaveBackupCodec {
       if (codec === "pako") {
         const pakoLib = this.getPako();
         if (!pakoLib || typeof pakoLib.deflate !== "function") {
-          throw new Error("当前游戏未提供 pako");
+          throw new Error(t("saveBackup.pakoMissing"));
         }
 
         return pakoLib.deflate(text, { to: "string", level: 1 });
@@ -163,7 +165,7 @@ export class SaveBackupCodec {
         if (lz && typeof lz.compressToBase64 === "function") {
           return lz.compressToBase64(text);
         }
-        throw new Error("当前游戏未提供 LZString");
+        throw new Error(t("saveBackup.lzstringMissing"));
       }
 
       // 极端兜底：UTF-8 安全的 base64（仅供本插件读写）
@@ -186,7 +188,8 @@ export class SaveBackupCodec {
     return this.encodePayloadText(jsonText);
   }
 
-  static decodePayloadText(raw, codec = null, label = "快照数据") {
+  static decodePayloadText(raw, codec = null, label = null) {
+    label = label || t("saveBackup.snapshotData");
     if (raw === null || raw === undefined || raw === "") {
       return null;
     }
@@ -248,7 +251,8 @@ export class SaveBackupCodec {
   }
 
   // 兼容旧调用：自动探测编码
-  static decodeSaveText(text, label = "存档数据") {
+  static decodeSaveText(text, label = null) {
+    label = label || t("saveBackup.saveData");
     return this.decodePayloadText(text, null, label);
   }
 

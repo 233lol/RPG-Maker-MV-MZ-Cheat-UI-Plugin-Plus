@@ -6,6 +6,7 @@ import { ConfirmDialog } from "../js/DialogHelper.js";
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
 import { getCheatSettingsPath } from "../js/SettingsPath.js";
 import { paginate } from "../js/PaginationHelper.js";
+import { t } from "../js/strings.js";
 import { tablePanelMixin } from "../js/TablePanelMixin.js";
 import { markRaw } from "../libs/vue.js";
 import {
@@ -74,7 +75,7 @@ export default {
         <search-field
             ref="searchField"
             v-model="search"
-            label="搜索变量名 / 值..."
+            :label="t('globalVariable.searchPlaceholder')"
             clearable
             prepend-icon="mdi-magnify">
             <template #append-inner>
@@ -89,7 +90,7 @@ export default {
                             <v-icon size="small">mdi-file-search-outline</v-icon>
                         </v-btn>
                     </template>
-                    <span>{{ deepSearch ? '关闭深度搜索（只搜索当前层）' : '深度搜索（递归搜索所有嵌套变量）' }}</span>
+                    <span>{{ deepSearch ? t("globalVariable.deepSearchOff") : t("globalVariable.deepSearchOn") }}</span>
                 </v-tooltip>
             </template>
         </search-field>
@@ -109,7 +110,7 @@ export default {
                     <v-icon>mdi-tune-variant</v-icon>
                 </v-btn>
             </template>
-            <span>深度搜索上限设置</span>
+            <span>{{ t("globalVariable.limitsTooltip") }}</span>
         </v-tooltip>
     </div>
 
@@ -141,16 +142,16 @@ export default {
             variant="outlined"
             divided
             mandatory>
-            <v-btn size="x-small" value="all">全部</v-btn>
-            <v-btn size="x-small" value="rpg">游戏内置</v-btn>
-            <v-btn size="x-small" value="plugin">插件 ({{ pluginCount }})</v-btn>
+            <v-btn size="x-small" value="all">{{ t("globalVariable.filterAll") }}</v-btn>
+            <v-btn size="x-small" value="rpg">{{ t("globalVariable.filterRpg") }}</v-btn>
+            <v-btn size="x-small" value="plugin">{{ t("globalVariable.filterPlugin") }} ({{ pluginCount }})</v-btn>
         </v-btn-toggle>
         <v-spacer></v-spacer>
         <v-checkbox
             v-model="autoRefresh"
             density="compact"
             hide-details
-            label="自动刷新">
+            :label="t('globalVariable.autoRefresh')">
         </v-checkbox>
         <v-select
             v-model="refreshIntervalMs"
@@ -173,16 +174,16 @@ export default {
                     <span>{{ currentContainerLabel }}</span>
                 </v-btn>
             </template>
-            <span>在当前层新增一个属性 / 元素（JSON）</span>
+            <span>{{ t("globalVariable.addInLayer") }}</span>
         </v-tooltip>
     </div>
     <div
         class="d-flex px-1 py-1 text-body-small text-grey-lighten-1 font-weight-bold"
         v-if="!searchActive">
-        <div style="width: 40%;">名称</div>
-        <div style="width: 14%;">类型</div>
-        <div class="flex-grow-1">值</div>
-        <div style="width: 96px; text-align: right;">操作</div>
+        <div style="width: 40%;">{{ t("globalVariable.nameHeader") }}</div>
+        <div style="width: 14%;">{{ t("globalVariable.typeHeader") }}</div>
+        <div class="flex-grow-1">{{ t("globalVariable.valueHeader") }}</div>
+        <div style="width: 96px; text-align: right;">{{ t("globalVariable.actionsHeader") }}</div>
     </div>
 
     <div v-if="!searchActive" class="hide-scrollbar" style="max-height: 290px; overflow-y: auto;">
@@ -212,7 +213,7 @@ export default {
                     color="indigo"
                     label
                     class="ml-1">
-                    插件
+                    {{ t("common.plugin") }}
                 </v-chip>
             </div>
             <div style="width: 14%;">
@@ -250,7 +251,7 @@ export default {
             <div class="d-flex align-center justify-end" style="width: 96px;">
                 <v-btn
                     v-if="item.isContainer"
-                    :title="'进入 ' + item.name"
+                    :title="t('globalVariable.enter', { name: item.name })"
                     icon
                     size="x-small"
                     color="amber"
@@ -259,7 +260,7 @@ export default {
                 </v-btn>
                 <v-btn
                     v-if="item.isContainer"
-                    title="编辑 JSON"
+                    :title="t('globalVariable.editJson')"
                     icon
                     size="x-small"
                     color="light-blue"
@@ -268,7 +269,7 @@ export default {
                 </v-btn>
                 <v-btn
                     v-if="item.isContainer"
-                    :title="'在 ' + item.name + ' 内新增属性 / 元素'"
+                    :title="t('globalVariable.addChild', { name: item.name })"
                     icon
                     size="x-small"
                     color="teal"
@@ -277,7 +278,7 @@ export default {
                 </v-btn>
                 <v-btn
                     v-if="!item.isRoot"
-                    title="删除"
+                    :title="t('globalVariable.delete')"
                     icon
                     size="x-small"
                     color="red"
@@ -288,19 +289,19 @@ export default {
         </div>
 
         <div v-if="pagedEntries.length === 0" class="pa-3 text-body-small text-grey-lighten-1">
-            <div v-if="entriesLoading">正在加载全局变量...</div>
+            <div v-if="entriesLoading">{{ t("globalVariable.loadingEntries") }}</div>
             <div v-else-if="containerError">{{ containerError }}</div>
             <div v-else-if="search">
-                「{{ search }}」在当前层没有匹配项
-                <v-btn size="x-small" color="amber" variant="text" @click="toggleDeepSearch">深度搜索</v-btn>
+                {{ t("globalVariable.noMatchHere", { search: search }) }}
+                <v-btn size="x-small" color="amber" variant="text" @click="toggleDeepSearch">{{ t("globalVariable.deepSearchButton") }}</v-btn>
             </div>
-            <div v-else>（没有可显示的属性）</div>
+            <div v-else>{{ t("globalVariable.emptyContainer") }}</div>
         </div>
     </div>
     <div v-if="searchActive" class="mt-2">
         <div class="text-body-small text-grey-lighten-1 mb-1">
-            深度搜索结果 {{ deepSearchResults.length }} 项
-            <span v-if="deepSearchTruncated">（{{ deepSearchLimitReason || '已达到搜索上限' }}，结果可能不完整）</span>
+            {{ t("globalVariable.deepSearchResults", { count: deepSearchResults.length }) }}
+            <span v-if="deepSearchTruncated">{{ t("globalVariable.truncated", { reason: deepSearchLimitReason || t("globalVariable.limitDefault") }) }}</span>
         </div>
         <div class="hide-scrollbar" style="max-height: 290px; overflow-y: auto;">
             <div
@@ -325,13 +326,13 @@ export default {
                     icon
                     size="x-small"
                     color="amber"
-                    title="跳转到该变量"
+                    :title="t('globalVariable.jumpToEntry')"
                     @click.stop="jumpToSearchResult(result)">
                     <v-icon size="small">mdi-target</v-icon>
                 </v-btn>
             </div>
             <div v-if="deepSearchResults.length === 0" class="pa-3 text-body-small text-grey-lighten-1">
-                {{ deepSearching ? '搜索中...' : '没有匹配的嵌套变量（最多搜索 ' + searchLimits.maxDepth + ' 层）' }}
+                {{ deepSearching ? t("globalVariable.searching") : t("globalVariable.noDeepMatch", { depth: searchLimits.maxDepth }) }}
             </div>
         </div>
     </div>
@@ -364,7 +365,7 @@ export default {
                 <v-text-field
                     v-if="jsonDialog.requireKey"
                     v-model="jsonDialog.keyText"
-                    label="属性名"
+                    :label="t('globalVariable.propertyName')"
                     variant="outlined"
                     density="compact"
                     hide-details
@@ -386,13 +387,13 @@ export default {
                     {{ jsonDialog.error }}
                 </div>
                 <div class="text-body-small text-grey-lighten-1 mt-2">
-                    支持 JSON 格式（数字 / 字符串 / 布尔 / null / 数组 / 对象）
+                    {{ t("globalVariable.jsonFormatHint") }}
                 </div>
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn variant="text" @click="closeJsonDialog">取消</v-btn>
-                <v-btn color="primary" @click="submitJsonDialog">保存</v-btn>
+                <v-btn variant="text" @click="closeJsonDialog">{{ t("common.cancel") }}</v-btn>
+                <v-btn color="primary" @click="submitJsonDialog">{{ t("common.save") }}</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -405,7 +406,7 @@ export default {
                 <v-btn icon size="small" @click="limitsDialog.show = false">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
-                <span class="text-title-large ml-2">深度搜索上限</span>
+                <span class="text-title-large ml-2">{{ t("globalVariable.limitsTitle") }}</span>
                 <v-spacer></v-spacer>
             </v-card-title>
             <v-card-text>
@@ -415,7 +416,7 @@ export default {
                             v-model.number="limitsDialog.maxDepth"
                             type="number"
                             min="1"
-                            label="最大深度"
+                            :label="t('globalVariable.maxDepth')"
                             variant="outlined"
                             density="compact"
                             hide-details
@@ -427,7 +428,7 @@ export default {
                             v-model.number="limitsDialog.maxKeysPerNode"
                             type="number"
                             min="1"
-                            label="每层最大属性数"
+                            :label="t('globalVariable.maxKeysPerNode')"
                             variant="outlined"
                             density="compact"
                             hide-details
@@ -439,7 +440,7 @@ export default {
                             v-model.number="limitsDialog.maxResults"
                             type="number"
                             min="1"
-                            label="最大结果数"
+                            :label="t('globalVariable.maxResults')"
                             variant="outlined"
                             density="compact"
                             hide-details
@@ -451,7 +452,7 @@ export default {
                             v-model.number="limitsDialog.maxNodes"
                             type="number"
                             min="1"
-                            label="最大节点数"
+                            :label="t('globalVariable.maxNodes')"
                             variant="outlined"
                             density="compact"
                             hide-details
@@ -463,7 +464,7 @@ export default {
                             v-model.number="limitsDialog.maxTimeMs"
                             type="number"
                             min="1"
-                            label="最大耗时(ms)"
+                            :label="t('globalVariable.maxTimeMs')"
                             variant="outlined"
                             density="compact"
                             hide-details
@@ -472,14 +473,14 @@ export default {
                     </v-col>
                 </v-row>
                 <div class="text-body-small text-grey-lighten-1 mt-3">
-                    数值越大搜索越完整，但越慢、越占内存。搜索被截断时结果上方会提示原因。
+                    {{ t("globalVariable.limitsHint") }}
                 </div>
             </v-card-text>
             <v-card-actions>
-                <v-btn variant="text" @click="resetSearchLimits">恢复默认</v-btn>
+                <v-btn variant="text" @click="resetSearchLimits">{{ t("common.restoreDefault") }}</v-btn>
                 <v-spacer></v-spacer>
-                <v-btn variant="text" @click="limitsDialog.show = false">取消</v-btn>
-                <v-btn color="primary" @click="saveSearchLimits">保存</v-btn>
+                <v-btn variant="text" @click="limitsDialog.show = false">{{ t("common.cancel") }}</v-btn>
+                <v-btn color="primary" @click="saveSearchLimits">{{ t("common.save") }}</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -525,15 +526,21 @@ export default {
       autoRefresh: true,
       refreshIntervalMs: 2000,
       refreshIntervalOptions: [
-        { title: "1 秒", value: 1000 },
-        { title: "2 秒", value: 2000 },
-        { title: "5 秒", value: 5000 },
+        { title: t("common.seconds", { count: 1 }), value: 1000 },
+        { title: t("common.seconds", { count: 2 }), value: 2000 },
+        { title: t("common.seconds", { count: 5 }), value: 5000 },
       ],
       refreshTimer: null,
 
       // 分页
       pagination: { page: 1, itemsPerPage: 50 },
-      itemsPerPageOptions: [10, 20, 50, 100, { title: "全部", value: -1 }],
+      itemsPerPageOptions: [
+        10,
+        20,
+        50,
+        100,
+        { title: t("common.all"), value: -1 },
+      ],
       panelStateExtraKeys: ["rootFilter", "autoRefresh", "refreshIntervalMs"],
 
       // JSON 编辑对话框
@@ -632,11 +639,13 @@ export default {
     },
 
     currentContainerLabel() {
-      return Array.isArray(this.container) ? "新增元素" : "新增属性";
+      return Array.isArray(this.container)
+        ? t("globalVariable.addElement")
+        : t("globalVariable.addProperty");
     },
 
     breadcrumbItems() {
-      return buildBreadcrumbItems(this.path);
+      return buildBreadcrumbItems(this.path, t("globalVariable.title"));
     },
 
     // 深度搜索生效时，用搜索结果替换当前层列表
@@ -672,6 +681,8 @@ export default {
   },
 
   methods: {
+    t,
+
     // ---------- 初始加载（推迟到首帧之后） ----------
 
     // 用空闲回调把「读设置文件 + 扫描 window + 构建列表」挪出点击关键路径：
@@ -737,9 +748,9 @@ export default {
           this.scheduleSearch();
         }
       } catch (error) {
-        this.containerError = `初始化失败: ${String(
-          (error && error.message) || error,
-        )}`;
+        this.containerError = t("globalVariable.initFailed", {
+          message: String((error && error.message) || error),
+        });
       } finally {
         this.entriesLoading = false;
         measureFrom("GlobalVariablePanel.initialLoad", startedAt);
@@ -766,7 +777,7 @@ export default {
     reloadAll() {
       this.reloadRootGlobals(true);
       this.rebuildEntries();
-      Alert.success("已重新加载游戏数据");
+      Alert.success(t("globalVariable.reloaded"));
     },
 
     // 把当前路径解析成真实对象（window 为根）
@@ -774,7 +785,9 @@ export default {
       const result = resolvePathValue(window, this.path);
 
       if (!result.ok) {
-        this.containerError = `无法读取该路径: ${result.message}`;
+        this.containerError = t("globalVariable.pathUnreadable", {
+          message: result.message,
+        });
         this.container = null;
         return false;
       }
@@ -787,7 +800,7 @@ export default {
         value === null ||
         (typeof value !== "object" && typeof value !== "function")
       ) {
-        this.containerError = "该路径的当前值为空或不是对象";
+        this.containerError = t("globalVariable.pathEmpty");
         this.container = null;
         return false;
       }
@@ -929,7 +942,9 @@ export default {
       const parsed = parseValueByKind(text, entry.kind);
 
       if (!parsed.ok) {
-        Alert.warn(`修改失败: ${parsed.message}`);
+        Alert.warn(
+          t("globalVariable.modifyFailed", { message: parsed.message }),
+        );
         this.refresh(true);
         return;
       }
@@ -949,7 +964,9 @@ export default {
       const result = setChildValue(this.container, entry.key, value);
 
       if (!result.ok) {
-        Alert.error(`修改失败: ${result.message}`);
+        Alert.error(
+          t("globalVariable.modifyFailed", { message: result.message }),
+        );
         this.refresh(true);
         return;
       }
@@ -967,7 +984,7 @@ export default {
       const child = getChildValue(this.container, entry.key);
 
       if (!child.ok) {
-        Alert.error(`读取失败: ${child.message}`);
+        Alert.error(t("globalVariable.readFailed", { message: child.message }));
         return;
       }
 
@@ -981,7 +998,9 @@ export default {
       this.jsonDialog = {
         show: true,
         mode: "edit",
-        title: `编辑 JSON: ${formatPathText([...this.path, entry.key])}`,
+        title: t("globalVariable.editJsonTitle", {
+          path: formatPathText([...this.path, entry.key]),
+        }),
         keyText: "",
         requireKey: false,
         text: json.text,
@@ -1004,7 +1023,9 @@ export default {
         const child = getChildValue(this.container, entry.key);
 
         if (!child.ok) {
-          Alert.error(`读取失败: ${child.message}`);
+          Alert.error(
+            t("globalVariable.readFailed", { message: child.message }),
+          );
           return;
         }
 
@@ -1015,10 +1036,15 @@ export default {
       this.jsonDialog = {
         show: true,
         mode: "add",
-        title: `新增${isArray ? "元素" : "属性"}: ${targetLabel}`,
+        title: t("globalVariable.addTitle", {
+          kind: isArray
+            ? t("globalVariable.addElement")
+            : t("globalVariable.addProperty"),
+          path: targetLabel,
+        }),
         keyText: "",
         requireKey: !isArray,
-        text: isArray ? "null" : '"值"',
+        text: isArray ? "null" : t("globalVariable.newValueText"),
         error: "",
         targetKey,
       };
@@ -1051,14 +1077,16 @@ export default {
       dialog.error = "";
 
       if (!this.container) {
-        dialog.error = "当前层无法写入";
+        dialog.error = t("globalVariable.layerNotWritable");
         return;
       }
 
       const resolved = this.resolveDialogTargetContainer();
 
       if (!resolved.ok) {
-        dialog.error = `读取失败: ${resolved.message}`;
+        dialog.error = t("globalVariable.readFailed", {
+          message: resolved.message,
+        });
         return;
       }
 
@@ -1068,9 +1096,9 @@ export default {
       try {
         parsed = JSON.parse(dialog.text);
       } catch (error) {
-        dialog.error = `JSON 解析失败: ${String(
-          (error && error.message) || error,
-        )}`;
+        dialog.error = t("globalVariable.jsonParseFailed", {
+          message: String((error && error.message) || error),
+        });
         return;
       }
 
@@ -1083,7 +1111,7 @@ export default {
           key = String(dialog.keyText || "").trim();
 
           if (!key) {
-            dialog.error = "请输入属性名";
+            dialog.error = t("globalVariable.keyRequired");
             return;
           }
         }
@@ -1092,13 +1120,15 @@ export default {
       const result = setChildValue(targetContainer, key, parsed);
 
       if (!result.ok) {
-        dialog.error = `写入失败: ${result.message}`;
+        dialog.error = t("globalVariable.writeFailed", {
+          message: result.message,
+        });
         return;
       }
 
       dialog.show = false;
       this.rebuildEntries();
-      Alert.success("已保存");
+      Alert.success(t("globalVariable.saved"));
     },
 
     // ---------- 删除属性 ----------
@@ -1113,18 +1143,18 @@ export default {
 
       ConfirmDialog.show({
         width: 460,
-        message: `确定删除 ${label} ？\n(警告: 可能导致游戏或存档异常)`,
+        message: t("globalVariable.deleteConfirm", { label }),
         actions: [
           {
             icon: "mdi-close",
-            label: "取消",
+            label: t("common.cancel"),
             color: "white",
             action: ConfirmDialog.close,
           },
           {
             icon: "mdi-delete",
             color: "red",
-            label: "删除",
+            label: t("common.delete"),
             action() {
               self.deleteEntry(entry);
               ConfirmDialog.close();
@@ -1142,12 +1172,14 @@ export default {
       const result = deleteChildValue(this.container, entry.key);
 
       if (!result.ok) {
-        Alert.error(`删除失败: ${result.message}`);
+        Alert.error(
+          t("globalVariable.deleteFailed", { message: result.message }),
+        );
         return;
       }
 
       this.rebuildEntries();
-      Alert.success(`已删除 ${entry.name}`);
+      Alert.success(t("globalVariable.deleted", { name: entry.name }));
     },
 
     // ---------- 搜索 ----------
@@ -1234,13 +1266,15 @@ export default {
         this.deepSearchResults = results;
         this.deepSearchTruncated = truncated;
         this.deepSearchLimitReason = truncated
-          ? SEARCH_LIMIT_REASONS[reason] || ""
+          ? t(SEARCH_LIMIT_REASONS[reason] || "globalVariable.limitDefault")
           : "";
       } catch (error) {
         this.deepSearchResults = [];
         this.deepSearchTruncated = false;
         this.deepSearchLimitReason = "";
-        Alert.error(`搜索失败: ${String(error)}`);
+        Alert.error(
+          t("globalVariable.searchFailed", { message: String(error) }),
+        );
       } finally {
         if (token === this.__deepSearchToken) {
           this.deepSearching = false;
@@ -1308,7 +1342,7 @@ export default {
       try {
         this.limitStorage.setItem("limits", JSON.stringify(next));
       } catch (error) {
-        Alert.warn("保存搜索上限失败");
+        Alert.warn(t("globalVariable.saveLimitsFailed"));
       }
 
       this.scheduleSearch();

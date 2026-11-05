@@ -4,6 +4,7 @@ import { Alert } from "../js/AlertHelper.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { filterByKeyword } from "../js/SearchFilter.js";
 import { tablePanelMixin } from "../js/TablePanelMixin.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "TeleportPanel",
@@ -19,7 +20,7 @@ export default {
             <v-card variant="outlined" color="primary" class="pa-2">
                 <v-row density="compact">
                     <v-col cols="4" class="text-center">
-                        <div class="text-body-small text-grey">当前地图</div>
+                        <div class="text-body-small text-grey">{{ t("teleport.currentMap") }}</div>
                         <div class="text-body-medium font-weight-bold">{{ currentMapName }}</div>
                     </v-col>
                     <v-col cols="4" class="text-center">
@@ -75,7 +76,7 @@ export default {
                 variant="outlined"
                 @click="sameMapTeleport">
                 <v-icon start>mdi-map-marker-path</v-icon>
-                当前传送
+                {{ t("teleport.currentTeleport") }}
             </v-btn>
         </v-col>
     </v-row>
@@ -95,7 +96,7 @@ export default {
                 v-model="excludeFullPath"
                 density="compact"
                 hide-details
-                label="隐藏完整路径">
+                :label="t('teleport.hideFullPath')">
             </v-checkbox>
         </template>
         <template
@@ -117,7 +118,7 @@ export default {
                         <v-icon size="small">mdi-map-marker</v-icon>
                     </v-btn>
                 </template>
-                <span>传送</span>
+                <span>{{ t("teleport.teleport") }}</span>
             </v-tooltip>
         </template>
          <template #bottom>
@@ -156,15 +157,15 @@ export default {
           key: "id",
         },
         {
-          title: "名称",
+          title: t("teleport.nameHeader"),
           key: "name",
         },
         {
-          title: "完整路径",
+          title: t("teleport.fullPathHeader"),
           key: "fullPath",
         },
         {
-          title: "操作",
+          title: t("teleport.actionsHeader"),
           key: "actions",
         },
       ],
@@ -212,6 +213,8 @@ export default {
   },
 
   methods: {
+    t,
+
     async initializeVariables() {
       if (
         typeof $dataMapInfos === "undefined" ||
@@ -271,7 +274,7 @@ export default {
         x < 0 ||
         y < 0
       ) {
-        Alert.warn("传送坐标必须是正整数");
+        Alert.warn(t("teleport.invalidCoord"));
         return false;
       }
 
@@ -280,12 +283,12 @@ export default {
         !$dataMapInfos ||
         !$dataMapInfos[targetMapId]
       ) {
-        Alert.warn(`地图 ${targetMapId} 不存在`);
+        Alert.warn(t("teleport.mapNotExist", { id: targetMapId }));
         return false;
       }
 
       if (typeof $gamePlayer === "undefined" || !$gamePlayer) {
-        Alert.warn("玩家数据尚未初始化，无法传送");
+        Alert.warn(t("teleport.playerNotReady"));
         return false;
       }
 
@@ -302,7 +305,7 @@ export default {
             : x < $gameMap.width() && y < $gameMap.height();
 
         if (!valid) {
-          Alert.warn(`坐标 ${x},${y} 超出当前地图范围`);
+          Alert.warn(t("teleport.outOfRange", { x, y }));
           return false;
         }
       }
@@ -337,7 +340,7 @@ export default {
       const y = Number(this.inputY);
 
       if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) {
-        Alert.warn("传送坐标必须是正整数");
+        Alert.warn(t("teleport.invalidCoord"));
         return;
       }
 
@@ -347,12 +350,12 @@ export default {
         typeof $gameMap === "undefined" ||
         !$gameMap
       ) {
-        Alert.warn("玩家数据尚未初始化，无法传送");
+        Alert.warn(t("teleport.playerNotReady"));
         return;
       }
 
       if (x >= $gameMap.width() || y >= $gameMap.height()) {
-        Alert.warn(`坐标 ${x},${y} 超出当前地图范围`);
+        Alert.warn(t("teleport.outOfRange", { x, y }));
         return;
       }
 

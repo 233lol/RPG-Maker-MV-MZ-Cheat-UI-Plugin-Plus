@@ -161,8 +161,8 @@ pnpm test:mz        # 只测 MZ
 | `cheat-engine/www/cheat/js/AtomicFile.js` | 原子写入 JSON / 文本文件 |
 | `cheat-engine/www/cheat/js/GameState.js` | 游戏数据就绪检查 |
 | `cheat-engine/www/cheat/js/PaginationHelper.js` | 统一分页计算（含“全部”） |
-| `cheat-engine/www/cheat/js/strings.js` | 共享 UI 文案 + 多语言入口（`t()` / `setLocale()`） |
-| `cheat-engine/www/cheat/js/locales/` | 简体中文 / English / 日本語 文案表 |
+| `cheat-engine/www/cheat/js/strings.js` | 共享 UI 文案 + 多语言入口（`t()` / `formatNumber()` / `formatDateTime()`） |
+| `cheat-engine/www/cheat/js/locales/` | 简体中文 / English / 日本語 文案表（支持 `{count}` 复数） |
 | `cheat-engine/www/cheat/js/LocaleService.js` | 语言检测与持久化 |
 | `cheat-engine/www/cheat/js/PanelState.js` | 面板筛选 / 分页状态持久化与 mixin |
 | `cheat-engine/www/cheat/js/GameDataState.js` | 统一游戏数据变化事件 |

@@ -3,6 +3,8 @@
  * 存档快照的格式化与 ID 生成（静态方法，运行时挂到 SaveBackupCheat 上）。
  */
 
+import { t } from "../strings.js";
+
 export class SaveBackupFormat {
   static formatBytes(bytes) {
     const value = Number(bytes);
@@ -94,7 +96,7 @@ export class SaveBackupFormat {
 
     const diff = Date.now() - value;
     if (diff < 0) {
-      return "刚刚";
+      return t("time.justNow");
     }
 
     const minute = 60 * 1000;
@@ -102,18 +104,18 @@ export class SaveBackupFormat {
     const day = 24 * hour;
 
     if (diff < minute) {
-      return "刚刚";
+      return t("time.justNow");
     }
 
     if (diff < hour) {
-      return `${Math.floor(diff / minute)} 分钟前`;
+      return t("time.minutesAgo", { count: Math.floor(diff / minute) });
     }
 
     if (diff < day) {
-      return `${Math.floor(diff / hour)} 小时前`;
+      return t("time.hoursAgo", { count: Math.floor(diff / hour) });
     }
 
-    return `${Math.floor(diff / day)} 天前`;
+    return t("time.daysAgo", { count: Math.floor(diff / day) });
   }
 
   static generateId(kind, slot, existingIds) {

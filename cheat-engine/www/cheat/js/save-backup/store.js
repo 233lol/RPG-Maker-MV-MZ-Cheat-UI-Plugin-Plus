@@ -4,6 +4,7 @@
 
 import { writeJsonAtomic, writeTextAtomic } from "../AtomicFile.js";
 import { getBackupDir, getIndexFile } from "./constants.js";
+import { t } from "../strings.js";
 
 export class SaveBackupStore {
   /* ----------------------------------------------------------- 索引读写 */
@@ -149,7 +150,7 @@ export class SaveBackupStore {
 
   static assertSnapshotId(id) {
     if (!this.isValidSnapshotId(id)) {
-      throw new Error("快照 ID 无效");
+      throw new Error(t("saveBackup.snapshotIdInvalid"));
     }
 
     return id;
@@ -315,7 +316,7 @@ export class SaveBackupStore {
 
     const encoded = this.encodePayloadText(jsonText, meta.codec);
     if (!encoded) {
-      throw new Error("压缩存档数据失败，无法写入快照");
+      throw new Error(t("saveBackup.compressFailed"));
     }
 
     writeTextAtomic(payloadFile, encoded, "utf-8");
@@ -331,17 +332,17 @@ export class SaveBackupStore {
     const payloadFile = this.findPayloadPath(meta);
 
     if (!payloadFile || !fs.existsSync(payloadFile)) {
-      throw new Error("快照数据文件已被删除或移动");
+      throw new Error(t("saveBackup.payloadMissing"));
     }
 
     const raw = fs.readFileSync(payloadFile, "utf-8");
     const codec =
       meta.codec || (payloadFile.endsWith(".rmmzsave") ? "pako" : null);
 
-    const jsonText = this.decodePayloadText(raw, codec, "快照数据");
+    const jsonText = this.decodePayloadText(raw, codec);
 
     if (typeof jsonText !== "string" || jsonText.length === 0) {
-      throw new Error("快照数据解压失败（编码格式不兼容）");
+      throw new Error(t("saveBackup.payloadDecodeFailed"));
     }
 
     return jsonText;

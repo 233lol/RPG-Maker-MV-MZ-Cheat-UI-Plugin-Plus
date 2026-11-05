@@ -5,23 +5,29 @@
  * 纯函数，不依赖 window / Vue，便于单元测试。
  */
 
-const KIND_TEXTS = {
-  number: "数字",
-  string: "字符串",
-  boolean: "布尔",
+import { t } from "../strings.js";
+
+// 需要翻译的类型名；null / undefined / bigint / symbol / dom 保持原样
+const KIND_TEXT_KEYS = {
+  number: "number",
+  string: "string",
+  boolean: "boolean",
+  function: "function",
+  array: "array",
+  object: "object",
+  date: "date",
+  regexp: "regexp",
+  error: "error",
+};
+
+const KIND_LITERALS = {
   null: "null",
   undefined: "undefined",
   bigint: "BigInt",
   symbol: "Symbol",
-  function: "函数",
-  array: "数组",
-  object: "对象",
-  date: "日期",
-  regexp: "正则",
   map: "Map",
   set: "Set",
   dom: "DOM",
-  error: "读取失败",
 };
 
 const KIND_ICONS = {
@@ -119,7 +125,11 @@ export function isHiddenKind(kind) {
 }
 
 export function getKindText(kind) {
-  return KIND_TEXTS[kind] || kind;
+  if (Object.hasOwnProperty.call(KIND_TEXT_KEYS, kind)) {
+    return t(`objectKind.${KIND_TEXT_KEYS[kind]}`);
+  }
+
+  return KIND_LITERALS[kind] || kind;
 }
 
 export function getKindIcon(kind) {
@@ -192,15 +202,16 @@ export function formatValuePreview(value, kind) {
       case "function":
         return truncate(String(value));
       case "array":
-        return `数组(${countChildren(value)} 项)`;
+        return t("objectKind.arrayItems", { count: countChildren(value) });
       case "object":
-        return `对象(${countChildren(value)} 个属性)`;
+        return t("objectKind.objectProps", { count: countChildren(value) });
       case "map":
+        return t("objectKind.mapItems", { count: value.size });
       case "set":
-        return `${kind}(${value.size} 项)`;
+        return t("objectKind.setItems", { count: value.size });
       case "date":
         return Number.isNaN(value.getTime())
-          ? "Invalid Date"
+          ? t("objectKind.invalidDate")
           : value.toISOString();
       case "regexp":
         return String(value);
@@ -210,7 +221,7 @@ export function formatValuePreview(value, kind) {
         return truncate(String(value));
     }
   } catch (error) {
-    return "（无法读取）";
+    return t("objectKind.unreadable");
   }
 }
 
@@ -234,7 +245,7 @@ function parseLooseValue(text) {
   const trimmed = String(text).trim();
 
   if (trimmed === "") {
-    return { ok: false, message: "值不能为空" };
+    return { ok: false, message: t("objectKind.valueRequired") };
   }
 
   if (trimmed === "null") {
@@ -267,12 +278,12 @@ export function parseValueByKind(text, kind) {
     case "number": {
       const trimmed = String(text).trim();
       if (trimmed === "") {
-        return { ok: false, message: "数字不能为空" };
+        return { ok: false, message: t("objectKind.numberRequired") };
       }
 
       const num = Number(trimmed);
       if (Number.isNaN(num)) {
-        return { ok: false, message: `"${text}" 不是合法数字` };
+        return { ok: false, message: t("objectKind.invalidNumber", { text }) };
       }
 
       return { ok: true, value: num };
@@ -285,7 +296,7 @@ export function parseValueByKind(text, kind) {
       try {
         return { ok: true, value: BigInt(String(text).trim()) };
       } catch (error) {
-        return { ok: false, message: `"${text}" 不是合法 BigInt` };
+        return { ok: false, message: t("objectKind.invalidBigInt", { text }) };
       }
     default:
       return parseLooseValue(text);

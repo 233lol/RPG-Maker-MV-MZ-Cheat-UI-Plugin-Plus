@@ -421,8 +421,9 @@ export const SEARCH_LIMITS = {
   maxTimeMs: SEARCH_DEFAULT_OPTIONS.maxTimeMs,
 };
 
+// 这里是翻译 key，由面板在展示时解析（见 GlobalVariablePanel）
 export const SEARCH_LIMIT_REASONS = {
-  results: "已达到结果数量上限",
-  nodes: "已达到遍历节点数上限",
-  time: "已达到时间上限",
+  results: "globalVariable.limitMaxResults",
+  nodes: "globalVariable.limitMaxNodes",
+  time: "globalVariable.limitMaxTime",
 };

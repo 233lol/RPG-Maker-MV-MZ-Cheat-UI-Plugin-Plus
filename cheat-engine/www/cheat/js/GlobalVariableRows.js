@@ -2,6 +2,7 @@
 /**
  * 全局变量面板的行构建 / 过滤 / 分页辅助（纯函数）。
  */
+import { t } from "./strings.js";
 import {
   createEntry,
   getContainerKeys,
@@ -9,7 +10,10 @@ import {
   isHiddenKind,
 } from "./GlobalObjectHelper.js";
 
-export function buildBreadcrumbItems(path, rootLabel = "全局变量") {
+export function buildBreadcrumbItems(
+  path,
+  rootLabel = t("globalVariable.title"),
+) {
   const items = [{ label: rootLabel, path: [] }];
 
   (path || []).forEach((key, index) => {

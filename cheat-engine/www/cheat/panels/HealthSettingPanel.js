@@ -4,6 +4,7 @@ import { BattleCheat } from "../js/CheatHelper.js";
 import { isPartyReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { markRaw } from "../libs/vue.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "HealthSettingPanel",
@@ -19,7 +20,7 @@ export default {
 <v-card 
     class="ma-0 pa-0"
     flat>
-    <v-card-subtitle class="text-body-small pb-0">战斗</v-card-subtitle>
+    <v-card-subtitle class="text-body-small pb-0">{{ t("battle.title") }}</v-card-subtitle>
     <v-card-text class="pt-0 pb-2">
         <v-checkbox
             v-model="disableRandomEncounter"
@@ -28,34 +29,34 @@ export default {
             class="my-0 py-0"
             @change="onDisableRandomEncounterChange">
             <template #label>
-                <span class="text-body-small">禁用随机遇敌</span>
+                <span class="text-body-small">{{ t("battle.disableRandomEncounter") }}</span>
             </template>
         </v-checkbox>
-        <v-btn size="small" @click.prevent="encounterBattle">遇敌</v-btn>
-        <v-btn size="small" @click.prevent="victory">胜利</v-btn>
-        <v-btn size="small" @click.prevent="defeat">失败</v-btn>
-        <v-btn size="small" @click.prevent="escape">逃跑</v-btn>
-        <v-btn size="small" @click.prevent="abort">中止</v-btn>
+        <v-btn size="small" @click.prevent="encounterBattle">{{ t("battle.encounter") }}</v-btn>
+        <v-btn size="small" @click.prevent="victory">{{ t("battle.victory") }}</v-btn>
+        <v-btn size="small" @click.prevent="defeat">{{ t("battle.defeat") }}</v-btn>
+        <v-btn size="small" @click.prevent="escape">{{ t("battle.escape") }}</v-btn>
+        <v-btn size="small" @click.prevent="abort">{{ t("battle.abort") }}</v-btn>
     </v-card-text>
     
-    <v-card-subtitle class="text-body-small pb-1">敌人</v-card-subtitle>
+    <v-card-subtitle class="text-body-small pb-1">{{ t("battle.enemy") }}</v-card-subtitle>
     <v-card-text class="pt-0 pb-2">
         <v-btn size="small" @click.prevent="changeAllEnemyHealth(0)">HP 0</v-btn>
         <v-btn size="small" @click.prevent="changeAllEnemyHealth(1)">HP 1</v-btn>
-        <v-btn size="small" @click.prevent="recoverAllEnemy">恢复</v-btn>
-        <v-btn size="small" @click.prevent="fillTpAllEnemy">补满 TP</v-btn>
+        <v-btn size="small" @click.prevent="recoverAllEnemy">{{ t("battle.recover") }}</v-btn>
+        <v-btn size="small" @click.prevent="fillTpAllEnemy">{{ t("battle.fillTp") }}</v-btn>
     </v-card-text>
     
-    <v-card-subtitle class="text-body-small pb-1">队伍</v-card-subtitle>
+    <v-card-subtitle class="text-body-small pb-1">{{ t("battle.party") }}</v-card-subtitle>
     <v-card-text class="pt-0 pb-2">
         <v-btn size="small" @click.prevent="changeAllPartyHealth(0)">HP 0</v-btn>
         <v-btn size="small" @click.prevent="changeAllPartyHealth(1)">HP 1</v-btn>
-        <v-btn size="small" @click.prevent="recoverAllParty">恢复</v-btn>
-        <v-btn size="small" @click.prevent="fillTpAllParty">补满 TP</v-btn>
+        <v-btn size="small" @click.prevent="recoverAllParty">{{ t("battle.recover") }}</v-btn>
+        <v-btn size="small" @click.prevent="fillTpAllParty">{{ t("battle.fillTp") }}</v-btn>
     </v-card-text>
     
     <template v-if="enemy && enemy.length > 0">
-        <v-card-subtitle class="text-body-small pb-1">敌人详情</v-card-subtitle>
+        <v-card-subtitle class="text-body-small pb-1">{{ t("battle.enemyDetail") }}</v-card-subtitle>
         <v-card-text class="pt-0 pb-2">
             <health-setting-tab
                 :items="enemy"
@@ -65,7 +66,7 @@ export default {
     </template>
     
     <template v-if="party && party.length > 0">
-        <v-card-subtitle class="text-body-small pb-1">队伍详情</v-card-subtitle>
+        <v-card-subtitle class="text-body-small pb-1">{{ t("battle.partyDetail") }}</v-card-subtitle>
         <v-card-text class="pt-0 pb-2">
             <health-setting-tab
                 :items="party"
@@ -93,6 +94,8 @@ export default {
   },
 
   methods: {
+    t,
+
     initializeVariables() {
       if (!isPartyReady() || typeof $gameTroop === "undefined" || !$gameTroop) {
         this.enemy = [];

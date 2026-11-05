@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  formatDateTime,
+  formatNumber,
   getAvailableLocales,
   getLocale,
   t,
@@ -41,13 +43,30 @@ test("导航文案完整且不重复", () => {
   assert.equal(new Set(names).size, names.length, "导航文案不应重复");
 });
 
+const PLURAL_FORMS = new Set(["zero", "one", "two", "few", "many", "other"]);
+
+function isPluralEntry(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const keys = Object.keys(value);
+
+  return keys.length > 0 && keys.every((key) => PLURAL_FORMS.has(key));
+}
+
 function collectKeys(value, prefix = "") {
   const keys = [];
 
   for (const [key, child] of Object.entries(value)) {
     const path = prefix ? `${prefix}.${key}` : key;
 
-    if (child && typeof child === "object") {
+    if (
+      child &&
+      typeof child === "object" &&
+      !Array.isArray(child) &&
+      !isPluralEntry(child)
+    ) {
       keys.push(...collectKeys(child, path));
     } else {
       keys.push(path);
@@ -80,4 +99,90 @@ test("getLocale / getAvailableLocales：默认语言与支持列表", () => {
 test("LocaleService：没有窗口环境时回退到默认中文", () => {
   assert.equal(detectLocale(), "zh-CN");
   assert.equal(loadSavedLocale(), "zh-CN");
+});
+
+test("t：支持 {count} 复数条目", () => {
+  assert.equal(t("saveBackup.snapshotCount", { count: 1 }), "快照 1 份");
+  assert.equal(t("saveBackup.snapshotCount", { count: 3 }), "快照 3 份");
+  assert.equal(t("time.minutesAgo", { count: 2 }), "2 分钟前");
+  assert.equal(t("common.seconds", { count: 5 }), "5 秒");
+});
+
+test("formatNumber / formatDateTime：按当前语言输出", () => {
+  assert.equal(formatNumber(1234567), "1,234,567");
+  assert.equal(
+    formatDateTime(new Date(2026, 0, 2, 3, 4, 5).getTime()),
+    "2026/01/02 03:04:05",
+  );
+  assert.equal(formatNumber("abc"), "abc");
+  assert.equal(formatDateTime("bad"), "");
+});
+
+test("英文文案不应残留中文标点或汉字", () => {
+  const texts = [];
+
+  const walk = (value, prefix) => {
+    for (const [key, child] of Object.entries(value)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+
+      if (child && typeof child === "object") {
+        walk(child, path);
+        continue;
+      }
+
+      if (typeof child === "string") {
+        texts.push([path, child]);
+      }
+    }
+  };
+
+  walk(en, "");
+
+  for (const [key, text] of texts) {
+    assert.doesNotMatch(text, /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/, key);
+  }
+});
+
+test("所有文案都不为空，且占位符在三种语言里保持一致", () => {
+  const PLURAL_FORMS = new Set(["zero", "one", "two", "few", "many", "other"]);
+
+  const flatten = (value, prefix = "", result = {}) => {
+    for (const [key, child] of Object.entries(value)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      const isPlural =
+        child &&
+        typeof child === "object" &&
+        !Array.isArray(child) &&
+        Object.keys(child).every((form) => PLURAL_FORMS.has(form));
+
+      if (child && typeof child === "object" && !isPlural) {
+        flatten(child, path, result);
+      } else {
+        result[path] = child;
+      }
+    }
+
+    return result;
+  };
+
+  const textOf = (entry) => {
+    if (entry && typeof entry === "object") {
+      return `${entry.one ?? ""} ${entry.other ?? ""}`;
+    }
+
+    return String(entry ?? "");
+  };
+
+  const placeholders = (entry) =>
+    [...new Set(textOf(entry).match(/\{(\w+)\}/g) || [])].sort().join(",");
+
+  const zhTexts = flatten(zhCN);
+  const enTexts = flatten(en);
+  const jaTexts = flatten(ja);
+
+  for (const [key, entry] of Object.entries(zhTexts)) {
+    assert.notEqual(textOf(entry).trim(), "", key);
+    assert.equal(placeholders(enTexts[key]), placeholders(entry), key);
+    assert.equal(placeholders(jaTexts[key]), placeholders(entry), key);
+  }
 });

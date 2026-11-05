@@ -1,3 +1,5 @@
+import { t } from "./strings.js";
+
 export const CHAR_TO_CODE = {
   Backspace: 8,
   Tab: 9,
@@ -175,10 +177,10 @@ export class Key {
           break;
         default:
           if (code !== null) {
-            throw Error("不能组合多个普通按键.");
+            throw Error(t("shortcut.multipleMainKeys"));
           }
           if (!Object.hasOwnProperty.call(CHAR_TO_CODE_LOWERCASE, key)) {
-            throw Error("这是未知的按键 : " + key);
+            throw Error(t("shortcut.unknownKey", { key }));
           }
           code = CHAR_TO_CODE_LOWERCASE[key];
       }
