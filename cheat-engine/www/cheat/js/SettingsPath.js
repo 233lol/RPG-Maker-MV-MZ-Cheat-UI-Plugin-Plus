@@ -26,15 +26,53 @@ export function isMZEngine() {
   }
 }
 
+// 游戏根目录。不能依赖 process.cwd()：Windows 快捷方式的「起始位置」、
+// Steam / 第三方启动器或插件里的 chdir 都可能把 cwd 指到别处，
+// 导致设置写到游戏目录之外，迁移也找不到旧数据。
+export function getAppRoot() {
+  try {
+    if (
+      typeof nw !== "undefined" &&
+      nw &&
+      nw.App &&
+      typeof nw.App.startPath === "string" &&
+      nw.App.startPath.length > 0
+    ) {
+      return nw.App.startPath.replace(/[\\/]+$/, "");
+    }
+  } catch (error) {
+    // 继续用 cwd 兜底
+  }
+
+  try {
+    if (typeof process !== "undefined" && typeof process.cwd === "function") {
+      const cwd = process.cwd();
+
+      if (typeof cwd === "string" && cwd.length > 0) {
+        return cwd;
+      }
+    }
+  } catch (error) {
+    // 浏览器 / 沙箱环境
+  }
+
+  return ".";
+}
+
 export function getCheatSettingsDir() {
-  return isMZEngine() ? "./cheat-settings" : "./www/cheat-settings";
+  const sub = isMZEngine() ? "cheat-settings" : "www/cheat-settings";
+  const root = getAppRoot();
+
+  return root === "." || root === "" ? `./${sub}` : `${root}/${sub}`;
 }
 
 export function getCheatSettingsPath(name) {
   return `${getCheatSettingsDir()}/${String(name)}`;
 }
 
-function copyDirectory(source, target) {
+// 只复制目标目录里不存在的条目，用于「迁移中断后下次继续补」。
+// 已存在的新设置不会被旧目录覆盖。
+function copyDirectoryMissing(source, target) {
   const fs = require("fs");
   const path = require("path");
 
@@ -45,8 +83,8 @@ function copyDirectory(source, target) {
     const to = path.join(target, entry.name);
 
     if (entry.isDirectory()) {
-      copyDirectory(from, to);
-    } else {
+      copyDirectoryMissing(from, to);
+    } else if (!fs.existsSync(to)) {
       fs.copyFileSync(from, to);
     }
   }
@@ -66,23 +104,38 @@ export function migrateLegacySettings() {
 
     const fs = require("fs");
     const path = require("path");
-    const root = process.cwd();
+    const root = getAppRoot();
     const legacyDir = path.join(root, "www", "cheat-settings");
     const nextDir = path.join(root, "cheat-settings");
 
-    if (!fs.existsSync(legacyDir) || fs.existsSync(nextDir)) {
+    if (!fs.existsSync(legacyDir)) {
       return false;
     }
 
-    fs.mkdirSync(path.dirname(nextDir), { recursive: true });
+    if (fs.existsSync(nextDir)) {
+      if (!fs.statSync(nextDir).isDirectory()) {
+        console.warn(
+          "[cheat plugin] cheat-settings 已存在但不是目录，跳过旧设置迁移",
+        );
+        return false;
+      }
 
-    try {
-      fs.renameSync(legacyDir, nextDir);
-    } catch (renameError) {
-      // 跨盘 / 权限问题：退化成复制后删除
-      copyDirectory(legacyDir, nextDir);
-      fs.rmSync(legacyDir, { recursive: true, force: true });
+      // 新目录已存在（可能是上次迁移中断留下的半成品）：
+      // 只补缺失文件，既不丢旧数据，也不覆盖用户已经使用的新设置。
+      copyDirectoryMissing(legacyDir, nextDir);
+    } else {
+      fs.mkdirSync(path.dirname(nextDir), { recursive: true });
+
+      try {
+        fs.renameSync(legacyDir, nextDir);
+      } catch (renameError) {
+        // 跨盘 / 权限问题：退化成复制后删除
+        copyDirectoryMissing(legacyDir, nextDir);
+      }
     }
+
+    // 复制成功后才删除旧目录；中途失败时旧目录保留，下次启动继续补。
+    fs.rmSync(legacyDir, { recursive: true, force: true });
 
     // 迁移后如果 www/ 里已经没有别的东西，顺手删掉空目录。
     try {

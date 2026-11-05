@@ -16,23 +16,25 @@ function restoreGlobals() {
 test("SettingsPath：优先使用 Utils.RPGMAKER_NAME 判断引擎", async () => {
   restoreGlobals();
 
+  const root = process.cwd();
+
   try {
     globalThis.Utils = { RPGMAKER_NAME: "MZ" };
     let mod = await loadModule("mz");
     assert.equal(mod.isMZEngine(), true);
-    assert.equal(mod.getCheatSettingsDir(), "./cheat-settings");
+    assert.equal(mod.getCheatSettingsDir(), `${root}/cheat-settings`);
     assert.equal(
       mod.getCheatSettingsPath("shortcuts.json"),
-      "./cheat-settings/shortcuts.json",
+      `${root}/cheat-settings/shortcuts.json`,
     );
 
     globalThis.Utils = { RPGMAKER_NAME: "MV" };
     mod = await loadModule("mv");
     assert.equal(mod.isMZEngine(), false);
-    assert.equal(mod.getCheatSettingsDir(), "./www/cheat-settings");
+    assert.equal(mod.getCheatSettingsDir(), `${root}/www/cheat-settings`);
     assert.equal(
       mod.getCheatSettingsPath("shortcuts.json"),
-      "./www/cheat-settings/shortcuts.json",
+      `${root}/www/cheat-settings/shortcuts.json`,
     );
   } finally {
     restoreGlobals();
@@ -57,7 +59,10 @@ test("SettingsPath：没有任何引擎标记时按 MV 处理", async () => {
   try {
     const mod = await loadModule("no-engine");
     assert.equal(mod.isMZEngine(), false);
-    assert.equal(mod.getCheatSettingsDir(), "./www/cheat-settings");
+    assert.equal(
+      mod.getCheatSettingsDir(),
+      `${process.cwd()}/www/cheat-settings`,
+    );
   } finally {
     restoreGlobals();
   }
