@@ -1,4 +1,9 @@
 import { t } from "./js/strings.js";
+import {
+  clampGeometry as clampWindowGeometry,
+  getDefaultGeometry,
+} from "./js/CheatWindowGeometry.js";
+import { panelStateMixin } from "./js/PanelState.js";
 import GeneralPanel from "./panels/GeneralPanel.js";
 import HealthSettingPanel from "./panels/HealthSettingPanel.js";
 import StatsSettingPanel from "./panels/StatsSettingPanel.js";
@@ -37,13 +42,26 @@ export default {
   },
 
   template: `
-<v-card 
-    class="z-index-cheat-0"
-    width="80vw"
-    height="90vh"
-    style="max-width: 775px; max-height: 550px;">
+<v-card
+    ref="cardRoot"
+    class="z-index-cheat-0 cheat-window d-flex flex-column"
+    tabindex="-1"
+    :style="cardStyle">
+    <div class="cheat-window-drag" @pointerdown="startDrag">
+        <v-icon size="small" class="mr-1">mdi-drag</v-icon>
+        <span class="text-body-small text-grey-lighten-1">{{ t("common.cheatWindow") }}</span>
+        <v-spacer></v-spacer>
+        <v-btn
+            icon
+            size="x-small"
+            variant="text"
+            :title="t('common.close')"
+            @click="$emit('close')">
+            <v-icon size="small">mdi-close</v-icon>
+        </v-btn>
+    </div>
     <div 
-        class="d-flex fill-height ma-0 pa-0">
+        class="d-flex flex-grow-1 ma-0 pa-0 cheat-window-content">
         <div
             :style="'width: ' + navWidth + 'px;'"
             class="fill-height d-inline pa-1 overflow-y-auto hide-scrollbar">
@@ -93,7 +111,9 @@ export default {
 </v-card>
     `,
 
-  emits: ["update:modelValue"],
+  emits: ["update:modelValue", "close"],
+
+  mixins: [panelStateMixin],
 
   props: {
     modelValue: {
@@ -103,6 +123,7 @@ export default {
 
   data() {
     return {
+      geometry: getDefaultGeometry(),
       navWidth: 160,
       openedGroups: [t("nav.items")],
 
@@ -193,6 +214,19 @@ export default {
   },
 
   computed: {
+    panelStateId() {
+      return "cheat-window";
+    },
+
+    cardStyle() {
+      return {
+        left: `${this.geometry.x}px`,
+        top: `${this.geometry.y}px`,
+        width: `${this.geometry.width}px`,
+        height: `${this.geometry.height}px`,
+      };
+    },
+
     componentNameToNavItem() {
       const ret = {};
       this.iterateLeaf(this.navTreeItems, (item) => {
@@ -209,9 +243,187 @@ export default {
       navItem = Object.values(this.componentNameToNavItem)[0];
       this.$emit("update:modelValue", navItem.component);
     }
+
+    this.setupResizeObserver();
+    window.addEventListener("resize", this.onViewportResize);
+    this.focusModal();
+  },
+
+  beforeUnmount() {
+    this.stopDrag();
+
+    if (this.__resizeObserver) {
+      this.__resizeObserver.disconnect();
+      this.__resizeObserver = null;
+    }
+
+    window.removeEventListener("resize", this.onViewportResize);
   },
 
   methods: {
+    getRootElement() {
+      const root = this.$refs.cardRoot;
+      return root && (root.$el || root);
+    },
+
+    focusModal() {
+      const root = this.getRootElement();
+
+      if (root && typeof root.focus === "function") {
+        root.focus({ preventScroll: true });
+      }
+    },
+
+    trapFocus(event) {
+      const root = this.getRootElement();
+
+      if (!root) {
+        return;
+      }
+
+      const selector = [
+        "a[href]",
+        "button:not([disabled])",
+        "input:not([disabled])",
+        "select:not([disabled])",
+        "textarea:not([disabled])",
+        "[tabindex]:not([tabindex='-1'])",
+      ].join(",");
+
+      const focusables = [...root.querySelectorAll(selector)].filter(
+        (element) =>
+          element.offsetParent !== null || element === document.activeElement,
+      );
+
+      if (focusables.length === 0) {
+        event.preventDefault();
+        this.focusModal();
+        return;
+      }
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+
+      if (!root.contains(active)) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+        return;
+      }
+
+      if (active === root) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus({ preventScroll: true });
+        return;
+      }
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus({ preventScroll: true });
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      }
+    },
+
+    clampGeometry(geometry = this.geometry) {
+      return clampWindowGeometry(geometry);
+    },
+
+    updateGeometry(patch) {
+      const next = this.clampGeometry({ ...this.geometry, ...patch });
+
+      if (
+        next.x !== this.geometry.x ||
+        next.y !== this.geometry.y ||
+        next.width !== this.geometry.width ||
+        next.height !== this.geometry.height
+      ) {
+        this.geometry = next;
+      }
+    },
+
+    onViewportResize() {
+      this.updateGeometry(this.geometry);
+    },
+
+    setupResizeObserver() {
+      if (typeof ResizeObserver === "undefined") {
+        return;
+      }
+
+      const root = this.getRootElement();
+
+      if (!root) {
+        return;
+      }
+
+      this.__resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+
+        if (!entry) {
+          return;
+        }
+
+        const rect = entry.target.getBoundingClientRect();
+
+        if (rect.width > 0 && rect.height > 0) {
+          this.updateGeometry({
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          });
+        }
+      });
+
+      this.__resizeObserver.observe(root);
+    },
+
+    startDrag(event) {
+      // 拖动条上的关闭按钮不能触发拖动
+      if (event.button !== 0 || event.target.closest("button")) {
+        return;
+      }
+
+      event.preventDefault();
+
+      this.__dragState = {
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: this.geometry.x,
+        originY: this.geometry.y,
+      };
+
+      window.addEventListener("pointermove", this.onDragMove);
+      window.addEventListener("pointerup", this.stopDrag, { once: true });
+    },
+
+    onDragMove(event) {
+      if (!this.__dragState) {
+        return;
+      }
+
+      this.updateGeometry({
+        x: this.__dragState.originX + (event.clientX - this.__dragState.startX),
+        y: this.__dragState.originY + (event.clientY - this.__dragState.startY),
+      });
+    },
+
+    stopDrag() {
+      this.__dragState = null;
+      window.removeEventListener("pointermove", this.onDragMove);
+      window.removeEventListener("pointerup", this.stopDrag);
+    },
+
+    getPanelStateSnapshot() {
+      return { geometry: this.geometry };
+    },
+
+    applyPanelState(state) {
+      if (state.geometry) {
+        this.geometry = this.clampGeometry(state.geometry);
+      }
+    },
+
     onNavItemClick(item) {
       this.$emit("update:modelValue", item.component);
     },

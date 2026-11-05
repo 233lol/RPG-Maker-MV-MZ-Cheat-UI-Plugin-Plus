@@ -205,6 +205,9 @@ export const panelStateMixin = {
       this.__panelStateUnwatch();
       this.__panelStateUnwatch = null;
     }
+
+    // 切换面板 / 关闭窗口时立即落盘，不等 300ms 防抖
+    flushPanelState();
   },
 
   methods: {

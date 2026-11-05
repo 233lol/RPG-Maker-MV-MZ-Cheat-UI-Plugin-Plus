@@ -6,6 +6,8 @@ export default {
     all: "全部",
     reloadGameData: "重新加载游戏数据",
     reloadSaveData: "重新加载存档数据",
+    cheatWindow: "作弊窗口",
+    close: "关闭",
     reloadTarget: "重新加载{target}",
   },
 
