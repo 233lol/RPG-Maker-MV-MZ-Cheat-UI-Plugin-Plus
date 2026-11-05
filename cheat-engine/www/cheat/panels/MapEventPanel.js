@@ -563,6 +563,16 @@ export default {
         }
       }
 
+      // 记录本次实际绘制所用的视口。点击传送必须按「画布当前的视口」
+      // 换算，而不是点击那一刻的 playerPosition（角色可能已经移动、
+      // 但画布还没重绘）。
+      this.renderedView = {
+        limitedView: this.limitedView,
+        startX: startX,
+        startY: startY,
+        cellSize: this.cellSize,
+      };
+
       this.drawMapGrid(ctx, startX, startY, endX, endY);
 
       this.drawMapEvents(ctx, startX, startY);
@@ -908,46 +918,50 @@ export default {
       const clickX = event.clientX - rect.left;
       const clickY = event.clientY - rect.top;
 
-      // Calculate which grid cell was clicked
-      const cellX = Math.floor(clickX / this.cellSize);
-      const cellY = Math.floor(clickY / this.cellSize);
+      // 优先使用画布最近一次绘制时的视口。角色移动后、下一次
+      // readInterval 重绘之前，点击位置必须按旧视口换算才和眼睛看到的一致。
+      const view =
+        this.renderedView && this.renderedView.limitedView === this.limitedView
+          ? this.renderedView
+          : null;
+      const cellSize = view ? view.cellSize : this.cellSize;
 
-      // Calculate actual map coordinates based on current view
-      let mapX, mapY;
+      // Calculate which grid cell was clicked
+      const cellX = Math.floor(clickX / cellSize);
+      const cellY = Math.floor(clickY / cellSize);
+
+      let startX = 0;
+      let startY = 0;
 
       if (this.limitedView) {
-        // For limited view, calculate offset from player position
-        const startX = Math.max(
-          0,
-          this.playerPosition.x - Math.floor(this.maxViewSize / 2),
-        );
-        const startY = Math.max(
-          0,
-          this.playerPosition.y - Math.floor(this.maxViewSize / 2),
-        );
-
-        // Adjust start positions if we hit map boundaries
-        const endX = Math.min(this.mapData.width, startX + this.maxViewSize);
-        const endY = Math.min(this.mapData.height, startY + this.maxViewSize);
-
-        if (endX - startX < this.maxViewSize) {
-          const adjustedStartX = Math.max(0, endX - this.maxViewSize);
-          mapX = adjustedStartX + cellX;
+        if (view) {
+          startX = view.startX;
+          startY = view.startY;
         } else {
-          mapX = startX + cellX;
-        }
+          // 还没有渲染记录时退回按当前角色位置计算
+          startX = Math.max(
+            0,
+            this.playerPosition.x - Math.floor(this.maxViewSize / 2),
+          );
+          startY = Math.max(
+            0,
+            this.playerPosition.y - Math.floor(this.maxViewSize / 2),
+          );
 
-        if (endY - startY < this.maxViewSize) {
-          const adjustedStartY = Math.max(0, endY - this.maxViewSize);
-          mapY = adjustedStartY + cellY;
-        } else {
-          mapY = startY + cellY;
+          const endX = Math.min(this.mapData.width, startX + this.maxViewSize);
+          const endY = Math.min(this.mapData.height, startY + this.maxViewSize);
+
+          if (endX - startX < this.maxViewSize) {
+            startX = Math.max(0, endX - this.maxViewSize);
+          }
+          if (endY - startY < this.maxViewSize) {
+            startY = Math.max(0, endY - this.maxViewSize);
+          }
         }
-      } else {
-        // For full view, direct mapping
-        mapX = cellX;
-        mapY = cellY;
       }
+
+      const mapX = startX + cellX;
+      const mapY = startY + cellY;
 
       // Validate coordinates are within map bounds
       if (
