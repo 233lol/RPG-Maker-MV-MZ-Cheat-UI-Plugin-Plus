@@ -45,6 +45,37 @@ test("GameState：全部核心对象存在时才算就绪", () => {
   clearGlobals();
 });
 
+test("GameState：标题 / 启动画面不算游戏就绪", () => {
+  clearGlobals();
+
+  class Scene_Title {}
+  class Scene_Boot {}
+  class Scene_Map {}
+
+  globalThis.Scene_Title = Scene_Title;
+  globalThis.Scene_Boot = Scene_Boot;
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = {};
+  globalThis.$gameMap = {};
+  globalThis.$gameSystem = {};
+
+  try {
+    globalThis.SceneManager = { _scene: new Scene_Title() };
+    assert.equal(isGameReady(), false);
+
+    globalThis.SceneManager = { _scene: new Scene_Boot() };
+    assert.equal(isGameReady(), false);
+
+    globalThis.SceneManager = { _scene: new Scene_Map() };
+    assert.equal(isGameReady(), true);
+  } finally {
+    delete globalThis.SceneManager;
+    delete globalThis.Scene_Title;
+    delete globalThis.Scene_Boot;
+    clearGlobals();
+  }
+});
+
 test("GameState：开关 / 变量独立判断", () => {
   clearGlobals();
 

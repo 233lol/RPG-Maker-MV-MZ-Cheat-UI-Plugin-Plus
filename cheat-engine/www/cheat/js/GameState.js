@@ -46,7 +46,36 @@ export function getGameVariables() {
   return readGlobal("$gameVariables") || null;
 }
 
+// 从游戏内返回标题后，MV/MZ 不会销毁 $gamePlayer / $gameParty 等旧实例。
+// 只检查四个全局对象会把标题画面误判为「游戏已就绪」，导致快速存档
+// 把上一局的旧数据写进磁盘。
+function isTitleOrBootScene() {
+  try {
+    if (typeof SceneManager === "undefined" || !SceneManager._scene) {
+      return false;
+    }
+
+    const scene = SceneManager._scene;
+
+    if (typeof Scene_Title !== "undefined" && scene instanceof Scene_Title) {
+      return true;
+    }
+
+    if (typeof Scene_Boot !== "undefined" && scene instanceof Scene_Boot) {
+      return true;
+    }
+  } catch (error) {
+    return false;
+  }
+
+  return false;
+}
+
 export function isGameReady() {
+  if (isTitleOrBootScene()) {
+    return false;
+  }
+
   return !!(
     getGamePlayer() &&
     getGameParty() &&
