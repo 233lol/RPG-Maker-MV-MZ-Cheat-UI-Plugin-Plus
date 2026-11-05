@@ -559,27 +559,16 @@ export class SaveBackupCheat {
         continue;
       }
 
-      // 只有「快照之后这个槽位被重新存过档」时，当前存档里的地图才代表快照里的地图。
-      // 否则（快照比存档新）说明快照拍的进度比磁盘上那份更靠后，回填会写错。
-      const savePath = this.getSaveFilePath(slot);
-      if (
-        !savePath ||
-        !fs.existsSync(savePath) ||
-        !fs.existsSync(payloadFile)
-      ) {
+      // 下面读的是快照自己的载荷，和当前槽位是否有存档 / 存档时间无关。
+      // 旧实现要求槽位存档存在且 mtime 比快照新，导致「存档被删、只剩快照」
+      // 这种最需要回填元数据的情况永远补不上。
+      if (!fs.existsSync(payloadFile)) {
         continue;
       }
 
       let changed = false;
 
       try {
-        const saveMtime = fs.statSync(savePath).mtimeMs;
-        const snapshotTime = Number(entry.createdAt) || 0;
-
-        if (!(saveMtime >= snapshotTime - 2000)) {
-          continue;
-        }
-
         const jsonText = this.readPayload(entry);
         const saveObject = this.parseAnySaveData(jsonText);
 
