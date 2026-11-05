@@ -26,6 +26,8 @@ export default {
 </span>
   `,
 
+  emits: ["jump"],
+
   props: {
     page: { type: Number, required: true },
     pageCount: { type: Number, required: true },
