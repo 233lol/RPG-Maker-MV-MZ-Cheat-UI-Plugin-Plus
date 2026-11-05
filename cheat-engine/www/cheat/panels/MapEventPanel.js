@@ -585,8 +585,9 @@ export default {
     },
 
     isTooLargeToDrawWalkableBoundaries(width, height) {
-      // Limit to 50 tiles for performance reasons
-      return width > 50 && height > 50;
+      // 每个格子最多 4 次 canPass，按「总格数」限制而不是要求宽高同时超限：
+      // 100x20 这类单边很长的地图旧判断仍会跑边界计算。
+      return width * height > 2500;
     },
 
     drawMapGrid(ctx, startX, startY, endX, endY) {
