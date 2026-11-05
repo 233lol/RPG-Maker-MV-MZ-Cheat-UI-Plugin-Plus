@@ -36,6 +36,15 @@ Click "OK" button to see the solution.
 }
 
 function applyCheat() {
+  // 插件 / 启动器 / 热重载可能再次加载本文件。重复执行会创建第二个
+  // #app、第二套 Vue 实例和 window 监听，必须在入口处拦截。
+  if (window.__CHEAT_APPLIED__) {
+    console.warn("[cheat plugin] 作弊模块已经初始化，跳过重复加载");
+    return;
+  }
+
+  window.__CHEAT_APPLIED__ = true;
+
   function __addScript(type, src) {
     const cheatScript = document.createElement("script");
     cheatScript.type = type;
