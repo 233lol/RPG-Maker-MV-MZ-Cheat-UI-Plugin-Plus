@@ -278,9 +278,10 @@ export class GameSpeedCheat {
 
   static removeApplied() {
     if (this.isApplied) {
+      // 只还原真正被替换过的 SceneManager.updateScene。
+      // Scene_Map / Spriteset_Base 本来就没改，旧代码会把备份重新赋回去，
+      // 反而覆盖其它插件在这之后打的补丁。
       SceneManager.updateScene = this.origin_SceneManager_updateScene;
-      Scene_Map.prototype.update = this.origin_Scene_Map_update;
-      Spriteset_Base.prototype.update = this.origin_Spriteset_Base_update;
       this.isApplied = false;
     }
   }
@@ -301,14 +302,6 @@ export class GameSpeedCheat {
     // backup original functions
     if (!this.origin_SceneManager_updateScene) {
       this.origin_SceneManager_updateScene = SceneManager.updateScene;
-    }
-
-    if (!this.origin_Scene_Map_update) {
-      this.origin_Scene_Map_update = Scene_Map.prototype.update;
-    }
-
-    if (!this.origin_Spriteset_Base_update) {
-      this.origin_Spriteset_Base_update = Spriteset_Base.prototype.update;
     }
 
     this.rate = rate;
