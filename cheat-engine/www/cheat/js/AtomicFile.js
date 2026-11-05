@@ -23,12 +23,25 @@ function syncDirectory(fs, dir) {
   }
 }
 
+// 每个目录最多每小时扫描一次，避免 save-backups 里文件很多时
+// 每次写索引都 readdir 一遍。
+const lastCleanupByDir = new Map();
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+
 // 清理进程崩溃后遗留的旧临时文件（只删一天前的同名 *.tmp，
 // 不碰其它进程正在写入的新临时文件）。
 function cleanupStaleTempFiles(fs, path, filePath) {
   const dir = path.dirname(filePath);
+  const now = Date.now();
+
+  if ((lastCleanupByDir.get(dir) || 0) > now - CLEANUP_INTERVAL_MS) {
+    return;
+  }
+
+  lastCleanupByDir.set(dir, now);
+
   const prefix = `${path.basename(filePath)}.`;
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const cutoff = now - 24 * 60 * 60 * 1000;
   let names;
 
   try {
