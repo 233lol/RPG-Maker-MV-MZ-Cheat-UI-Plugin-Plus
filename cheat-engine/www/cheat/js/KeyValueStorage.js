@@ -16,12 +16,20 @@ function isNwjs() {
 
 export class KeyValueStorage {
   constructor(filePath) {
+    this.filePath = filePath;
+
     if (isNwjs()) {
-      this.filePath = filePath;
       this.fileEncoding = "utf-8";
       this.fileSystem = require("fs");
       this.pathModule = require("path");
     }
+  }
+
+  // 浏览器模式下没有文件路径可用，必须把文件名拼进 localStorage key。
+  // 否则 switch-locks.json / variable-locks.json / gameSpeed.json 等
+  // 所有实例都读写同一个 "data"，会互相覆盖。
+  __browserStorageKey(key) {
+    return `${this.filePath || "cheat"}:${key}`;
   }
 
   getItem(key) {
@@ -33,7 +41,16 @@ export class KeyValueStorage {
         return null;
       }
 
-      return localStorage.getItem(key);
+      const storageKey = this.__browserStorageKey(key);
+      const value = localStorage.getItem(storageKey);
+
+      if (value === null && localStorage.getItem(key) !== null) {
+        console.warn(
+          `[cheat plugin] 忽略旧版未按文件隔离的 localStorage 数据: ${key}`,
+        );
+      }
+
+      return value;
     }
 
     return this.__getItemFromFile(key);
@@ -45,7 +62,7 @@ export class KeyValueStorage {
         typeof window !== "undefined" &&
         typeof localStorage !== "undefined"
       ) {
-        localStorage.setItem(key, value);
+        localStorage.setItem(this.__browserStorageKey(key), value);
       }
       return;
     }
