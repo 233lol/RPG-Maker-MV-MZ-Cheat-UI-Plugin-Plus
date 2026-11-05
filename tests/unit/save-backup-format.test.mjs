@@ -62,6 +62,27 @@ test("getSaveTimeText：优先存档头文本，再回退格式化时间", () =>
   assert.equal(SaveBackupCheat.getSaveTimeText(null), "");
 });
 
+test("validateSaveText：拒绝缺失或为空的核心字段", () => {
+  assert.throws(
+    () => SaveBackupCheat.validateSaveText('{"system":null,"party":{}}'),
+    /system/,
+  );
+  assert.throws(
+    () => SaveBackupCheat.validateSaveText('{"system":{},"party":null}'),
+    /party/,
+  );
+  assert.throws(
+    () => SaveBackupCheat.validateSaveText('{"system":{}}'),
+    /party/,
+  );
+
+  assert.doesNotThrow(() =>
+    SaveBackupCheat.validateSaveText(
+      JSON.stringify({ system: {}, party: {}, actors: [] }),
+    ),
+  );
+});
+
 test("isValidSnapshotId / assertSnapshotId：阻止路径穿越", () => {
   for (const id of ["auto-s1-abc", "manual-s2-x_y.z", "a"]) {
     assert.equal(SaveBackupCheat.isValidSnapshotId(id), true, id);

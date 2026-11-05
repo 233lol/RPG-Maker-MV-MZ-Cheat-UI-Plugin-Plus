@@ -172,21 +172,30 @@ export class SaveBackupMetadata {
       throw new Error(`${label}不是有效的存档 JSON`);
     }
 
-    const knownKeys = [
-      "system",
-      "party",
-      "actors",
-      "switches",
-      "variables",
-      "player",
-      "map",
-    ];
+    // system / party 是引擎读档的必需对象。只看 key 是否存在会让
+    // {"system":null} 通过，还原后 extractSaveContents 直接把 $gameSystem
+    // 置空，读档必崩。
+    for (const key of ["system", "party"]) {
+      if (!Object.prototype.hasOwnProperty.call(data, key)) {
+        throw new Error(`${label}缺少 ${key} 字段`);
+      }
+
+      const value = data[key];
+
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new Error(`${label}的 ${key} 字段为空或格式错误`);
+      }
+    }
+
+    const knownKeys = ["actors", "switches", "variables", "player", "map"];
     const hasSaveShape = knownKeys.some((key) =>
       Object.prototype.hasOwnProperty.call(data, key),
     );
 
     if (!hasSaveShape) {
-      throw new Error(`${label}缺少存档结构（system / party / actors 等）`);
+      throw new Error(
+        `${label}缺少存档结构（actors / switches / variables 等）`,
+      );
     }
 
     return data;
