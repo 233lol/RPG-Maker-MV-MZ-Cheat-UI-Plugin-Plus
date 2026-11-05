@@ -11,6 +11,7 @@ export class SaveBackupStore {
   static readIndex() {
     const fs = this.requireFs();
     let data = [];
+    let indexBroken = false;
 
     try {
       if (fs.existsSync(getIndexFile())) {
@@ -18,16 +19,39 @@ export class SaveBackupStore {
         if (Array.isArray(parsed)) {
           data = parsed;
         } else {
-          console.warn("[cheat plugin] 快照索引结构异常，已忽略");
+          console.warn("[cheat plugin] 快照索引结构异常，尝试从元数据重建");
+          indexBroken = true;
         }
+      } else {
+        // 索引被误删时也从元数据恢复；目录不存在时重建会直接返回空数组。
+        indexBroken = true;
       }
     } catch (error) {
-      // 索引损坏不能连累存档本身：退化成空索引，原始快照文件仍在磁盘上
-      console.warn("[cheat plugin] 读取快照索引失败，按空索引处理", error);
-      data = [];
+      // 索引损坏不能连累存档本身：先尝试从每个快照的 <id>.json 重建，
+      // 否则下一次写入会用空索引把磁盘上所有快照「甩出」列表。
+      console.warn("[cheat plugin] 读取快照索引失败，尝试重建", error);
+      indexBroken = true;
     }
 
-    return data.filter(
+    if (indexBroken) {
+      const rebuilt = this.rebuildIndexFromMetas();
+
+      if (rebuilt.length > 0) {
+        console.warn(
+          `[cheat plugin] 已从 ${rebuilt.length} 份快照元数据重建索引`,
+        );
+
+        try {
+          this.writeIndex(rebuilt);
+        } catch (error) {
+          console.warn("[cheat plugin] 写回重建后的索引失败", error);
+        }
+      }
+
+      return rebuilt;
+    }
+
+    const valid = data.filter(
       (item) =>
         item &&
         typeof item === "object" &&
@@ -35,6 +59,81 @@ export class SaveBackupStore {
         Number.isInteger(item.slot) &&
         item.slot >= 1,
     );
+
+    if (valid.length !== data.length) {
+      // 只丢弃坏条目不值得整份重建，但可以从 meta 里把能恢复的补回来，
+      // 避免下一次 writeIndex 把它们永久删掉。
+      const known = new Set(valid.map((item) => item.id));
+
+      for (const meta of this.rebuildIndexFromMetas()) {
+        if (!known.has(meta.id)) {
+          valid.push(meta);
+          known.add(meta.id);
+        }
+      }
+    }
+
+    return valid;
+  }
+
+  // 从 <id>.json 元数据重建索引。读取时不反向调用 readMeta/readIndex，
+  // 避免递归；损坏的元数据直接跳过。
+  static rebuildIndexFromMetas() {
+    const fs = this.requireFs();
+    const path = require("path");
+    const dir = getBackupDir();
+
+    if (!fs.existsSync(dir)) {
+      return [];
+    }
+
+    let names;
+
+    try {
+      names = fs.readdirSync(dir);
+    } catch (error) {
+      console.warn("[cheat plugin] 扫描快照目录失败", error);
+      return [];
+    }
+
+    const indexName = path.basename(getIndexFile());
+    const entries = [];
+    const seen = new Set();
+
+    for (const name of names) {
+      if (!name.endsWith(".json") || name === indexName) {
+        continue;
+      }
+
+      const id = name.slice(0, -".json".length);
+
+      if (!this.isValidSnapshotId(id) || seen.has(id)) {
+        continue;
+      }
+
+      let meta;
+
+      try {
+        meta = JSON.parse(fs.readFileSync(path.join(dir, name), "utf-8"));
+      } catch (error) {
+        continue;
+      }
+
+      if (!meta || typeof meta !== "object" || meta.id !== id) {
+        continue;
+      }
+
+      const slot = Number(meta.slot);
+
+      if (!Number.isInteger(slot) || slot < 1) {
+        continue;
+      }
+
+      seen.add(id);
+      entries.push({ ...meta, id: id, slot: slot });
+    }
+
+    return entries;
   }
 
   // 快照 ID 会直接拼进文件路径，必须挡住 ../、绝对路径、盘符等写法。
