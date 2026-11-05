@@ -17,6 +17,16 @@ function cloneValue(value) {
     return value;
   }
 
+  // JSON 深拷贝会把 Date 变成字符串、Map/Set 变成 {}、undefined/NaN 丢失，
+  // 锁定值一旦被改写就会把游戏变量改坏。优先用 structuredClone 保留类型。
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(value);
+    } catch (error) {
+      // 含函数 / DOM / 原生对象时无法克隆，退回 JSON
+    }
+  }
+
   try {
     return JSON.parse(JSON.stringify(value));
   } catch (error) {
@@ -25,7 +35,7 @@ function cloneValue(value) {
 }
 
 function valuesEqual(a, b) {
-  if (a === b) {
+  if (Object.is(a, b)) {
     return true;
   }
 
@@ -38,11 +48,75 @@ function valuesEqual(a, b) {
     return false;
   }
 
-  try {
-    return JSON.stringify(a) === JSON.stringify(b);
-  } catch (error) {
+  if (a instanceof Date || b instanceof Date) {
+    return (
+      a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
+    );
+  }
+
+  if (a instanceof Map || b instanceof Map) {
+    if (!(a instanceof Map) || !(b instanceof Map) || a.size !== b.size) {
+      return false;
+    }
+
+    for (const [key, value] of a) {
+      if (!b.has(key) || !valuesEqual(value, b.get(key))) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  if (a instanceof Set || b instanceof Set) {
+    if (!(a instanceof Set) || !(b instanceof Set) || a.size !== b.size) {
+      return false;
+    }
+
+    for (const value of a) {
+      if (!b.has(value)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  if (Array.isArray(a) !== Array.isArray(b)) {
     return false;
   }
+
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) {
+      return false;
+    }
+
+    for (let i = 0; i < a.length; i++) {
+      if (!valuesEqual(a[i], b[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  for (const key of aKeys) {
+    if (
+      !Object.prototype.hasOwnProperty.call(b, key) ||
+      !valuesEqual(a[key], b[key])
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function sanitizeLocks(raw) {
