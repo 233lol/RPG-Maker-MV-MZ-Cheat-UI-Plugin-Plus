@@ -20,8 +20,9 @@ body::-webkit-scrollbar {
   position: fixed !important;
   overflow: hidden;
   resize: both;
-  min-width: 320px;
-  min-height: 240px;
+  /* 视口小于最小窗口时允许继续收缩，避免窗口被顶出屏幕 */
+  min-width: min(320px, 100vw);
+  min-height: min(240px, 100vh);
   max-width: calc(100vw - 8px);
   max-height: calc(100vh - 8px);
 }

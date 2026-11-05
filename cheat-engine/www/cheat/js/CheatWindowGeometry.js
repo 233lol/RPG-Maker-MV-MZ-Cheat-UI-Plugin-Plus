@@ -28,8 +28,10 @@ export function getViewportSize() {
  * @param {{ width: number, height: number }} [viewport]
  */
 export function getDefaultGeometry(viewport = getViewportSize()) {
-  const maxWidth = Math.max(320, viewport.width - 16);
-  const maxHeight = Math.max(240, viewport.height - 16);
+  // 视口可能比最小窗口还小（分屏 / 远程桌面）。上限不能再钳到 320，
+  // 否则窗口会超出视口；CSS 的 min() 也做了同样处理。
+  const maxWidth = Math.max(1, viewport.width - 16);
+  const maxHeight = Math.max(1, viewport.height - 16);
   const width = clampNumber(
     Math.round(viewport.width * 0.8),
     Math.min(MIN_WINDOW_WIDTH, maxWidth),
@@ -56,8 +58,8 @@ export function getDefaultGeometry(viewport = getViewportSize()) {
  * @param {{ width: number, height: number }} [viewport]
  */
 export function clampGeometry(geometry, viewport = getViewportSize()) {
-  const maxWidth = Math.max(320, viewport.width - 8);
-  const maxHeight = Math.max(240, viewport.height - 8);
+  const maxWidth = Math.max(1, viewport.width - 8);
+  const maxHeight = Math.max(1, viewport.height - 8);
   const minWidth = Math.min(MIN_WINDOW_WIDTH, maxWidth);
   const minHeight = Math.min(MIN_WINDOW_HEIGHT, maxHeight);
   const width = clampNumber(

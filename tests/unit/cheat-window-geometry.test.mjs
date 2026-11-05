@@ -28,6 +28,25 @@ test("getDefaultGeometry：小视口下收缩到视口内", () => {
   assert.ok(geometry.y >= 0);
 });
 
+test("getDefaultGeometry / clampGeometry：极小视口下不超出视口", () => {
+  const viewport = { width: 300, height: 200 };
+
+  const defaults = getDefaultGeometry(viewport);
+  assert.ok(defaults.width <= viewport.width);
+  assert.ok(defaults.height <= viewport.height);
+  assert.ok(defaults.x >= 0);
+  assert.ok(defaults.y >= 0);
+
+  const clamped = clampGeometry(
+    { x: 999, y: 999, width: 775, height: 550 },
+    viewport,
+  );
+  assert.ok(clamped.width <= viewport.width);
+  assert.ok(clamped.height <= viewport.height);
+  assert.ok(clamped.x + clamped.width <= viewport.width);
+  assert.ok(clamped.y + clamped.height <= viewport.height);
+});
+
 test("clampGeometry：限制最小尺寸并拉回视口", () => {
   const geometry = clampGeometry(
     { x: -100, y: -100, width: 10, height: 10 },
