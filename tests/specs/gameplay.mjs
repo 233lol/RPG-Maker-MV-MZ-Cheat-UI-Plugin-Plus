@@ -581,4 +581,151 @@ export function registerGameplay({ test, page, type, state }) {
     assert.equal(gameSpeed.rate, 3);
     assert.equal(gameSpeed.sceneOption, "all");
   });
+
+  test("常用面板：REPL 执行 / 输出上限 / 游戏速度场景选项", async () => {
+    const result = await page.evaluate(async () => {
+      const api = window.__cheatTest;
+      const { GameSpeedCheat } = await import(
+        new URL("cheat/js/CheatHelper.js", document.baseURI).href
+      );
+
+      const panel = await api.openPanel("general-panel", "GeneralPanel");
+      await api.waitFor(() => typeof panel.runRepl === "function", 5000, 50);
+
+      const circular = {};
+      circular.self = circular;
+
+      const formatted = [
+        panel.formatReplValue(undefined),
+        panel.formatReplValue("text"),
+        panel.formatReplValue(12),
+        panel.formatReplValue(false),
+        panel.formatReplValue(null),
+        panel.formatReplValue({ a: 1 }),
+        panel.formatReplValue(circular),
+      ];
+
+      panel.replOutputEntries = [];
+      for (let i = 0; i < 205; i++) {
+        panel.appendReplOutput("result", String(i));
+      }
+      const cappedLength = panel.replOutputEntries.length;
+      const cappedFirst = panel.replOutputEntries[0];
+
+      panel.clearReplOutput();
+      const cleared = panel.replOutputEntries.length === 0;
+
+      panel.replInput = "$gameMap.mapId()";
+      panel.runRepl();
+      const mapOutput = panel.replOutputEntries.join("\n");
+      const mapId = $gameMap.mapId();
+
+      panel.clearReplOutput();
+      panel.replInput = "throw new Error('repl-boom')";
+      panel.runRepl();
+      const errorOutput = panel.replOutputEntries.join("\n");
+
+      panel.clearReplOutput();
+      panel.replInput = "";
+      panel.runRepl();
+      const emptyOutput = panel.replOutputEntries.join("\n");
+
+      panel.clearReplOutput();
+
+      const originalRate = GameSpeedCheat.getRate();
+      const originalOption = GameSpeedCheat.getSceneOption();
+
+      try {
+        panel.gameSpeed = 2.5;
+        panel.applyAllForGameSpeed = true;
+        panel.applyBattleForGameSpeed = false;
+        panel.onGameSpeedChange();
+        const allRate = GameSpeedCheat.getRate();
+        const allOptionIsAll =
+          GameSpeedCheat.getSceneOption() === GameSpeedCheat.sceneOptions().all;
+
+        panel.gameSpeed = 3;
+        panel.applyAllForGameSpeed = false;
+        panel.applyBattleForGameSpeed = true;
+        panel.onGameSpeedChange();
+        const battleRate = GameSpeedCheat.getRate();
+        const battleOptionIsBattle =
+          GameSpeedCheat.getSceneOption() ===
+          GameSpeedCheat.sceneOptions().battle;
+
+        panel.addGameSpeed(100);
+        const clampedRate = GameSpeedCheat.getRate();
+        const clampedSlider = panel.gameSpeed;
+
+        panel.applyAllForGameSpeed = true;
+        panel.applyBattleForGameSpeed = false;
+        panel.onApplyAllForGameSpeedChange();
+        const allToggle = {
+          all: panel.applyAllForGameSpeed,
+          battle: panel.applyBattleForGameSpeed,
+        };
+
+        panel.applyBattleForGameSpeed = true;
+        panel.onApplyBattleForGameSpeedChange();
+        const battleToggle = {
+          all: panel.applyAllForGameSpeed,
+          battle: panel.applyBattleForGameSpeed,
+        };
+
+        return {
+          formatted,
+          cappedLength,
+          cappedFirst,
+          cleared,
+          mapOutput,
+          mapId,
+          errorOutput,
+          emptyOutput,
+          allRate,
+          allOptionIsAll,
+          battleRate,
+          battleOptionIsBattle,
+          clampedRate,
+          clampedSlider,
+          allToggle,
+          battleToggle,
+        };
+      } finally {
+        GameSpeedCheat.setGameSpeed(originalRate, originalOption);
+        panel.initializeVariables();
+        panel.replInput = "";
+        panel.clearReplOutput();
+      }
+    });
+
+    assert.deepEqual(result.formatted, [
+      "undefined",
+      "text",
+      "12",
+      "false",
+      "null",
+      '{\n  "a": 1\n}',
+      "[object Object]",
+    ]);
+    assert.equal(result.cappedLength, 200, "REPL 输出没有限制在 200 条");
+    assert.equal(result.cappedFirst, "OUT> 5");
+    assert.equal(result.cleared, true);
+    assert.ok(result.mapOutput.includes("IN> $gameMap.mapId()"));
+    assert.ok(
+      result.mapOutput.includes(`OUT> ${result.mapId}`),
+      `REPL 没有返回地图 ID: ${result.mapOutput}`,
+    );
+    assert.ok(result.errorOutput.startsWith("IN>"));
+    assert.ok(result.errorOutput.includes("ERR>"));
+    assert.ok(result.errorOutput.includes("repl-boom"));
+    assert.ok(result.emptyOutput.startsWith("WARN>"));
+    assert.equal(result.allRate, 2.5);
+    assert.equal(result.allOptionIsAll, true);
+    assert.equal(result.battleRate, 3);
+    assert.equal(result.battleOptionIsBattle, true);
+    assert.equal(result.clampedRate, 10, "游戏速度上限不是 10");
+    assert.equal(result.clampedSlider, 10);
+    assert.deepEqual(result.allToggle, { all: true, battle: false });
+    assert.deepEqual(result.battleToggle, { all: false, battle: true });
+  });
 }

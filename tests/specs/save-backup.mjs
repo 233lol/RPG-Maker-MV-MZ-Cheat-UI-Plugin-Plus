@@ -406,4 +406,103 @@ export function registerSaveBackup({ test, page, type }) {
       `复制出的存档扩展名不正确: ${result.copiedPath}`,
     );
   });
+
+  test("存档时间机器面板：设置输入收敛 / 参数写入 / 目标槽位建议", async () => {
+    const result = await page.evaluate(async () => {
+      const base = document.baseURI;
+      const { SaveBackupCheat: Backups } = await import(
+        new URL("cheat/js/SaveBackupHelper.js", base).href
+      );
+      const api = window.__cheatTest;
+
+      const panel = await api.openPanel("save-backup-panel", "SaveBackupPanel");
+      await api.waitFor(() => panel.available, 10000, 100);
+
+      const original = Backups.getSettings();
+      const sourceSlot = 1;
+      const suggested = panel.getSuggestedTargetSlot(sourceSlot);
+      const maxSavefiles = Backups.maxSavefiles();
+
+      try {
+        const parsed = [
+          panel.parseCount("0", 1),
+          panel.parseCount("abc", 3),
+          panel.parseCount(" 7 次", 1),
+          panel.parseCount("999", 1),
+          panel.parseCount(null, 4),
+          panel.parseCount("2.9", 1),
+        ];
+
+        const widths = [
+          panel.numFieldStyle("1").width,
+          panel.numFieldStyle("12").width,
+          panel.numFieldStyle("123").width,
+        ];
+
+        panel.onIntervalInput("3");
+        const afterIntervalInput = Backups.getSettings().autoSaveInterval;
+        const intervalText = panel.intervalText;
+
+        panel.onKeepInput("0");
+        const afterKeepZero = Backups.getSettings().autoKeep;
+
+        panel.keepText = "abc";
+        panel.commitKeepText();
+        const afterKeepCommit = Backups.getSettings().autoKeep;
+        const keepText = panel.keepText;
+
+        panel.intervalText = "500";
+        panel.commitIntervalText();
+        const afterIntervalCommit = Backups.getSettings().autoSaveInterval;
+        const clampedIntervalText = panel.intervalText;
+
+        panel.settings.autoOnSave = true;
+        panel.settings.autoKeep = 3;
+        panel.onSettingsChange();
+        const persisted = Backups.getSettings();
+
+        return {
+          parsed,
+          widths,
+          sourceSlot,
+          suggested,
+          maxSavefiles,
+          afterIntervalInput,
+          intervalText,
+          afterKeepZero,
+          afterKeepCommit,
+          keepText,
+          afterIntervalCommit,
+          clampedIntervalText,
+          persisted,
+          available: panel.available,
+        };
+      } finally {
+        Backups.writeSettings(original);
+        panel.settings = original;
+        panel.intervalText = String(original.autoSaveInterval);
+        panel.keepText = String(original.autoKeep);
+        panel.reload();
+      }
+    });
+
+    assert.deepEqual(result.parsed, [1, 3, 7, 100, 4, 2]);
+    assert.deepEqual(result.widths, ["36px", "41px", "51px"]);
+    assert.ok(Number.isInteger(result.suggested));
+    assert.ok(result.suggested >= 1);
+    assert.ok(
+      result.suggested !== result.sourceSlot || result.maxSavefiles <= 1,
+      "有可用槽位时建议值不应等于来源槽位",
+    );
+    assert.equal(result.afterIntervalInput, 3, "自动快照间隔没有写入");
+    assert.equal(result.intervalText, "3");
+    assert.equal(result.afterKeepZero, 1, "自动快照保留份数下限不是 1");
+    assert.equal(result.afterKeepCommit, 1);
+    assert.equal(result.keepText, "1");
+    assert.equal(result.afterIntervalCommit, 100, "自动快照间隔上限不是 100");
+    assert.equal(result.clampedIntervalText, "100");
+    assert.equal(result.persisted.autoOnSave, true);
+    assert.equal(result.persisted.autoKeep, 3);
+    assert.equal(result.available, true);
+  });
 }
