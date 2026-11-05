@@ -1138,7 +1138,7 @@ export class SaveBackupCheat {
       throw new Error(`存档 ${slot} 的文件不存在`);
     }
 
-    const stamp = this.formatTime(Date.now()).replace(/[: ]/g, "-");
+    const stamp = this.formatFileTimestamp(Date.now());
     const extension = this.isMZ() ? ".rmmzsave" : ".rpgsave";
     const target = path.join(
       this.ensureBackupDir(),

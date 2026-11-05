@@ -26,7 +26,7 @@ export class SaveBackupTransfer {
     const path = require("path");
     const dir = this.ensureBackupDir();
 
-    const stamp = this.formatTime(Date.now()).replace(/[: ]/g, "-");
+    const stamp = this.formatFileTimestamp(Date.now());
     const file = path.join(dir, `cheat-save-backups-${stamp}.json`);
     const payload = {
       format: IMPORT_EXPORT_FORMAT,

@@ -61,6 +61,15 @@ export class SaveBackupFormat {
     )}`;
   }
 
+  // 导出 / 复制文件名用：精确到毫秒，避免同一秒内重复操作互相覆盖。
+  static formatFileTimestamp(ms = Date.now()) {
+    const value = Number(ms);
+    const safe = Number.isFinite(value) && value > 0 ? value : Date.now();
+    const millis = String(new Date(safe).getMilliseconds()).padStart(3, "0");
+
+    return `${this.formatTime(safe)}-${millis}`.replace(/[: ]/g, "-");
+  }
+
   static formatRelative(ms) {
     const value = Number(ms);
     if (!Number.isFinite(value) || value <= 0) {
