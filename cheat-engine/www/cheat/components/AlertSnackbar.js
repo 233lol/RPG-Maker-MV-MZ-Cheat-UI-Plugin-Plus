@@ -18,6 +18,7 @@ export default {
 
   template: `
 <v-snackbar
+    :key="snackbarKey"
     location="top left"
     :color="color"
     v-model="showSnackbar"
@@ -45,6 +46,9 @@ export default {
   data() {
     return {
       showSnackbar: false,
+      // 每条提示换一个 key，强制重建 v-snackbar：
+      // 否则同一 tick 内先 false 再 true 会被 Vue 合并，timeout 也不会重新计时。
+      snackbarKey: 0,
       text: "",
       timeout: 1000,
       color: "black",
@@ -91,14 +95,13 @@ export default {
 
   methods: {
     show(options) {
-      this.showSnackbar = false;
-
       this.text = options.text.split("\n");
       this.timeout = options.timeout;
       if (options.color) {
         this.color = options.color;
       }
 
+      this.snackbarKey += 1;
       this.showSnackbar = true;
     },
   },
