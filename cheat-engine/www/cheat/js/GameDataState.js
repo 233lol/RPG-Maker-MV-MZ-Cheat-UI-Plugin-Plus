@@ -13,7 +13,6 @@
 const listeners = new Set();
 
 let version = 0;
-let installed = false;
 
 /**
  * 订阅游戏数据变化。
@@ -80,10 +79,9 @@ function wrapMethod(target, name, after) {
  * 之后任意一次调用都会补装，不会出现「先调一次就永久放弃」的情况。
  */
 export function installGameDataHooks() {
-  if (installed) {
-    return true;
-  }
-
+  // 不再用一次性 installed 标志：首次调用时某些引擎对象可能还没创建，
+  // 只要有一个包装成功就永久放弃会导致 Scene_Map 等钩子永远补不上。
+  // wrapMethod 自身用 __cheatGameDataWrapped 去重，重复调用是安全的。
   let wrappedAny = false;
 
   const wrap = (target, name, reason) => {
@@ -104,8 +102,6 @@ export function installGameDataHooks() {
   if (typeof Scene_Map !== "undefined" && Scene_Map.prototype) {
     wrap(Scene_Map.prototype, "onMapLoaded", "map-loaded");
   }
-
-  installed = wrappedAny;
 
   return wrappedAny;
 }
