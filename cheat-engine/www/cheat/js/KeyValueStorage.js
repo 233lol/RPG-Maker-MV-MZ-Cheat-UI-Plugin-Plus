@@ -1,6 +1,7 @@
 // 模块级内存缓存（按文件路径共享）：消除定时器/高频调用的同步读盘。
-// 注意：缓存生效期间外部手工修改同一 JSON 文件不会被感知；
-// 写入始终直写磁盘并同步更新缓存，崩溃时最多丢最后一次写。
+// 注意：缓存生效期间外部手工修改同一 JSON 文件不会被读取感知；
+// 但每次写入前都会重新读盘合并，避免用旧缓存把别人刚写入的 key 覆盖掉。
+// 写入始终原子写盘并同步更新缓存，崩溃时最多丢最后一次写。
 import { getCheatSettingsPath } from "./SettingsPath.js";
 import { writeJsonAtomic } from "./AtomicFile.js";
 
@@ -88,6 +89,14 @@ export class KeyValueStorage {
       return cached;
     }
 
+    return this.__readFileFromDisk();
+  }
+
+  // 绕过缓存重新读盘。写入前用它做一次读改写，避免另一个游戏实例 /
+  // 外部编辑器刚写入的 key 被本实例的旧缓存整文件覆盖掉。
+  __readFileFromDisk() {
+    this.__ensureFileSystem();
+
     let data = {};
     if (this.fileSystem.existsSync(this.filePath)) {
       try {
@@ -133,7 +142,7 @@ export class KeyValueStorage {
   }
 
   __setItemToFile(key, value) {
-    const data = this.__readFile();
+    const data = this.__readFileFromDisk();
     const next = { ...data, [key]: value };
 
     // 先原子写盘，成功后再替换缓存；写失败时内存里仍是旧值，
