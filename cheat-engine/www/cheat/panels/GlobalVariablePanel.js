@@ -72,6 +72,7 @@ export default {
 <v-card flat class="ma-0 pa-0">
     <div class="d-flex align-center">
         <search-field
+            ref="searchField"
             v-model="search"
             label="搜索变量名 / 值..."
             clearable
@@ -900,6 +901,19 @@ export default {
       }
 
       if (!root.contains(active)) {
+        return false;
+      }
+
+      // 搜索框本身不算「正在编辑值」：焦点停在搜索框时自动刷新不应暂停，
+      // 否则游戏变量变化后列表会静默停止更新。
+      const searchField = this.$refs.searchField;
+      const searchRoot = searchField && (searchField.$el || searchField);
+
+      if (
+        searchRoot &&
+        typeof searchRoot.contains === "function" &&
+        searchRoot.contains(active)
+      ) {
         return false;
       }
 
