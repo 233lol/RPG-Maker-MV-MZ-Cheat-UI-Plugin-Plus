@@ -108,6 +108,12 @@ export default {
     onShortcutInput(e) {
       const eventKey = Key.fromEvent(e);
 
+      // PrintScreen / IME / ISO 额外键等无法写进 shortcuts.json 的键码，
+      // 直接忽略，避免生成空字符串或 "ctrl " 之类的坏配置。
+      if (!eventKey.isRepresentable()) {
+        return;
+      }
+
       if (eventKey.isCombiningKey() && !this.combiningKeyAlone) {
         return;
       }

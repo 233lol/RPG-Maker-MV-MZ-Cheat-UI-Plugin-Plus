@@ -623,6 +623,14 @@ class GlobalShortcut {
   }
 
   setShortcut(shortcutId, newKey) {
+    if (!newKey || typeof newKey.isRepresentable !== "function") {
+      throw Error("无效的快捷键");
+    }
+
+    if (!newKey.isRepresentable()) {
+      throw Error("这个按键无法保存为快捷键");
+    }
+
     // not need to change shortcut
     const prevKey = this.getShortcut(shortcutId);
     if (prevKey.equals(newKey)) {

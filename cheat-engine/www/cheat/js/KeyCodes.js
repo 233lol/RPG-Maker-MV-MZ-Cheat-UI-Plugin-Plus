@@ -113,7 +113,9 @@ for (const key of Object.keys(CHAR_TO_CODE_LOWERCASE)) {
   CODE_TO_CHAR_LOWERCASE[CHAR_TO_CODE_LOWERCASE[key]] = key;
 }
 
-const COMBINING_KEY_CODES = new Set([17, 18, 16, 91]);
+// 92 是 Chromium 下右侧 Meta/Win；左右两个 Meta 都按组合键处理，
+// 否则 92 会走普通按键分支，asString 无法表示，还会让 meta 状态残留。
+const COMBINING_KEY_CODES = new Set([17, 18, 16, 91, 92]);
 
 export const UNASSIGNED_KEY_CODE = 256;
 export const MAX_KEY_CODE = UNASSIGNED_KEY_CODE;
@@ -140,9 +142,15 @@ export class Key {
       return Key.createEmpty();
     }
 
-    const keys = text.toLowerCase().split(" ");
+    // 过滤空 token：兼容旧版本 asString 可能写出的 "ctrl " 这类尾随空格
+    const keys = text
+      .toLowerCase()
+      .split(" ")
+      .map((key) => key.trim())
+      .filter((key) => key.length > 0);
+
     if (keys.length === 0) {
-      throw Error("没有键位映射.");
+      return Key.createEmpty();
     }
 
     let code = null;
@@ -151,9 +159,7 @@ export class Key {
     let shift = false;
     let meta = false;
 
-    for (let key of keys) {
-      key = key.trim();
-
+    for (const key of keys) {
       switch (key) {
         case "ctrl":
           ctrl = true;
@@ -201,6 +207,15 @@ export class Key {
       e.keyCode === 18 || e.altKey,
       e.keyCode === 16 || e.shiftKey,
       e.keyCode === 91 || e.metaKey,
+    );
+  }
+
+  // code 能否被 asString / fromString 无损表示。
+  // 组合键（code 未分配）也视为可表示。
+  isRepresentable() {
+    return (
+      this.code === UNASSIGNED_KEY_CODE ||
+      CODE_TO_CHAR_LOWERCASE[this.code] !== undefined
     );
   }
 
@@ -292,7 +307,13 @@ export class Key {
     }
 
     if (this.code !== UNASSIGNED_KEY_CODE) {
-      ret.push(CODE_TO_CHAR_LOWERCASE[this.code]);
+      const name = CODE_TO_CHAR_LOWERCASE[this.code];
+
+      // 未登记的 keyCode（PrintScreen / IME / ISO 额外键等）无法写进配置，
+      // 直接跳过而不是 push undefined —— 否则 asDisplayString 会崩溃。
+      if (name !== undefined) {
+        ret.push(name);
+      }
     }
 
     return ret;
@@ -337,13 +358,14 @@ export class Key {
         this.shift = flag;
         break;
       case 91:
+      case 92:
         this.meta = flag;
         break;
     }
   }
 
   capitalize(str) {
-    if (str.length === 0) {
+    if (typeof str !== "string" || str.length === 0) {
       return "";
     } else if (str.length === 1) {
       return str.charAt(0).toUpperCase();
