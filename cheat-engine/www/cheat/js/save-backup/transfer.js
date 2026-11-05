@@ -104,74 +104,89 @@ export class SaveBackupTransfer {
     let added = 0;
     let skipped = 0;
 
-    for (const item of parsed.backups) {
-      if (!item || !item.meta || typeof item.data !== "string") {
-        skipped++;
-        continue;
-      }
+    try {
+      for (const item of parsed.backups) {
+        if (!item || !item.meta || typeof item.data !== "string") {
+          skipped++;
+          continue;
+        }
 
-      const slot = Number(item.meta.slot);
-      if (!Number.isInteger(slot) || slot < 1) {
-        skipped++;
-        continue;
-      }
+        const slot = Number(item.meta.slot);
+        if (!Number.isInteger(slot) || slot < 1) {
+          skipped++;
+          continue;
+        }
 
-      // 导入文件可能来自别处 / 被手工改坏，校验不过就跳过这一条，
-      // 不要写出一份读档必崩的快照。
-      try {
-        this.validateSaveText(item.data, "导入的快照数据");
-      } catch (error) {
-        console.warn("[cheat plugin] 跳过无效的导入快照", slot, error);
-        skipped++;
-        continue;
-      }
+        // 导入文件可能来自别处 / 被手工改坏，校验不过就跳过这一条，
+        // 不要写出一份读档必崩的快照。
+        try {
+          this.validateSaveText(item.data, "导入的快照数据");
+        } catch (error) {
+          console.warn("[cheat plugin] 跳过无效的导入快照", slot, error);
+          skipped++;
+          continue;
+        }
 
-      const id = this.generateId(
-        item.meta.kind === BACKUP_KIND_AUTO
-          ? BACKUP_KIND_AUTO
-          : BACKUP_KIND_MANUAL,
-        slot,
-        knownIds,
-      );
-
-      knownIds.add(id);
-
-      const meta = {
-        id: id,
-        slot: slot,
-        kind:
+        const id = this.generateId(
           item.meta.kind === BACKUP_KIND_AUTO
             ? BACKUP_KIND_AUTO
             : BACKUP_KIND_MANUAL,
-        createdAt: Number(item.meta.createdAt) || Date.now(),
-        label: String(item.meta.label || "").slice(0, MAX_NAME_LENGTH),
-        sizeBytes: item.data.length,
-        codec: this.getSnapshotCodec(),
-        saveExt: this.getPayloadExtension(this.getSnapshotCodec()),
-        mapId: Number(item.meta.mapId) || 0,
-        mapName: String(item.meta.mapName || ""),
-        // 兼容旧版本导出的文件（只有 saveTime 字符串）
-        savefileTime: Number(item.meta.savefileTime) || 0,
-        savefileTimeText: String(
-          item.meta.savefileTimeText || item.meta.saveTime || "",
-        ),
-        playtimeFrames: Number(item.meta.playtimeFrames) || 0,
-        playtime: String(item.meta.playtime || ""),
-        gameVersion: String(item.meta.gameVersion || ""),
-        importedAt: Date.now(),
-      };
+          slot,
+          knownIds,
+        );
 
-      this.writePayload(meta, item.data);
+        knownIds.add(id);
 
-      entries.push({
-        ...meta,
-        payloadFile: meta.payloadFile,
-      });
+        const meta = {
+          id: id,
+          slot: slot,
+          kind:
+            item.meta.kind === BACKUP_KIND_AUTO
+              ? BACKUP_KIND_AUTO
+              : BACKUP_KIND_MANUAL,
+          createdAt: Number(item.meta.createdAt) || Date.now(),
+          label: String(item.meta.label || "").slice(0, MAX_NAME_LENGTH),
+          sizeBytes: item.data.length,
+          codec: this.getSnapshotCodec(),
+          saveExt: this.getPayloadExtension(this.getSnapshotCodec()),
+          mapId: Number(item.meta.mapId) || 0,
+          mapName: String(item.meta.mapName || ""),
+          // 兼容旧版本导出的文件（只有 saveTime 字符串）
+          savefileTime: Number(item.meta.savefileTime) || 0,
+          savefileTimeText: String(
+            item.meta.savefileTimeText || item.meta.saveTime || "",
+          ),
+          playtimeFrames: Number(item.meta.playtimeFrames) || 0,
+          playtime: String(item.meta.playtime || ""),
+          gameVersion: String(item.meta.gameVersion || ""),
+          importedAt: Date.now(),
+        };
 
-      added++;
+        // 保留自动快照的存档次数，导入后仍能参与去重
+        const saveCount = Number(item.meta.saveCount);
+
+        if (Number.isFinite(saveCount)) {
+          meta.saveCount = saveCount;
+        }
+
+        this.writePayload(meta, item.data);
+
+        entries.push({
+          ...meta,
+          payloadFile: meta.payloadFile,
+        });
+
+        added++;
+      }
+    } finally {
+      // 中途某条写入失败时，已经成功的 payload 也必须登记进索引，
+      // 否则会变成永远找不到的孤儿文件。
+      try {
+        this.writeIndex(entries);
+      } catch (error) {
+        console.warn("[cheat plugin] 写入导入后的索引失败", error);
+      }
     }
-
-    this.writeIndex(entries);
 
     return { added: added, skipped: skipped };
   }
