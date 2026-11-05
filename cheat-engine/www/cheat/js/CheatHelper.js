@@ -843,6 +843,12 @@ export class BattleCheat {
 
 export class MessageCheat {
   static initialize() {
+    // 重复调用会把已经包过的方法再包一层，栈越来越深。
+    if (this.__initialized) {
+      return;
+    }
+
+    this.__initialized = true;
     this.skip = false;
 
     // Skip message display animation
