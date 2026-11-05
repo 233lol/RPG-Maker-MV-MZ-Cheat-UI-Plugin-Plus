@@ -446,8 +446,14 @@ export default {
       this.currentSavefileInfo = SaveBackupCheat.readSavefileInfo(
         this.loadedSlot > 0 ? this.loadedSlot : 1,
       );
-      // 旧版本建的快照没记时长 / 存档时间，这里用引擎存档头补一次
-      SaveBackupCheat.backfillFromSavefileInfo();
+      // 旧版本建的快照没记时长 / 存档时间，这里用引擎存档头补一次。
+      // 回填只是锦上添花，写盘失败（只读目录 / 磁盘满）不能让面板打不开。
+      try {
+        SaveBackupCheat.backfillFromSavefileInfo();
+      } catch (error) {
+        console.warn("[cheat plugin] 回填快照元数据失败", error);
+      }
+
       this.backups = SaveBackupCheat.listBackups();
 
       const stats = SaveBackupCheat.getStats();
