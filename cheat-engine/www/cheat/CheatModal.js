@@ -395,12 +395,32 @@ export default {
         originY: this.geometry.y,
       };
 
+      // 捕获指针：拖出窗口后再松开也能收到 pointerup。
+      // 部分环境不支持 capture，失败时仍靠 window 监听兜底。
+      try {
+        if (
+          event.currentTarget &&
+          typeof event.currentTarget.setPointerCapture === "function"
+        ) {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }
+      } catch (error) {
+        // ignore
+      }
+
       window.addEventListener("pointermove", this.onDragMove);
       window.addEventListener("pointerup", this.stopDrag, { once: true });
+      window.addEventListener("pointercancel", this.stopDrag, { once: true });
     },
 
     onDragMove(event) {
       if (!this.__dragState) {
+        return;
+      }
+
+      // 丢失 pointerup 时 mouseup 后 buttons 会变成 0，主动结束拖动。
+      if (event.buttons === 0) {
+        this.stopDrag();
         return;
       }
 
@@ -414,6 +434,7 @@ export default {
       this.__dragState = null;
       window.removeEventListener("pointermove", this.onDragMove);
       window.removeEventListener("pointerup", this.stopDrag);
+      window.removeEventListener("pointercancel", this.stopDrag);
     },
 
     getPanelStateSnapshot() {
