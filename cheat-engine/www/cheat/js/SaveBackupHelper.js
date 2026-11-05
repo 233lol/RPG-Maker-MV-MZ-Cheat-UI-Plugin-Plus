@@ -291,8 +291,10 @@ export class SaveBackupCheat {
       throw new Error("存档数据为空");
     }
 
-    // 交给引擎自己的 API 写，压缩方式与 .bak 维护都由引擎负责。
-    // MZ 的 saveToLocalFile 要求传入 pako 压缩后的 zip，MV 则要求明文 JSON。
+    // MV 的 saveToLocalFile 是同步的，继续交给引擎。
+    // MZ 的 saveToLocalFile 返回 Promise（内部先 copy 再 write），
+    // 旧代码忽略返回值，写盘失败也会被当成还原成功。这里改成同步原子写：
+    // 先写同目录临时文件，再 rename 覆盖，失败会直接抛给调用方。
     if (this.isLocalMode()) {
       if (this.isMZ()) {
         // 与快照文件同一套编码实现（codec.js），避免两边压缩参数漂移
@@ -302,7 +304,31 @@ export class SaveBackupCheat {
           throw new Error("当前游戏未提供 pako，无法写入 MZ 存档");
         }
 
-        StorageManager.saveToLocalFile(this.getSaveName(slot), zip);
+        const filePath = this.getSaveFilePath(slot);
+
+        if (!filePath) {
+          throw new Error("无法确定当前游戏的 MZ 存档路径");
+        }
+
+        const fs = this.requireFs();
+        const tmpFile = `${filePath}.cheat-${process.pid}-${Date.now()}.tmp`;
+
+        try {
+          // 与 Snapshot 载荷保持一致：pako 的 binary string 按 utf-8 写入
+          fs.writeFileSync(tmpFile, zip, "utf-8");
+          fs.renameSync(tmpFile, filePath);
+        } catch (error) {
+          try {
+            if (fs.existsSync(tmpFile)) {
+              fs.unlinkSync(tmpFile);
+            }
+          } catch (cleanupError) {
+            // 清不掉临时文件不影响主流程
+          }
+
+          throw error;
+        }
+
         return;
       }
 
