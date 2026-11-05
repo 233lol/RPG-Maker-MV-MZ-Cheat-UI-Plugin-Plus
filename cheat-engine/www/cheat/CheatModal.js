@@ -252,6 +252,12 @@ export default {
   beforeUnmount() {
     this.stopDrag();
 
+    if (this.__sizeSyncTimer) {
+      window.clearTimeout(this.__sizeSyncTimer);
+      this.__sizeSyncTimer = null;
+    }
+    this.__pendingSize = null;
+
     if (this.__resizeObserver) {
       this.__resizeObserver.disconnect();
       this.__resizeObserver = null;
@@ -369,15 +375,55 @@ export default {
 
         const rect = entry.target.getBoundingClientRect();
 
-        if (rect.width > 0 && rect.height > 0) {
-          this.updateGeometry({
-            width: Math.round(rect.width),
-            height: Math.round(rect.height),
-          });
+        if (!(rect.width > 0 && rect.height > 0)) {
+          return;
         }
+
+        const width = Math.round(rect.width);
+        const height = Math.round(rect.height);
+
+        if (width === this.geometry.width && height === this.geometry.height) {
+          return;
+        }
+
+        // 不能在这个回调里同步写回尺寸：CSS resize 手柄会给出小数尺寸，
+        // 写回整数宽高会在同一次观察循环里再次触发布局，Chromium 报
+        // "ResizeObserver loop completed with undelivered notifications"，
+        // 而 MZ 的全局 error 处理会因此停掉游戏循环。放到下一个任务里再写。
+        this.scheduleSizeSync(width, height);
       });
 
       this.__resizeObserver.observe(root);
+    },
+
+    scheduleSizeSync(width, height) {
+      this.__pendingSize = { width, height };
+
+      if (this.__sizeSyncTimer) {
+        return;
+      }
+
+      // 用 setTimeout 而不是 requestAnimationFrame：窗口最小化 / 被遮挡时
+      // rAF 可能长时间不触发，尺寸就再也同步不回来了。
+      this.__sizeSyncTimer = window.setTimeout(() => {
+        this.__sizeSyncTimer = null;
+
+        const pending = this.__pendingSize;
+        this.__pendingSize = null;
+
+        if (!pending) {
+          return;
+        }
+
+        if (
+          pending.width === this.geometry.width &&
+          pending.height === this.geometry.height
+        ) {
+          return;
+        }
+
+        this.updateGeometry(pending);
+      }, 0);
     },
 
     startDrag(event) {

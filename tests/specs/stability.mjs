@@ -426,6 +426,24 @@ export function registerStability({ test, page }) {
       const mapPanel = await api.openPanel("map-event-panel", "MapEventPanel");
       await api.waitFor(() => mapPanel.currentMapId > 0, 10000, 100);
 
+      // 传送 / 读档瞬间 $dataMap 是 null：markRaw(null) 在 Vue 3.5 会抛
+      // TypeError。这里模拟该窗口，确认面板能安全降级并在数据恢复后重新绑定。
+      const realDataMap = $dataMap;
+      let mapDataThrew = false;
+      let mapDataCleared = null;
+
+      try {
+        $dataMap = null;
+        mapPanel.updateCurrentMapData();
+        mapDataCleared = mapPanel.mapData;
+      } catch (error) {
+        mapDataThrew = true;
+      } finally {
+        $dataMap = realDataMap;
+        mapPanel.updateCurrentMapData();
+        mapPanel.updateMapEvents();
+      }
+
       return {
         threw,
         emptyEnemy,
@@ -438,6 +456,9 @@ export function registerStability({ test, page }) {
         detailRestored: member.hp === originalHp && member.mp === originalMp,
         mapDataRaw: !isReactive(mapPanel.mapData),
         regularEventsRaw: !isReactive(mapPanel.regularEvents),
+        mapDataThrew,
+        mapDataCleared,
+        mapDataRestored: mapPanel.mapData === realDataMap,
       };
     });
 
@@ -455,6 +476,79 @@ export function registerStability({ test, page }) {
       result.regularEventsRaw,
       true,
       "地图事件数组被 Vue 响应式代理",
+    );
+    assert.equal(result.mapDataThrew, false, "地图数据为 null 时面板抛错");
+    assert.equal(
+      result.mapDataCleared,
+      null,
+      "地图数据为 null 时没有清空画布数据",
+    );
+    assert.equal(
+      result.mapDataRestored,
+      true,
+      "地图数据恢复后面板没有重新绑定",
+    );
+  });
+
+  test("ResizeObserver 循环提示不再让游戏报错", async () => {
+    const result = await page.evaluate(() => {
+      if (typeof window.__CHEAT_RESIZE_OBSERVER_GUARD__ !== "function") {
+        return { missingGuard: true };
+      }
+
+      const originalStop = SceneManager.stop;
+      const originalPrintError = Graphics.printError;
+      const originalStopAll = AudioManager.stopAll;
+      const originalConsoleError = console.error;
+      let handled = 0;
+
+      // 让错误处理流程真实跑一遍，但不真的停游戏 / 写错误页 / 刷控制台。
+      SceneManager.stop = () => {};
+      Graphics.printError = () => {
+        handled += 1;
+      };
+      AudioManager.stopAll = () => {};
+      console.error = () => {};
+
+      const dispatch = (message) => {
+        window.dispatchEvent(
+          new ErrorEvent("error", {
+            message,
+            filename: "file:///cheat-test",
+            lineno: 1,
+          }),
+        );
+      };
+
+      try {
+        dispatch(
+          "ResizeObserver loop completed with undelivered notifications.",
+        );
+        const guarded = handled;
+
+        // 对照：普通错误仍应进入游戏错误处理（stub 已避免真的停游戏 / 弹错误页）。
+        dispatch("cheat-test-non-resize-observer-error");
+        const normal = handled;
+
+        return { guarded, normal };
+      } finally {
+        SceneManager.stop = originalStop;
+        Graphics.printError = originalPrintError;
+        AudioManager.stopAll = originalStopAll;
+        console.error = originalConsoleError;
+      }
+    });
+
+    assert.notEqual(result.missingGuard, true, "ResizeObserver 拦截器没有安装");
+    assert.equal(
+      result.guarded,
+      0,
+      "ResizeObserver 循环提示仍然交给了游戏错误处理",
+    );
+    assert.equal(
+      result.normal,
+      1,
+      "普通错误没有进入游戏错误处理（对照用例失败）",
     );
   });
 

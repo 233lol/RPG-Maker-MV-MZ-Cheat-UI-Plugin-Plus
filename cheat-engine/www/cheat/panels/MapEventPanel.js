@@ -82,6 +82,7 @@ export default {
       baseCellSize: 14, // Original cellSize for limited view mode
 
       mapData: null,
+      renderedView: null, // 最近一次绘制使用的视口（点击传送按它换算坐标）
       mapEvents: [],
       regularEvents: [], // Filtered events list excluding enemies and treasure boxes
       playerPosition: { x: 0, y: 0 },
@@ -200,10 +201,13 @@ export default {
     },
 
     initializeMapDisplay() {
-      this.updateCurrentMapData();
+      // 地图数据是异步加载的（刚读档 / 传送时 $dataMap 还是 null）。
+      // 只有数据真正可用时才记录 mapId，否则下个周期不会再重试。
+      if (this.updateCurrentMapData()) {
+        this.lastKnownMapId = this.currentMapId;
+      }
       this.updatePlayerPosition();
       this.updateMapEvents(); // Now handles all event classification in one pass
-      this.lastKnownMapId = this.currentMapId;
 
       // Update every readInterval to reflect real-time changes
       // store interval id so we can clear it when component is destroyed
@@ -253,16 +257,79 @@ export default {
       }, valid);
     },
 
+    // $gameMap 在游戏对象创建前是 undefined（例如自动恢复上次面板时）。
+    // 返回 0 表示「当前没有地图」，调用方按无数据处理即可。
+    getCurrentMapId() {
+      try {
+        if (typeof $gameMap === "undefined" || !$gameMap) {
+          return 0;
+        }
+
+        const mapId = Number($gameMap.mapId());
+        return Number.isFinite(mapId) && mapId > 0 ? mapId : 0;
+      } catch (error) {
+        return 0;
+      }
+    },
+
+    // $dataMap 在地图异步加载期间是 null（传送 / 读档 / 新游戏起始的一瞬间）。
+    // Vue 3.5 的 markRaw(null) 会直接抛 TypeError，所以先判断数据是否真的可用。
+    isMapDataReady(dataMap) {
+      return (
+        !!dataMap &&
+        typeof dataMap === "object" &&
+        Number.isFinite(dataMap.width) &&
+        Number.isFinite(dataMap.height)
+      );
+    },
+
     updateCurrentMapData() {
       try {
-        this.currentMapId = $gameMap.mapId();
-        this.mapData = markRaw($dataMap);
+        this.currentMapId = this.getCurrentMapId();
 
-        if (this.mapData) {
-          this.updateCanvasSize();
+        const dataMap = typeof $dataMap === "undefined" ? null : $dataMap;
+
+        // mapId 为 0 表示还没进入地图（标题画面）；此时 $dataMap 可能仍是
+        // 上一张地图的残留数据，不能拿来画。
+        if (this.currentMapId <= 0 || !this.isMapDataReady(dataMap)) {
+          this.clearMapData();
+          return false;
         }
+
+        if (this.mapData !== dataMap) {
+          this.mapData = markRaw(dataMap);
+          this.needsRedraw = true;
+        }
+        this.updateCanvasSize();
+        return true;
       } catch (error) {
         console.warn("Could not get current map data:", error);
+        this.clearMapData();
+        return false;
+      }
+    },
+
+    // 没有可用地图数据时清空面板，避免继续画上一张地图。
+    clearMapData() {
+      this.mapData = null;
+      this.mapEvents = [];
+      this.regularEvents = [];
+      this.enemies = [];
+      this.treasureBoxes = [];
+      this.renderedView = null;
+      this.needsRedraw = true;
+      this.clearCanvas();
+    },
+
+    clearCanvas() {
+      const canvas = this.$refs.mapCanvas;
+      if (!canvas) return;
+
+      try {
+        const ctx = canvas.getContext("2d");
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      } catch (error) {
+        // ignore
       }
     },
 
@@ -408,7 +475,7 @@ export default {
         const treasureBoxes = [];
         const regularEvents = [];
 
-        if (!$dataMap || !$dataMap.events) {
+        if (!this.mapData || !this.mapData.events) {
           this.mapEvents = markRaw(mapEvents);
           this.enemies = enemies;
           this.treasureBoxes = treasureBoxes;
@@ -417,8 +484,8 @@ export default {
         }
 
         // Single pass through events - classify each one
-        for (let i = 1; i < $dataMap.events.length; i++) {
-          const event = $dataMap.events[i];
+        for (let i = 1; i < this.mapData.events.length; i++) {
+          const event = this.mapData.events[i];
           if (!event || event.x === undefined || event.y === undefined)
             continue;
 
@@ -509,10 +576,33 @@ export default {
 
     checkForMapChange() {
       try {
-        const currentMapId = $gameMap.mapId();
+        const currentMapId = this.getCurrentMapId();
 
-        if (currentMapId !== this.lastKnownMapId) {
-          this.updateCurrentMapData();
+        if (currentMapId <= 0) {
+          // 标题画面等没有当前地图的场景：清空后记下 0，
+          // 否则每个周期都会当成「地图正在加载」反复重试。
+          if (this.lastKnownMapId !== 0) {
+            this.updateCurrentMapData();
+            this.lastKnownMapId = 0;
+          }
+          return;
+        }
+
+        const dataMap = typeof $dataMap === "undefined" ? null : $dataMap;
+        const mapChanged = currentMapId !== this.lastKnownMapId;
+        // 读档回到同一张地图时 mapId 不变，但 $dataMap 已经换成新对象。
+        const dataChanged = this.mapData !== dataMap;
+
+        if (mapChanged || dataChanged) {
+          const loaded = this.updateCurrentMapData();
+
+          if (!loaded) {
+            // 地图数据还没加载完：不记录新的 mapId，下个周期继续重试。
+            // 否则面板会一直停在上一张地图上，直到下一次切图。
+            this.needsRedraw = true;
+            return;
+          }
+
           this.updateMapEvents();
           this.lastKnownMapId = currentMapId;
           this.needsRedraw = true;
@@ -527,10 +617,15 @@ export default {
     },
 
     renderMap() {
-      if (!this.mapData || !this.$refs.mapCanvas) return;
-
       const canvas = this.$refs.mapCanvas;
+      if (!canvas) return;
+
       const ctx = canvas.getContext("2d");
+
+      if (!this.mapData) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
 
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);

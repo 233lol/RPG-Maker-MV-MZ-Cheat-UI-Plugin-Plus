@@ -1,3 +1,58 @@
+// Chromium 在 ResizeObserver 回调里同步修改布局时会派发
+// "ResizeObserver loop completed with undelivered notifications" 错误事件。
+// 它只是观察循环的提示，但 MZ/MV 的 SceneManager.onError 会把它当成致命错误：
+// 停掉游戏循环并显示错误页。这里只过滤这一条已知消息，其他错误照常处理。
+function isResizeObserverLoopEvent(event) {
+  return String((event && event.message) || "").startsWith(
+    "ResizeObserver loop",
+  );
+}
+
+function ignoreResizeObserverLoopErrors() {
+  // 在 window 上捕获拦截。本文件在引擎脚本之后、SceneManager.run 之前执行，
+  // 所以监听器注册得比 SceneManager.setupEventHandlers 更早；同时用捕获阶段，
+  // 避免游戏插件包装过的 onError 再弹一次错误页。
+  if (
+    typeof window !== "undefined" &&
+    typeof window.addEventListener === "function" &&
+    !window.__CHEAT_RESIZE_OBSERVER_GUARD__
+  ) {
+    const guard = (event) => {
+      if (isResizeObserverLoopEvent(event)) {
+        event.stopImmediatePropagation();
+      }
+    };
+
+    // 暴露给自动化测试，便于确认拦截器已经安装。
+    window.__CHEAT_RESIZE_OBSERVER_GUARD__ = guard;
+    window.addEventListener("error", guard, true);
+  }
+
+  if (typeof SceneManager === "undefined" || !SceneManager) {
+    return;
+  }
+
+  const original = SceneManager.onError;
+
+  if (
+    typeof original !== "function" ||
+    original.__cheatResizeObserverFiltered
+  ) {
+    return;
+  }
+
+  function onErrorFiltered(event) {
+    if (isResizeObserverLoopEvent(event)) {
+      return;
+    }
+
+    return original.apply(this, arguments);
+  }
+
+  onErrorFiltered.__cheatResizeObserverFiltered = true;
+  SceneManager.onError = onErrorFiltered;
+}
+
 function validateNwjsVersion() {
   if (!(typeof require === "function" && typeof process === "object")) {
     return true;
@@ -44,6 +99,8 @@ function applyCheat() {
   }
 
   window.__CHEAT_APPLIED__ = true;
+
+  ignoreResizeObserverLoopErrors();
 
   function __addScript(type, src) {
     const cheatScript = document.createElement("script");
