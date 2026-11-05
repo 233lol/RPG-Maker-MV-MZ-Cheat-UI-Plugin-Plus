@@ -960,7 +960,9 @@ export class SaveBackupCheat {
           return;
         }
 
-        const source = all[sourceSlot] || all[slot] || {};
+        // 源槽位的存档可能已被删除；这时不能退回目标槽位被覆盖前的
+        // 旧记录，否则角色 / 头像会继承与还原内容无关的元数据。
+        const source = all[sourceSlot] || {};
         const next = { ...source };
 
         next.title = next.title || $dataSystem?.gameTitle || "";
@@ -986,7 +988,8 @@ export class SaveBackupCheat {
       }
 
       const all = DataManager.loadGlobalInfo() || [];
-      const source = all[sourceSlot] || all[slot] || {};
+      // 同 MZ 分支：源槽位不存在时不要继承目标槽位的旧元数据
+      const source = all[sourceSlot] || {};
       const next = { ...source };
 
       next.globalId = next.globalId ?? DataManager._globalId;
