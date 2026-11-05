@@ -441,6 +441,16 @@ class GlobalShortcut {
 
   migrateShortcutSettings() {
     let defaultSettings = null;
+    let migrated = false;
+
+    const getDefaultSettings = () => {
+      if (!defaultSettings) {
+        defaultSettings = parseStringToKeyObject(defaultShortcutSettings);
+      }
+
+      return defaultSettings;
+    };
+
     const assignedKeys = new Set(
       Object.values(this.shortcutSettings).map((setting) =>
         setting.shortcut.asString(),
@@ -452,12 +462,9 @@ class GlobalShortcut {
         !Object.hasOwnProperty.call(this.shortcutSettings, shortcutConfig.id)
       ) {
         // initialize default settings if not initialized
-        if (!defaultSettings) {
-          defaultSettings = parseStringToKeyObject(defaultShortcutSettings);
-        }
+        const defaultSetting = getDefaultSettings()[shortcutConfig.id];
 
         // handle conflict keys
-        const defaultSetting = defaultSettings[shortcutConfig.id];
         if (
           !defaultSetting.shortcut.isEmpty() &&
           assignedKeys.has(defaultSetting.shortcut.asString())
@@ -470,13 +477,40 @@ class GlobalShortcut {
 
         assignedKeys.add(defaultSetting.shortcut.asString());
 
-        this.shortcutSettings[shortcutConfig.id] =
-          defaultSettings[shortcutConfig.id];
+        this.shortcutSettings[shortcutConfig.id] = defaultSetting;
+        migrated = true;
+        continue;
+      }
+
+      // 已有条目补齐后续版本新增的参数。
+      // 例如 1.0.3 才加入的 skipMessage.param.accelerate：旧文件里整段
+      // param 缺失，不补的话 enterAction 会拿到 undefined 并抛错。
+      const defaultParam = getDefaultSettings()[shortcutConfig.id]?.param;
+
+      if (!defaultParam) {
+        continue;
+      }
+
+      const setting = this.shortcutSettings[shortcutConfig.id];
+
+      if (
+        !setting.param ||
+        typeof setting.param !== "object" ||
+        Array.isArray(setting.param)
+      ) {
+        setting.param = {};
+      }
+
+      for (const [paramId, value] of Object.entries(defaultParam)) {
+        if (!Object.hasOwnProperty.call(setting.param, paramId)) {
+          setting.param[paramId] = value;
+          migrated = true;
+        }
       }
     }
 
     // if settings migrated, save to file
-    if (defaultSettings) {
+    if (migrated) {
       console.warn("__settings migrated");
       this.writeShortcutSettings();
     }
