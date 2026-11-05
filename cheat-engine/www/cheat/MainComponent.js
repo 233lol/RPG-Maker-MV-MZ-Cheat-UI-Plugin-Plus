@@ -93,6 +93,7 @@ export default {
   },
 
   beforeUnmount() {
+    this.releaseCurrentKey();
     window.removeEventListener("keydown", this.onGlobalKeyDown, true);
     window.removeEventListener("keyup", this.onGlobalKeyUp, true);
     window.removeEventListener("keypress", this.onGlobalKeyPress, true);
@@ -231,15 +232,38 @@ export default {
       }
     },
 
+    // 失焦 / 关闭窗口时收不到 keyup，必须手动补一次 leave，
+    // 否则「按住生效」的快捷键（skipMessage 的加速 / 跳过消息）会永久残留。
+    releaseCurrentKey() {
+      const key = Key.fromKey(this.currentKey);
+
+      try {
+        if (!key.isEmpty()) {
+          GLOBAL_SHORTCUT.runKeyLeaveEvent(
+            {
+              preventDefault() {},
+              stopImmediatePropagation() {},
+              stopPropagation() {},
+            },
+            key,
+          );
+        }
+      } catch (error) {
+        console.warn("[cheat plugin] 释放快捷键失败", error);
+      } finally {
+        this.currentKey = Key.createEmpty();
+      }
+    },
+
     closeCheatModal() {
       this.show = false;
-      this.currentKey = Key.createEmpty();
+      this.releaseCurrentKey();
     },
 
     // 窗口失焦时收不到 keyup，按键状态会卡住（例如切出去再回来，
-    // Ctrl 仍被当成按下）。直接清空当前组合键。
+    // Ctrl 仍被当成按下）。这里先补 leave，再清空当前组合键。
     onWindowBlur() {
-      this.currentKey = Key.createEmpty();
+      this.releaseCurrentKey();
     },
 
     openCheatModal(componentName) {
