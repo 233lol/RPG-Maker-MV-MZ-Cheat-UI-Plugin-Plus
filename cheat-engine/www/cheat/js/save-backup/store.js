@@ -155,6 +155,14 @@ export class SaveBackupStore {
     return id;
   }
 
+  // saveExt 会被直接拼进文件路径，必须限制成 ".rmmzsave" / ".rpgsave"
+  // 这种单段扩展名，挡住被篡改 meta 里的 "/../../"。
+  static isSafeSaveExt(extension) {
+    return (
+      typeof extension === "string" && /^\.[A-Za-z0-9]{1,16}$/.test(extension)
+    );
+  }
+
   // 手工改过 index.json 时 payloadFile 可能指向快照目录以外。
   // 读取 / 删除 / 展示前都必须确认目标仍在 save-backups/ 内。
   static isPathInsideBackupDir(file) {
@@ -203,7 +211,10 @@ export class SaveBackupStore {
       (meta && meta.codec) ||
       (meta && meta.saveExt === ".rmmzsave" ? "pako" : null) ||
       this.getSnapshotCodec();
-    const extension = (meta && meta.saveExt) || this.getPayloadExtension(codec);
+    const extension =
+      meta && this.isSafeSaveExt(meta.saveExt)
+        ? meta.saveExt
+        : this.getPayloadExtension(codec);
 
     return `${getBackupDir()}/${safeId}${extension}`;
   }
