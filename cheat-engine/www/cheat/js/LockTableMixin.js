@@ -45,6 +45,21 @@ export function buildLockPayload(items, isVariable) {
 export const lockTableMixin = {
   mixins: [tablePanelMixin],
 
+  mounted() {
+    // LockService 每秒会把被锁的值写回游戏，但不会通知面板。
+    // 面板必须定期把锁定行的显示值同步回来，否则会一直显示旧值。
+    this.__lockSyncTimer = window.setInterval(() => {
+      this.syncLockedRows();
+    }, 1000);
+  },
+
+  beforeUnmount() {
+    if (this.__lockSyncTimer) {
+      window.clearInterval(this.__lockSyncTimer);
+      this.__lockSyncTimer = null;
+    }
+  },
+
   data() {
     return {
       lockKind: "switch",
@@ -207,6 +222,30 @@ export const lockTableMixin = {
       });
 
       this.writePersistedLocks();
+    },
+
+    // 只同步「已锁定」的行：未锁定的行可能正在被用户编辑，
+    // 不能每秒用游戏值覆盖输入框。
+    syncLockedRows() {
+      if (!Array.isArray(this.tableItems) || this.tableItems.length === 0) {
+        return;
+      }
+
+      if (!this.isDataReady() || !LockService.hasAnyLock()) {
+        return;
+      }
+
+      for (const item of this.tableItems) {
+        if (!item || !item.lockEnabled) {
+          continue;
+        }
+
+        const value = this.normalizeValue(this.readValue(item.id));
+
+        if (!Object.is(item.value, value)) {
+          item.value = value;
+        }
+      }
     },
 
     // 值被修改后刷新显示；锁定时把新值同步进锁定表
