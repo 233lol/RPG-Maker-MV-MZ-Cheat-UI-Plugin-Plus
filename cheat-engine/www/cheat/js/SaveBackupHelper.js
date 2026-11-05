@@ -863,25 +863,30 @@ export class SaveBackupCheat {
 
   // 还原前给「将被覆盖的存档」留一份自动快照 —— 这是还原可回退的保证。
   // 但如果这份存档刚被留过快照（记录里的 saveCount 与当前一致），就不再重复留。
+  //
+  // 返回值必须是三态，调用方才能区分「不需要备份」「已有等价快照」和
+  // 「备份失败」：以前统一返回 null，备份失败时还原仍会继续覆盖且谎报已备份。
   static backupCurrentSave(slot) {
     if (!this.hasSave(slot)) {
-      return null;
+      return { status: "skipped", reason: "no-save" };
     }
 
     const saveCount = this.getSaveCount();
     const newest = this.findNewestAutoSnapshot(slot);
 
     if (newest && Number(newest.saveCount) === saveCount) {
-      return null;
+      return { status: "skipped", reason: "deduped", snapshot: newest };
     }
 
     try {
-      return this.createSnapshot(slot, BACKUP_KIND_AUTO, "", {
+      const snapshot = this.createSnapshot(slot, BACKUP_KIND_AUTO, "", {
         saveCount: saveCount,
       });
+
+      return { status: "created", snapshot: snapshot };
     } catch (error) {
       console.warn("[cheat plugin] 还原前自动快照失败", error);
-      return null;
+      return { status: "failed", error: error };
     }
   }
 
@@ -1009,8 +1014,17 @@ export class SaveBackupCheat {
 
     // 只在「会覆盖已有存档」时才留退路。写到空槽位不用备份，
     // 尤其不能去备份目标槽位 —— 那会凭空造出一份空快照。
+    let backupResult = { status: "skipped", reason: "no-save" };
+
     if (this.hasSave(slot)) {
-      this.backupCurrentSave(slot);
+      backupResult = this.backupCurrentSave(slot);
+
+      // 备份失败就不能继续覆盖：否则玩家唯一的回退路径也没了。
+      if (backupResult.status === "failed") {
+        throw new Error(
+          "覆盖前自动留快照失败，已中止还原。请检查存档目录与 cheat-settings 目录是否可写。",
+        );
+      }
     }
 
     this.writeSaveText(slot, jsonText);
@@ -1036,12 +1050,24 @@ export class SaveBackupCheat {
         ],
       });
     } else if (isSameSlot) {
-      Alert.success(`已还原存档 ${slot}（覆盖前已自动留了一份快照）`);
+      const backupNote =
+        backupResult.status === "created"
+          ? "（覆盖前已自动留了一份快照）"
+          : backupResult.reason === "deduped"
+            ? "（该存档已有最新快照）"
+            : "";
+
+      Alert.success(`已还原存档 ${slot}${backupNote}`);
     } else {
       Alert.success(`已还原到存档 ${slot}（来自存档 ${sourceSlot} 的快照）`);
     }
 
-    return { slot: slot, sourceSlot: sourceSlot, isSameSlot: isSameSlot };
+    return {
+      slot: slot,
+      sourceSlot: sourceSlot,
+      isSameSlot: isSameSlot,
+      backup: backupResult,
+    };
   }
 
   static touchBackup(id) {
