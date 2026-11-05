@@ -691,8 +691,13 @@ export default {
         }
       }
 
-      const next = Math.min(source + 1, limit);
-      return next === source ? source + 1 : next;
+      // 所有槽位都占满时也要给一个有效默认值：source 是最大槽位时
+      // 旧逻辑返回 source + 1，用户直接回车就会在还原时抛「超出上限」。
+      if (limit > 1) {
+        return source < limit ? source + 1 : 1;
+      }
+
+      return source;
     },
 
     confirmRestore(item, targetSlot) {
