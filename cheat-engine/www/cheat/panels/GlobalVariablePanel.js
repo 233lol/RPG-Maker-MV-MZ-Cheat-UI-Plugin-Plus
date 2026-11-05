@@ -774,8 +774,21 @@ export default {
         return false;
       }
 
+      // 属性可能在游戏运行时被 delete / 置空。markRaw(null/undefined)
+      // 会直接抛 TypeError，自动刷新每个周期都会中断，列表静默冻结。
+      const value = result.value;
+
+      if (
+        value === null ||
+        (typeof value !== "object" && typeof value !== "function")
+      ) {
+        this.containerError = "该路径的当前值为空或不是对象";
+        this.container = null;
+        return false;
+      }
+
       this.containerError = "";
-      this.container = markRaw(result.value);
+      this.container = markRaw(value);
       return true;
     },
 
