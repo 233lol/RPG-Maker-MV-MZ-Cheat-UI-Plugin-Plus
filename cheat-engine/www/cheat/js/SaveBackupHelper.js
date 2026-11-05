@@ -467,9 +467,37 @@ export class SaveBackupCheat {
       return 0;
     }
 
+    const fs = this.requireFs();
     const entries = this.readIndex();
     const infoCache = new Map();
+    const sameSaveCache = new Map();
     let patched = 0;
+
+    // 当前槽位的存档是否就是快照拍的那一份。文件 mtime 与快照创建时间
+    // 相差太大说明之后又存过档，此时用当前存档头回填会把旧快照的时间
+    // 永久改成新存档的时间。
+    const isLikelySameSave = (slot, entryTime) => {
+      const cacheKey = `${slot}:${entryTime}`;
+
+      if (sameSaveCache.has(cacheKey)) {
+        return sameSaveCache.get(cacheKey);
+      }
+
+      let same = false;
+
+      try {
+        const savePath = this.getSaveFilePath(slot);
+
+        if (savePath && fs.existsSync(savePath) && entryTime > 0) {
+          same = Math.abs(fs.statSync(savePath).mtimeMs - entryTime) <= 5000;
+        }
+      } catch (error) {
+        same = false;
+      }
+
+      sameSaveCache.set(cacheKey, same);
+      return same;
+    };
 
     for (const entry of entries) {
       if (entry.backfillChecked) {
@@ -498,6 +526,11 @@ export class SaveBackupCheat {
         continue;
       }
 
+      // 只有当前存档与快照创建时间吻合时才认为是同一份存档
+      if (!isLikelySameSave(slot, Number(entry.createdAt) || 0)) {
+        continue;
+      }
+
       if (!hasPlaytime && info.playtimeFrames > 0) {
         entry.playtimeFrames = info.playtimeFrames;
         entry.playtime = info.playtimeText;
@@ -511,13 +544,18 @@ export class SaveBackupCheat {
       // 存档头里确实没有时长 / 时间：记下来别再反复尝试
       entry.backfillChecked = true;
 
-      const meta = this.readMeta(entry.id);
-      if (meta) {
-        meta.playtimeFrames = entry.playtimeFrames;
-        meta.playtime = entry.playtime;
-        meta.savefileTime = entry.savefileTime;
-        meta.savefileTimeText = entry.savefileTimeText;
-        this.writeMeta(meta);
+      try {
+        const meta = this.readMeta(entry.id);
+        if (meta) {
+          meta.playtimeFrames = entry.playtimeFrames;
+          meta.playtime = entry.playtime;
+          meta.savefileTime = entry.savefileTime;
+          meta.savefileTimeText = entry.savefileTimeText;
+          this.writeMeta(meta);
+        }
+      } catch (error) {
+        // 只读设置目录 / 磁盘满时不要让整个面板初始化失败
+        console.warn("[cheat plugin] 回填快照元数据失败", entry.id, error);
       }
 
       patched++;
@@ -530,7 +568,11 @@ export class SaveBackupCheat {
     }
 
     if (patched > 0) {
-      this.writeIndex(entries);
+      try {
+        this.writeIndex(entries);
+      } catch (error) {
+        console.warn("[cheat plugin] 写回快照索引失败", error);
+      }
     }
 
     return patched;
