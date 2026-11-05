@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "strict": false,
+    "types": []
+  },
+  "include": ["cheat-engine/www/cheat/**/*.js", "tests/unit/**/*.mjs"],
+  "exclude": [
+    "node_modules",
+    "cheat-engine/www/cheat/libs/**",
+    "cheat-engine/www/cheat/css/**",
+    "cheat-engine/www/cheat/fonts/**",
+    "cheat-engine/www/cheat/version.js"
+  ]
+}

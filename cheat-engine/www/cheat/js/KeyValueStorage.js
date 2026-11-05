@@ -6,9 +6,17 @@ import { writeJsonAtomic } from "./AtomicFile.js";
 
 const fileCache = new Map();
 
+function isNwjs() {
+  return (
+    typeof Utils !== "undefined" &&
+    typeof Utils.isNwjs === "function" &&
+    Utils.isNwjs()
+  );
+}
+
 export class KeyValueStorage {
   constructor(filePath) {
-    if (Utils.isNwjs()) {
+    if (isNwjs()) {
       this.filePath = filePath;
       this.fileEncoding = "utf-8";
       this.fileSystem = require("fs");
@@ -17,7 +25,14 @@ export class KeyValueStorage {
   }
 
   getItem(key) {
-    if (!Utils.isNwjs()) {
+    if (!isNwjs()) {
+      if (
+        typeof window === "undefined" ||
+        typeof localStorage === "undefined"
+      ) {
+        return null;
+      }
+
       return localStorage.getItem(key);
     }
 
@@ -25,8 +40,13 @@ export class KeyValueStorage {
   }
 
   setItem(key, value) {
-    if (!Utils.isNwjs()) {
-      localStorage.setItem(key, value);
+    if (!isNwjs()) {
+      if (
+        typeof window !== "undefined" &&
+        typeof localStorage !== "undefined"
+      ) {
+        localStorage.setItem(key, value);
+      }
       return;
     }
 

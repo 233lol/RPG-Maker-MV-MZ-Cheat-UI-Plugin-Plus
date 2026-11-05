@@ -5,6 +5,7 @@ import { LockService } from "./js/LockService.js";
 import AlertSnackbar from "./components/AlertSnackbar.js";
 import ConfirmDialog from "./components/ConfirmDialog.js";
 import { customizeRPGMakerFunctions } from "./init/customize_functions.js";
+import { installGameDataHooks } from "./js/GameDataState.js";
 import { Key } from "./js/KeyCodes.js";
 
 export default {
@@ -37,6 +38,7 @@ export default {
 
   created() {
     customizeRPGMakerFunctions(this);
+    installGameDataHooks();
     LockService.ensureLoaded();
 
     GeneralCheat.toggleCheatModal = (componentName = null) => {

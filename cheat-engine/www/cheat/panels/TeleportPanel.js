@@ -6,11 +6,13 @@ import {
   getPageCount,
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
+import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
+import { panelStateMixin } from "../js/PanelState.js";
 
 export default {
   name: "TeleportPanel",
 
-  mixins: [paginationWatcherMixin],
+  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
 
   components: { PaginationFooter, SearchField },
 
@@ -190,6 +192,10 @@ export default {
   },
 
   computed: {
+    panelStateId() {
+      return "teleport";
+    },
+
     filteredTableHeaders() {
       if (this.excludeFullPath) {
         return this.tableHeaders.filter((header) => header.key !== "fullPath");
@@ -225,6 +231,20 @@ export default {
   },
 
   methods: {
+    getPanelStateSnapshot() {
+      return {
+        search: this.search,
+        excludeFullPath: this.excludeFullPath,
+        pagination: this.pagination,
+      };
+    },
+
+    applyPanelState(state) {
+      this.search = state.search;
+      this.excludeFullPath = state.excludeFullPath;
+      this.pagination = { ...this.pagination, ...state.pagination };
+    },
+
     jumpToPage(page) {
       this.pagination.page = page;
     },

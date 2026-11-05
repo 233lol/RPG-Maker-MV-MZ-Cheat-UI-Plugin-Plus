@@ -8,12 +8,14 @@ import {
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
 import { isVariablesReady, requireVariablesReady } from "../js/GameState.js";
+import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
+import { panelStateMixin } from "../js/PanelState.js";
 import { markRaw } from "../libs/vue.js";
 
 export default {
   name: "VariableSettingPanel",
 
-  mixins: [paginationWatcherMixin],
+  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -192,6 +194,10 @@ export default {
   },
 
   computed: {
+    panelStateId() {
+      return "variables";
+    },
+
     filteredTableItems() {
       let items = this.tableItems.filter((item) => {
         if (this.excludeNameless && !item.name) {
@@ -233,6 +239,20 @@ export default {
   },
 
   methods: {
+    getPanelStateSnapshot() {
+      return {
+        search: this.search,
+        excludeNameless: this.excludeNameless,
+        pagination: this.pagination,
+      };
+    },
+
+    applyPanelState(state) {
+      this.search = state.search;
+      this.excludeNameless = state.excludeNameless;
+      this.pagination = { ...this.pagination, ...state.pagination };
+    },
+
     async initializeVariables() {
       if (!isVariablesReady() || typeof $dataSystem === "undefined") {
         this.tableItems = [];

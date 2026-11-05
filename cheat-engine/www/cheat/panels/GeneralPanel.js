@@ -8,6 +8,9 @@ import {
 
 import RefreshButton from "../components/RefreshButton.js";
 import interpretCodes from "../js/eventCodes.js";
+import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
+import { saveLocale } from "../js/LocaleService.js";
+import { getAvailableLocales, getLocale, t } from "../js/strings.js";
 import * as BuildVersion from "../version.js";
 
 // shiki 体积较大，改为首次使用时动态加载并缓存，避免随面板启动解析
@@ -40,6 +43,8 @@ function plainParamHtml(text) {
 export default {
   name: "GeneralPanel",
 
+  mixins: [gameDataWatcherMixin],
+
   components: { RefreshButton },
 
   template: `
@@ -52,7 +57,7 @@ export default {
             v-model="noClip"
             density="compact"
             hide-details
-            label="穿墙"
+            :label="t('general.noClip')"
             @change="onNoClipChange">
         </v-checkbox>
     </v-card-text>
@@ -60,7 +65,7 @@ export default {
     <v-card-text class="py-0">
         <v-text-field
             v-model="gold"
-            label="钱"
+            :label="t('general.gold')"
             variant="outlined"
             density="compact"
             hide-details
@@ -81,7 +86,7 @@ export default {
             hide-details
             @end="onSpeedChange">
             <template #prepend>
-                <span class="text-grey-lighten-1 align-self-center mr-2 text-body-medium" style="white-space: nowrap;">移动速度</span>
+                <span class="text-grey-lighten-1 align-self-center mr-2 text-body-medium" style="white-space: nowrap;">{{ t("general.moveSpeed") }}</span>
                 <v-icon color="grey lighten-3" @click="addSpeed(-stepSpeed)">mdi-chevron-left</v-icon>
             </template>
             <template #append>
@@ -94,7 +99,7 @@ export default {
             class="pt-0"
             hide-details
             density="compact"
-            label="固定速度"
+            :label="t('general.fixedSpeed')"
             @change="onSpeedChange">
         </v-checkbox>
         
@@ -109,7 +114,7 @@ export default {
             hide-details
             @end="onGameSpeedChange">
             <template #prepend>
-                <span class="text-grey-lighten-1 align-self-center mr-2 d-inline-block text-body-medium" style="white-space: nowrap;">游戏速度</span>
+                <span class="text-grey-lighten-1 align-self-center mr-2 d-inline-block text-body-medium" style="white-space: nowrap;">{{ t("general.gameSpeed") }}</span>
                 <v-icon color="grey lighten-3" @click="addGameSpeed(-stepGameSpeed)">mdi-chevron-left</v-icon>
             </template>
             <template #append>
@@ -124,7 +129,7 @@ export default {
             class="d-inline-flex pt-0"
             hide-details
             density="compact"
-            label="全部场景"
+            :label="t('general.allScenes')"
             @change="onApplyAllForGameSpeedChange">
         </v-checkbox>
         <v-checkbox
@@ -132,28 +137,28 @@ export default {
             class="d-inline-flex ml-2 pt-0 mb-0"
             hide-details
             density="compact"
-            label="战斗中"
+            :label="t('general.inBattle')"
             @change="onApplyBattleForGameSpeedChange">
         </v-checkbox>
     </v-card-text>
 
-    <v-card-subtitle class="mt-3 font-weight-bold">快速操作</v-card-subtitle>
+    <v-card-subtitle class="mt-3 font-weight-bold">{{ t("general.quickActions") }}</v-card-subtitle>
     
     <v-card-text class="py-0">
-        <v-btn size="small" @click="gotoTitle">返回标题</v-btn>
-        <v-btn size="small" class="mr-1" @click="toggleSaveScene">保存页面</v-btn>
-        <v-btn size="small" @click="toggleLoadScene">加载页面</v-btn>
+        <v-btn size="small" @click="gotoTitle">{{ t("general.backToTitle") }}</v-btn>
+        <v-btn size="small" class="mr-1" @click="toggleSaveScene">{{ t("general.saveScene") }}</v-btn>
+        <v-btn size="small" @click="toggleLoadScene">{{ t("general.loadScene") }}</v-btn>
     </v-card-text>
 
     <v-card-text>
-        <v-btn size="small" @click="victory">胜利</v-btn>
-        <v-btn size="small" @click="recoverAllParty">我方恢复</v-btn>
-        <v-btn size="small" @click="changeAllEnemyHealth(1)">敌人1血</v-btn>
+        <v-btn size="small" @click="victory">{{ t("general.victory") }}</v-btn>
+        <v-btn size="small" @click="recoverAllParty">{{ t("general.recoverParty") }}</v-btn>
+        <v-btn size="small" @click="changeAllEnemyHealth(1)">{{ t("general.enemyHp1") }}</v-btn>
     </v-card-text>
 
     <v-card-text class="pt-0">
-        <v-btn size="small" color="indigo" @click="inspectCurrentEvent">检查当前事件</v-btn>
-        <v-btn size="small" color="deep-purple" class="ml-2" @click="openDebugRepl">打开REPL</v-btn>
+        <v-btn size="small" color="indigo" @click="inspectCurrentEvent">{{ t("general.inspectEvent") }}</v-btn>
+        <v-btn size="small" color="deep-purple" class="ml-2" @click="openDebugRepl">{{ t("general.openRepl") }}</v-btn>
     </v-card-text>
 
     <v-dialog v-model="showEventInspectDialog" max-width="1200" persistent>
@@ -255,6 +260,21 @@ export default {
         </v-card>
     </v-dialog>
 
+    <v-card-text class="py-0 d-flex align-center">
+        <span class="text-body-small text-grey-lighten-1 mr-2">{{ t("general.language") }}</span>
+        <v-select
+            v-model="locale"
+            :items="localeOptions"
+            item-title="title"
+            item-value="value"
+            density="compact"
+            variant="outlined"
+            hide-details
+            style="max-width: 160px;"
+            @update:model-value="onLocaleChange">
+        </v-select>
+    </v-card-text>
+
     <v-card-text class="pt-2 pb-2 text-body-small text-grey-lighten-1 text-center">
         <a
             :href="versionUrl"
@@ -275,6 +295,9 @@ export default {
 
   data() {
     return {
+      locale: getLocale(),
+      localeOptions: getAvailableLocales(),
+
       noClip: false,
       gold: 0,
       speed: 0,
@@ -331,6 +354,21 @@ export default {
   },
 
   methods: {
+    t,
+
+    onLocaleChange(locale) {
+      if (!locale || locale === getLocale()) {
+        return;
+      }
+
+      saveLocale(locale);
+
+      // 导航、分页选项等模块级常量在加载时求值，刷新一次最省事
+      if (typeof window !== "undefined" && window.location) {
+        window.location.reload();
+      }
+    },
+
     initializeVariables() {
       // 键盘监听在 app 挂载时就绑定了，读档 / 加载转圈（MZ 还要初始化 effekseer
       // WASM）这段窗口里 $gamePlayer、$gameParty 还不存在。这里用默认值兜底 ——

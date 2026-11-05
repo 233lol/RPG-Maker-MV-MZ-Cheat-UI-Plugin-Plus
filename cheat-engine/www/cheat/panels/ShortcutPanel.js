@@ -9,11 +9,12 @@ import {
   getPageCount,
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
+import { panelStateMixin } from "../js/PanelState.js";
 
 export default {
   name: "ShortcutPanel",
 
-  mixins: [paginationWatcherMixin],
+  mixins: [paginationWatcherMixin, panelStateMixin],
 
   components: {
     KeyInputField,
@@ -203,6 +204,10 @@ export default {
   },
 
   computed: {
+    panelStateId() {
+      return "shortcuts";
+    },
+
     filteredHeaders() {
       return this.tableHeaders.filter(
         (header) => !this.hideDesc || header.key !== "desc",
@@ -238,6 +243,20 @@ export default {
   },
 
   methods: {
+    getPanelStateSnapshot() {
+      return {
+        search: this.search,
+        hideDesc: this.hideDesc,
+        pagination: this.pagination,
+      };
+    },
+
+    applyPanelState(state) {
+      this.search = state.search;
+      this.hideDesc = state.hideDesc;
+      this.pagination = { ...this.pagination, ...state.pagination };
+    },
+
     jumpToPage(page) {
       this.pagination.page = page;
     },

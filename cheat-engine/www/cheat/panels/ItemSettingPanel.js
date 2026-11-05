@@ -11,6 +11,7 @@ export default {
   template: `
 <v-card flat class="ma-0 pa-0">
     <item-table-tab
+        state-key="item"
         :items="items"
         :headers="headers"
         :as-table-data="convertToTableData"

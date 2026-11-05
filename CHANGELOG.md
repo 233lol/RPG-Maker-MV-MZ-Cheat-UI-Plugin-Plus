@@ -9,6 +9,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- 界面多语言：简体中文 / English / 日本語，可在「常用」面板切换；导航、通用文案与常用面板已接入。
+- 面板状态持久化：搜索词、过滤开关、分页大小与页码会写入 `panel-state.json`，下次打开自动恢复。
+- 统一游戏数据状态层：读档、新游戏、战斗结束、地图切换后自动刷新当前面板。
+- `pnpm run typecheck`（TypeScript 检查带 `// @ts-check` 的文件），并接入 `make check` 与 CI。
+
+### Changed
+
+- 拆分超大模块：`SaveBackupHelper` → `save-backup/*`，`GlobalObjectHelper` → `global-object/*`，地图事件识别 → `map-event/classifier.js`，全局变量行构建 → `GlobalVariableRows.js`。
+
 ### Fixed
 
 - 快速读档补齐 `Scene_Load` 的地图重载、`onAfterLoad` 与淡出收尾，避免读档后地图/插件状态不同步。

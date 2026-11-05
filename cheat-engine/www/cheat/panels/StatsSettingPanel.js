@@ -1,10 +1,14 @@
 import RefreshButton from "../components/RefreshButton.js";
 import { GeneralCheat } from "../js/CheatHelper.js";
 import { isPartyReady, requirePartyReady } from "../js/GameState.js";
+import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
+import { panelStateMixin } from "../js/PanelState.js";
 import { markRaw } from "../libs/vue.js";
 
 export default {
   name: "StatsSettingPanel",
+
+  mixins: [gameDataWatcherMixin, panelStateMixin],
 
   components: { RefreshButton },
 
@@ -107,7 +111,23 @@ export default {
     this.initializeVariables();
   },
 
+  computed: {
+    panelStateId() {
+      return "stats";
+    },
+  },
+
   methods: {
+    getPanelStateSnapshot() {
+      return {
+        selectedTab: this.selectedTab,
+      };
+    },
+
+    applyPanelState(state) {
+      this.selectedTab = state.selectedTab;
+    },
+
     extractActorData(actor) {
       // get actor param
       const paramSize = actor._paramPlus.length;
@@ -142,6 +162,10 @@ export default {
       this.actors = $gameParty
         .members()
         .map((actor) => this.extractActorData(actor));
+
+      if (!this.actors.some((actor) => actor.id === this.selectedTab)) {
+        this.selectedTab = this.actors[0]?.id ?? null;
+      }
     },
 
     onLevelChange(item) {

@@ -8,11 +8,13 @@ import {
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
 import { isPartyReady, requirePartyReady } from "../js/GameState.js";
+import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
+import { panelStateMixin } from "../js/PanelState.js";
 
 export default {
   name: "ItemTableTab",
 
-  mixins: [paginationWatcherMixin],
+  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -102,6 +104,10 @@ export default {
   },
 
   props: {
+    stateKey: {
+      type: String,
+      default: "item",
+    },
     items: {
       type: Array,
       default: () => [],
@@ -129,6 +135,10 @@ export default {
   },
 
   computed: {
+    panelStateId() {
+      return `item-table-${this.stateKey}`;
+    },
+
     filteredTableItems() {
       let items = this.tableItems.filter((item) => {
         if (this.excludeNameless && !item.name) {
@@ -169,6 +179,22 @@ export default {
   },
 
   methods: {
+    getPanelStateSnapshot() {
+      return {
+        search: this.search,
+        excludeNameless: this.excludeNameless,
+        onlyOwnedItems: this.onlyOwnedItems,
+        pagination: this.pagination,
+      };
+    },
+
+    applyPanelState(state) {
+      this.search = state.search;
+      this.excludeNameless = state.excludeNameless;
+      this.onlyOwnedItems = state.onlyOwnedItems;
+      this.pagination = { ...this.pagination, ...state.pagination };
+    },
+
     initializeVariables() {
       this.tableHeaders = this.headers.slice(0);
       this.tableHeaders.push({

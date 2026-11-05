@@ -11,6 +11,9 @@ Vue 2 + Vuetify 2 迁移至 Vue 3，UI 框架已升级至 Vuetify 4。
 - 添加了角色技能修改
 - 添加了「全局变量」面板：以文件夹形式浏览 RPG Maker / 第三方插件定义的 JS 全局变量（自动过滤函数 / 方法），可进入嵌套对象（进入层级时自动清空搜索，避免内部变量被过滤）、直接修改数字 / 字符串 / 布尔值、用 JSON 编辑数组与对象、新增 / 删除属性，支持当前层搜索与递归深度搜索
 - 添加了「存档时间机器」面板：为任意存档槽留快照、一键回滚、导入导出（详见下文）
+- 界面支持简体中文 / English / 日本語 切换（完整翻译仍在逐步迁移，导航与常用面板已覆盖）
+- 面板的搜索词、过滤开关、分页大小和页码会持久化，下次打开保持上次状态
+- 读档 / 新游戏 / 战斗结束 / 地图切换后，当前面板会自动刷新
 - 完全离线化
 
 ## 界面预览
@@ -65,9 +68,10 @@ make clean
 pnpm run lint          # ESLint
 pnpm run format        # Prettier 自动格式化
 pnpm run format:check  # 只检查格式（CI 使用）
+pnpm run typecheck     # TypeScript 检查带 // @ts-check 的 JS 文件
 pnpm run test:unit     # node --test 纯函数单测，不需要游戏 / nwjs-sdk
 pnpm run test:packaging # 压缩包结构测试，需要先 make 生成 vendor 文件
-make check             # lint + format:check + test:unit
+make check             # lint + format:check + test:unit + typecheck
 ```
 
 代码风格配置见 `.editorconfig`、`.prettierrc.json`、`eslint.config.mjs`。RPG Maker 在运行时注入大量全局变量（`$gamePlayer`、`DataManager` 等），因此作弊源码关闭了 `no-undef`，其余推荐规则仍然启用。
@@ -154,7 +158,15 @@ pnpm test:mz        # 只测 MZ
 | `cheat-engine/www/cheat/js/AtomicFile.js` | 原子写入 JSON / 文本文件 |
 | `cheat-engine/www/cheat/js/GameState.js` | 游戏数据就绪检查 |
 | `cheat-engine/www/cheat/js/PaginationHelper.js` | 统一分页计算（含“全部”） |
-| `cheat-engine/www/cheat/js/strings.js` | 共享 UI 文案（搜索 / 分页 / 刷新 / 导航名称） |
+| `cheat-engine/www/cheat/js/strings.js` | 共享 UI 文案 + 多语言入口（`t()` / `setLocale()`） |
+| `cheat-engine/www/cheat/js/locales/` | 简体中文 / English / 日本語 文案表 |
+| `cheat-engine/www/cheat/js/LocaleService.js` | 语言检测与持久化 |
+| `cheat-engine/www/cheat/js/PanelState.js` | 面板筛选 / 分页状态持久化与 mixin |
+| `cheat-engine/www/cheat/js/GameDataState.js` | 统一游戏数据变化事件 |
+| `cheat-engine/www/cheat/js/GameDataWatcher.js` | 面板自动刷新 mixin |
+| `cheat-engine/www/cheat/js/save-backup/` | 存档时间机器拆分模块（格式 / 编解码 / 索引 / 导入导出 / 设置） |
+| `cheat-engine/www/cheat/js/global-object/` | 全局变量拆分模块（名称 / 格式化 / 编辑 / 扫描） |
+| `cheat-engine/www/cheat/js/map-event/` | 地图事件识别规则 |
 | `cheat-engine/www/cheat/js/ClickGuard.js` | 作弊 UI / 弹层点击拦截 |
 | `cheat-engine/www/cheat/init/` | 插件入口 & 初始化 |
 | `cheat-engine/www/cheat/libs/` | 第三方库 (Vue, Vuetify, Shiki) |
@@ -274,8 +286,9 @@ GitHub Actions 在推送到 `main`、`vue-3`（以及相关 `pull_request`）时
 
 1. `pnpm run lint`、`pnpm run format:check`
 2. `pnpm run test:unit`（纯函数单测）
-3. `make` 构建 MV / MZ 压缩包
-4. `pnpm run test:packaging` 校验压缩包目录结构与入口路径
+3. `pnpm run typecheck`（`// @ts-check` 文件的 TypeScript 检查）
+4. `make` 构建 MV / MZ 压缩包
+5. `pnpm run test:packaging` 校验压缩包目录结构与入口路径
 
 最后上传两个 `.zip` 产物。完整的 nw.js 无头测试仍需本地准备 `mv/`、`mz/` 测试游戏，未放进 CI。
 

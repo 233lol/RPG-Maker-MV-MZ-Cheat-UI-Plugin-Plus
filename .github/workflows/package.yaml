@@ -18,6 +18,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
+      - "jsconfig.json"
   pull_request:
     paths:
       - "cheat-engine/**"
@@ -32,6 +33,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
+      - "jsconfig.json"
   workflow_dispatch:
 
 # 最小权限：本 workflow 只需读代码并上传 artifact，无需写权限
@@ -59,6 +61,8 @@ jobs:
         run: pnpm run format:check
       - name: unit tests
         run: pnpm run test:unit
+      - name: typecheck
+        run: pnpm run typecheck
       - name: build and package
         run: make
       - name: packaging tests

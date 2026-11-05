@@ -48,6 +48,7 @@ check:
 	pnpm run lint
 	pnpm run format:check
 	pnpm run test:unit
+	pnpm run typecheck
 
 $(vuetifycss) $(mdicss) $(mdifonts):
 	pnpm run vendor:assets$(if $(filter dev,$(VUE)),:dev)

@@ -8,11 +8,13 @@ import {
   getPageCount,
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
+import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
+import { panelStateMixin } from "../js/PanelState.js";
 
 export default {
   name: "SaveRecallPanel",
 
-  mixins: [paginationWatcherMixin],
+  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -161,6 +163,10 @@ export default {
   },
 
   computed: {
+    panelStateId() {
+      return "save-recall";
+    },
+
     tableItems() {
       return this.locations.map((location, idx) => {
         return {
@@ -210,6 +216,18 @@ export default {
   },
 
   methods: {
+    getPanelStateSnapshot() {
+      return {
+        search: this.search,
+        pagination: this.pagination,
+      };
+    },
+
+    applyPanelState(state) {
+      this.search = state.search;
+      this.pagination = { ...this.pagination, ...state.pagination };
+    },
+
     jumpToPage(page) {
       this.pagination.page = page;
     },

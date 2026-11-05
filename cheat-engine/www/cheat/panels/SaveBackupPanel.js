@@ -9,6 +9,8 @@ import {
   getPageCount,
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
+import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
+import { panelStateMixin } from "../js/PanelState.js";
 import { markRaw } from "../libs/vue.js";
 
 // 存档时间机器面板：手动/自动快照、一键回滚、导入导出。
@@ -16,7 +18,7 @@ import { markRaw } from "../libs/vue.js";
 export default {
   name: "SaveBackupPanel",
 
-  mixins: [paginationWatcherMixin],
+  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -342,6 +344,10 @@ export default {
   },
 
   computed: {
+    panelStateId() {
+      return "save-backup";
+    },
+
     // 状态压成一行：槽位 · 地图 · 快照计数 · 占用。
     // 逐条换行会把表格挤到屏幕外，得不偿失。
     currentSummary() {
@@ -454,6 +460,20 @@ export default {
   },
 
   methods: {
+    getPanelStateSnapshot() {
+      return {
+        search: this.search,
+        slotFilter: this.slotFilter,
+        pagination: this.pagination,
+      };
+    },
+
+    applyPanelState(state) {
+      this.search = state.search;
+      this.slotFilter = state.slotFilter;
+      this.pagination = { ...this.pagination, ...state.pagination };
+    },
+
     jumpToPage(page) {
       this.pagination.page = page;
     },

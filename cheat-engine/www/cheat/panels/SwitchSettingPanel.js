@@ -9,11 +9,13 @@ import {
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
 import { isSwitchesReady, requireSwitchesReady } from "../js/GameState.js";
+import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
+import { panelStateMixin } from "../js/PanelState.js";
 
 export default {
   name: "SwitchSettingPanel",
 
-  mixins: [paginationWatcherMixin],
+  mixins: [paginationWatcherMixin, gameDataWatcherMixin, panelStateMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -144,6 +146,10 @@ export default {
   },
 
   computed: {
+    panelStateId() {
+      return "switches";
+    },
+
     filteredTableItems() {
       return this.tableItems.filter((item) => {
         if (
@@ -190,6 +196,20 @@ export default {
   },
 
   methods: {
+    getPanelStateSnapshot() {
+      return {
+        search: this.search,
+        excludeNameless: this.excludeNameless,
+        pagination: this.pagination,
+      };
+    },
+
+    applyPanelState(state) {
+      this.search = state.search;
+      this.excludeNameless = state.excludeNameless;
+      this.pagination = { ...this.pagination, ...state.pagination };
+    },
+
     async initializeVariables() {
       if (!isSwitchesReady() || typeof $dataSystem === "undefined") {
         this.tableItems = [];

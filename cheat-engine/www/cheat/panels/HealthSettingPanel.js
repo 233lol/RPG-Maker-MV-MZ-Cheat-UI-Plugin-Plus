@@ -2,10 +2,13 @@ import RefreshButton from "../components/RefreshButton.js";
 import HealthSettingTab from "./HealthSettingTab.js";
 import { BattleCheat } from "../js/CheatHelper.js";
 import { isPartyReady } from "../js/GameState.js";
+import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { markRaw } from "../libs/vue.js";
 
 export default {
   name: "HealthSettingPanel",
+
+  mixins: [gameDataWatcherMixin],
 
   components: {
     HealthSettingTab,

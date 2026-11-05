@@ -8,6 +8,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "typecheck": "tsc -p jsconfig.json",
     "test:unit": "node --test \"tests/unit/**/*.test.mjs\"",
     "vendor:shiki": "node tools/build-shiki.mjs",
     "vendor:shiki:dev": "node tools/build-shiki.mjs dev",
@@ -36,6 +37,7 @@
     "globals": "^17.14.0",
     "prettier": "^3.9.10",
     "shiki": "^4.6.0",
+    "typescript": "^5.9.3",
     "vue": "^3.5.44",
     "vuetify": "^4.3.1"
   },

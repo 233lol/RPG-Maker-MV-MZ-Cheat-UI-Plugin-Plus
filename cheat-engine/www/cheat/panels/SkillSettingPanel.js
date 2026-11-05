@@ -7,6 +7,8 @@ import {
   getPageCount,
 } from "../js/PaginationHelper.js";
 import { isPartyReady, requirePartyReady } from "../js/GameState.js";
+import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
+import { panelStateMixin } from "../js/PanelState.js";
 
 // 模块级缓存：getFilteredSkills 每轮渲染被调用 5 次（表格 items + 4 个分页方法），
 // 缓存过滤结果避免重复全量 map+filter；搜索/过滤开关/已学技能/刷新数据任一变化即失效。
@@ -15,6 +17,8 @@ const filteredSkillsCache = new Map();
 
 export default {
   name: "SkillSettingPanel",
+
+  mixins: [gameDataWatcherMixin, panelStateMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -157,7 +161,52 @@ export default {
     this.initializeVariables();
   },
 
+  computed: {
+    panelStateId() {
+      return "skills";
+    },
+  },
+
   methods: {
+    getPanelStateSnapshot() {
+      return {
+        selectedTab: this.selectedTab,
+        actors: this.actors.map((actor) => ({
+          id: actor.id,
+          onlyLearned: actor.onlyLearned,
+          skillSearch: actor.skillSearch,
+          pagination: actor.pagination,
+        })),
+      };
+    },
+
+    applyPanelState(state) {
+      this.selectedTab = state.selectedTab;
+
+      const savedById = new Map(
+        (state.actors || []).map((entry) => [entry.id, entry]),
+      );
+
+      for (const actor of this.actors) {
+        const saved = savedById.get(actor.id);
+        if (!saved) {
+          continue;
+        }
+
+        if (typeof saved.onlyLearned === "boolean") {
+          actor.onlyLearned = saved.onlyLearned;
+        }
+
+        if (typeof saved.skillSearch === "string") {
+          actor.skillSearch = saved.skillSearch;
+        }
+
+        if (saved.pagination && typeof saved.pagination === "object") {
+          actor.pagination = { ...actor.pagination, ...saved.pagination };
+        }
+      }
+    },
+
     extractSkillData(skill) {
       return {
         _skill: markRaw(skill),
@@ -201,10 +250,36 @@ export default {
           .map((skill) => this.extractSkillData(skill)),
       );
 
+      // 保留刷新前的筛选 / 分页状态：读档后 Game_Actor 会重建，
+      // 但玩家正在看的过滤条件不应该跟着重置。
+      const previousById = new Map(
+        this.actors.map((actor) => [
+          actor.id,
+          {
+            onlyLearned: actor.onlyLearned,
+            skillSearch: actor.skillSearch,
+            pagination: actor.pagination,
+          },
+        ]),
+      );
+
       // Load actors
-      this.actors = $gameParty
-        .members()
-        .map((actor) => this.extractActorData(actor));
+      this.actors = $gameParty.members().map((actor) => {
+        const data = this.extractActorData(actor);
+        const previous = previousById.get(data.id);
+
+        if (previous) {
+          data.onlyLearned = previous.onlyLearned;
+          data.skillSearch = previous.skillSearch;
+          data.pagination = previous.pagination;
+        }
+
+        return data;
+      });
+
+      if (!this.actors.some((actor) => actor.id === this.selectedTab)) {
+        this.selectedTab = this.actors[0]?.id ?? null;
+      }
     },
 
     getFilteredSkills(actor) {

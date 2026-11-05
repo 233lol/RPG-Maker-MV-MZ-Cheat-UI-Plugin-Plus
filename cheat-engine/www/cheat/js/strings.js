@@ -1,56 +1,69 @@
-// 共享 UI 文案。
+// @ts-check
+// 共享 UI 文案 + 轻量国际化。
 //
-// 面板里大量文案是一次性的游戏名词，继续留在各自模板里更易读；这里集中
-// 的是「多个地方会复用、改一次要全局生效」的通用文案（搜索、分页、刷新、
-// 导航名称等）。新增共享文案时优先放这里，避免同一个词在不同面板里出现
-// 两种写法。
+// 默认语言是简体中文；`t()` 每次调用都会按当前语言查表，因此组件重新渲染时
+// 会显示新语言。切换语言后界面会刷新窗口，让模块级常量（分页选项等）也重新求值。
 //
 // 用法：
 //   import { t } from "../js/strings.js";
 //   t("common.search")
 //   t("common.reloadTarget", { target: "游戏数据" })
-export const STRINGS = {
-  common: {
-    search: "搜索...",
-    perPage: "每页",
-    all: "全部",
-    reloadGameData: "重新加载游戏数据",
-    reloadSaveData: "重新加载存档数据",
-    reloadTarget: "重新加载{target}",
-  },
+import zhCN from "./locales/zh-CN.js";
+import en from "./locales/en.js";
+import ja from "./locales/ja.js";
+import { loadSavedLocale } from "./LocaleService.js";
 
-  nav: {
-    general: "常用",
-    battle: "战斗",
-    stats: "等级/属性",
-    items: "物品",
-    item: "道具",
-    weapon: "武器",
-    armor: "防具",
-    skill: "技能",
-    variable: "变量",
-    globalVariable: "全局变量",
-    switch: "开关",
-    saveLocation: "存读位置",
-    saveBackup: "存档时间机器",
-    teleport: "传送",
-    mapEvent: "地图事件",
-    shortcut: "快捷键",
-  },
+const DICTIONARIES = {
+  "zh-CN": zhCN,
+  en,
+  ja,
 };
 
-function lookup(key) {
+const LOCALE_TITLES = {
+  "zh-CN": "简体中文",
+  en: "English",
+  ja: "日本語",
+};
+
+// 保持向后兼容：测试和旧代码可以通过 STRINGS 读取默认中文表。
+export const STRINGS = zhCN;
+
+let currentLocale = loadSavedLocale();
+
+function normalizeLocale(locale) {
+  return Object.hasOwnProperty.call(DICTIONARIES, locale) ? locale : "zh-CN";
+}
+
+export function getLocale() {
+  return currentLocale;
+}
+
+export function setLocale(locale) {
+  currentLocale = normalizeLocale(locale);
+  return currentLocale;
+}
+
+export function getAvailableLocales() {
+  return Object.keys(DICTIONARIES).map((value) => ({
+    value,
+    title: LOCALE_TITLES[value] || value,
+  }));
+}
+
+function lookup(dictionary, key) {
   return key
     .split(".")
     .reduce(
       (node, part) =>
         node && Object.hasOwnProperty.call(node, part) ? node[part] : undefined,
-      STRINGS,
+      dictionary,
     );
 }
 
 export function t(key, params = {}) {
-  const text = lookup(key);
+  const current = lookup(DICTIONARIES[currentLocale], key);
+  const text =
+    typeof current === "string" ? current : lookup(DICTIONARIES["zh-CN"], key);
 
   if (typeof text !== "string") {
     // 缺失的 key 回显自身，方便开发时发现拼写错误，而不是静默显示空字符串。

@@ -1,7 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { STRINGS, t } from "../../cheat-engine/www/cheat/js/strings.js";
+import {
+  STRINGS,
+  getAvailableLocales,
+  getLocale,
+  setLocale,
+  t,
+} from "../../cheat-engine/www/cheat/js/strings.js";
+import en from "../../cheat-engine/www/cheat/js/locales/en.js";
+import ja from "../../cheat-engine/www/cheat/js/locales/ja.js";
 
 test("t：读取共享文案", () => {
   assert.equal(t("common.search"), "搜索...");
@@ -28,4 +36,49 @@ test("导航文案完整且不重复", () => {
 
   assert.ok(names.length >= 15);
   assert.equal(new Set(names).size, names.length, "导航文案不应重复");
+});
+
+function collectKeys(value, prefix = "") {
+  const keys = [];
+
+  for (const [key, child] of Object.entries(value)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+
+    if (child && typeof child === "object") {
+      keys.push(...collectKeys(child, path));
+    } else {
+      keys.push(path);
+    }
+  }
+
+  return keys.sort();
+}
+
+test("各语言文案表的 key 与中文表一致", () => {
+  const expected = collectKeys(STRINGS);
+
+  assert.deepEqual(collectKeys(en), expected);
+  assert.deepEqual(collectKeys(ja), expected);
+});
+
+test("setLocale：切换语言并支持未知语言回退", () => {
+  const original = getLocale();
+
+  try {
+    assert.deepEqual(
+      getAvailableLocales().map((item) => item.value),
+      ["zh-CN", "en", "ja"],
+    );
+
+    assert.equal(setLocale("en"), "en");
+    assert.equal(t("common.search"), "Search...");
+
+    assert.equal(setLocale("ja"), "ja");
+    assert.equal(t("general.noClip"), "壁抜け");
+
+    assert.equal(setLocale("fr"), "zh-CN");
+    assert.equal(t("common.search"), "搜索...");
+  } finally {
+    setLocale(original);
+  }
 });

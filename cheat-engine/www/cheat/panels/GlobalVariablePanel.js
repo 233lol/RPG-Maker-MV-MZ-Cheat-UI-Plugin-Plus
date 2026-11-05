@@ -10,19 +10,17 @@ import {
   paginate,
   paginationWatcherMixin,
 } from "../js/PaginationHelper.js";
+import { panelStateMixin } from "../js/PanelState.js";
 import { markRaw } from "../libs/vue.js";
 import {
   ROOT_FILTERS,
   SEARCH_LIMIT_REASONS,
   SEARCH_LIMITS,
-  createEntry,
   deleteChildValue,
   formatPathText,
   getChildValue,
-  getContainerKeys,
   getRootNamesByFilter,
   invalidateRootScanCache,
-  isHiddenKind,
   parseValueByKind,
   resolvePathValue,
   scanRootGlobalsCached,
@@ -30,6 +28,13 @@ import {
   setChildValue,
   toJsonText,
 } from "../js/GlobalObjectHelper.js";
+import {
+  buildBreadcrumbItems,
+  buildEntries as buildEntryRows,
+  entriesShallowEqual,
+  filterEntries,
+  findPageOfKey as findEntryPage,
+} from "../js/GlobalVariableRows.js";
 
 // 搜索上限的模块级缓存：设置文件只在第一次真正需要时同步读一次，
 // 之后重复打开面板都复用内存里的值，不再走 fs.readFileSync。
@@ -60,50 +65,10 @@ function measureFrom(name, startMs) {
   }
 }
 
-// 自动刷新用：两次构建结果的显示字段全部一致时复用旧数组，
-// 避免每 2 秒整体替换 entries 触发整列表 diff 与重渲染。
-function entriesShallowEqual(a, b) {
-  if (a === b) {
-    return true;
-  }
-
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
-    return false;
-  }
-
-  for (let i = 0; i < a.length; i++) {
-    const x = a[i];
-    const y = b[i];
-
-    if (x === y) {
-      continue;
-    }
-
-    if (!x || !y) {
-      return false;
-    }
-
-    if (
-      x.key !== y.key ||
-      x.kind !== y.kind ||
-      x.preview !== y.preview ||
-      x.valueText !== y.valueText ||
-      x.boolValue !== y.boolValue ||
-      x.isContainer !== y.isContainer ||
-      x.isEditable !== y.isEditable ||
-      x.isPlugin !== y.isPlugin
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 export default {
   name: "GlobalVariablePanel",
 
-  mixins: [paginationWatcherMixin],
+  mixins: [paginationWatcherMixin, panelStateMixin],
 
   components: { PaginationFooter, RefreshButton, SearchField },
 
@@ -659,6 +624,10 @@ export default {
   },
 
   computed: {
+    panelStateId() {
+      return "global-variables";
+    },
+
     isRoot() {
       return this.path.length === 0;
     },
@@ -672,16 +641,7 @@ export default {
     },
 
     breadcrumbItems() {
-      const items = [{ label: "全局变量", path: [] }];
-
-      this.path.forEach((key, index) => {
-        items.push({
-          label: String(key),
-          path: this.path.slice(0, index + 1),
-        });
-      });
-
-      return items;
+      return buildBreadcrumbItems(this.path);
     },
 
     // 深度搜索生效时，用搜索结果替换当前层列表
@@ -690,15 +650,7 @@ export default {
     },
 
     filteredEntries() {
-      const keyword = String(this.search || "")
-        .trim()
-        .toLowerCase();
-
-      if (!keyword) {
-        return this.entries;
-      }
-
-      return this.entries.filter((item) => this.entryMatches(item, keyword));
+      return filterEntries(this.entries, this.search);
     },
 
     // 0 表示「全部」
@@ -729,6 +681,24 @@ export default {
   },
 
   methods: {
+    getPanelStateSnapshot() {
+      return {
+        search: this.search,
+        rootFilter: this.rootFilter,
+        autoRefresh: this.autoRefresh,
+        refreshIntervalMs: this.refreshIntervalMs,
+        pagination: this.pagination,
+      };
+    },
+
+    applyPanelState(state) {
+      this.search = state.search;
+      this.rootFilter = state.rootFilter;
+      this.autoRefresh = state.autoRefresh;
+      this.refreshIntervalMs = state.refreshIntervalMs;
+      this.pagination = { ...this.pagination, ...state.pagination };
+    },
+
     // ---------- 初始加载（推迟到首帧之后） ----------
 
     // 用空闲回调把「读设置文件 + 扫描 window + 构建列表」挪出点击关键路径：
@@ -861,28 +831,13 @@ export default {
     },
 
     buildEntries() {
-      const container = this.container;
-
-      if (container === null || container === undefined) {
-        return [];
-      }
-
-      const atRoot = this.path.length === 0;
-      const keys = atRoot
-        ? getRootNamesByFilter(this.rootScan, this.rootFilter)
-        : getContainerKeys(container);
-
-      return keys
-        .map((key) => {
-          const entry = createEntry(container, key, atRoot);
-
-          if (atRoot) {
-            entry.isPlugin = !!this.pluginNameMap[key];
-          }
-
-          return entry;
-        })
-        .filter((entry) => !isHiddenKind(entry.kind));
+      return buildEntryRows({
+        container: this.container,
+        atRoot: this.path.length === 0,
+        rootScan: this.rootScan,
+        rootFilter: this.rootFilter,
+        pluginNameMap: this.pluginNameMap,
+      });
     },
 
     // ---------- 导航 ----------
@@ -1386,21 +1341,11 @@ export default {
     },
 
     findPageOfKey(key) {
-      const perPage = this.effectiveItemsPerPage;
-
-      if (perPage <= 0) {
-        return 1;
-      }
-
-      const index = this.filteredEntries.findIndex(
-        (item) => String(item.key) === String(key),
+      return findEntryPage(
+        this.filteredEntries,
+        key,
+        this.effectiveItemsPerPage,
       );
-
-      if (index < 0) {
-        return 1;
-      }
-
-      return Math.floor(index / perPage) + 1;
     },
 
     scrollToHighlight() {
@@ -1433,20 +1378,6 @@ export default {
     isHighlighted(item) {
       return (
         this.highlightKey !== null && String(item.key) === this.highlightKey
-      );
-    },
-
-    entryMatches(item, keyword) {
-      return (
-        String(item.name || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(item.preview || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(item.typeText || "")
-          .toLowerCase()
-          .includes(keyword)
       );
     },
   },
