@@ -670,8 +670,12 @@ export class SaveBackupCheat {
         .length,
       missingCount: entries.filter((item) => !this.isSnapshotPresent(item))
         .length,
+      // 文件已丢失的快照不应再计入占用
       bytes: entries.reduce(
-        (sum, item) => sum + (Number(item.sizeBytes) || 0),
+        (sum, item) =>
+          this.isSnapshotPresent(item)
+            ? sum + (Number(item.sizeBytes) || 0)
+            : sum,
         0,
       ),
     };
@@ -707,7 +711,7 @@ export class SaveBackupCheat {
       kind: kind,
       createdAt: Date.now(),
       label: String(label || "").slice(0, MAX_NAME_LENGTH),
-      sizeBytes: text.length,
+      sizeBytes: this.getTextByteLength(text),
       // 快照载荷使用与当前引擎一致的编码，方便直接改名为存档文件
       codec: codec,
       saveExt: this.getPayloadExtension(codec),

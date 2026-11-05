@@ -146,7 +146,7 @@ export class SaveBackupTransfer {
               : BACKUP_KIND_MANUAL,
           createdAt: Number(item.meta.createdAt) || Date.now(),
           label: String(item.meta.label || "").slice(0, MAX_NAME_LENGTH),
-          sizeBytes: item.data.length,
+          sizeBytes: this.getTextByteLength(item.data),
           codec: this.getSnapshotCodec(),
           saveExt: this.getPayloadExtension(this.getSnapshotCodec()),
           mapId: Number(item.meta.mapId) || 0,

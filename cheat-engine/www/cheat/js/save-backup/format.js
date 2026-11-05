@@ -61,6 +61,22 @@ export class SaveBackupFormat {
     )}`;
   }
 
+  // 快照大小按 UTF-8 字节算。String.length 是 UTF-16 代码单元，
+  // 中文 / 日文存档会被明显低估。
+  static getTextByteLength(text) {
+    const value = String(text ?? "");
+
+    try {
+      if (typeof TextEncoder !== "undefined") {
+        return new TextEncoder().encode(value).length;
+      }
+    } catch (error) {
+      // 回退到字符数
+    }
+
+    return value.length;
+  }
+
   // 导出 / 复制文件名用：精确到毫秒，避免同一秒内重复操作互相覆盖。
   static formatFileTimestamp(ms = Date.now()) {
     const value = Number(ms);

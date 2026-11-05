@@ -62,6 +62,12 @@ test("getSaveTimeText：优先存档头文本，再回退格式化时间", () =>
   assert.equal(SaveBackupCheat.getSaveTimeText(null), "");
 });
 
+test("getTextByteLength：按 UTF-8 字节计数", () => {
+  assert.equal(SaveBackupCheat.getTextByteLength("abc"), 3);
+  assert.equal(SaveBackupCheat.getTextByteLength("中文"), 6);
+  assert.equal(SaveBackupCheat.getTextByteLength(null), 0);
+});
+
 test("validateSaveText：拒绝缺失或为空的核心字段", () => {
   assert.throws(
     () => SaveBackupCheat.validateSaveText('{"system":null,"party":{}}'),
