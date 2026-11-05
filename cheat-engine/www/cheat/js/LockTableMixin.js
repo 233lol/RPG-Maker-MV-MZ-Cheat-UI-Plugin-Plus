@@ -195,6 +195,12 @@ export const lockTableMixin = {
     toggleItemLock(item) {
       if (!this.requireDataReady(`锁定${this.lockLabel}`)) return;
 
+      // buildLockPayload / LockService 都会跳过 id <= 0（第 0 号是占位），
+      // 这里不拦就会得到「图标显示已锁定但实际不生效」的假状态。
+      if (!item || !Number.isInteger(item.id) || item.id <= 0) {
+        return;
+      }
+
       item.lockEnabled = !item.lockEnabled;
       if (item.lockEnabled) {
         item.lockValue = this.lockValueOf(item.id);
