@@ -412,11 +412,18 @@ export default {
     },
 
     onGoldChange() {
+      const value = Number(this.gold);
+
+      // 空字符串会被 Number("") 转成 0，旧逻辑会把金币直接清零；
+      // 非法输入也不会回滚显示，输入框会一直停在校验失败的值上。
       if (
-        isNaN(this.gold) ||
-        !Number.isInteger(Number(this.gold)) ||
-        this.gold < 0
+        this.gold === "" ||
+        this.gold === null ||
+        this.gold === undefined ||
+        !Number.isInteger(value) ||
+        value < 0
       ) {
+        this.initializeVariables();
         return;
       }
 
@@ -426,7 +433,7 @@ export default {
         return;
       }
 
-      const diff = this.gold - $gameParty._gold;
+      const diff = value - $gameParty._gold;
 
       if (diff < 0) {
         $gameParty.loseGold(-diff);
