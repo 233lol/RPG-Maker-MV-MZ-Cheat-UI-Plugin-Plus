@@ -81,6 +81,51 @@ test("getPayloadExtension：按编码选择扩展名", () => {
   assert.equal(SaveBackupCheat.getPayloadExtension("base64"), ".rpgsave");
 });
 
+test("importFromJson：先拦截超大文件", () => {
+  const originalIsLocalMode = SaveBackupCheat.isLocalMode;
+  SaveBackupCheat.isLocalMode = () => true;
+
+  try {
+    const huge = "x".repeat(SaveBackupCheat.getMaxImportBytes() + 1);
+    assert.throws(() => SaveBackupCheat.importFromJson(huge), /导入文件过大/);
+  } finally {
+    SaveBackupCheat.isLocalMode = originalIsLocalMode;
+  }
+});
+
+test("importFromJson：拒绝不支持的版本和过多快照", () => {
+  const originalIsLocalMode = SaveBackupCheat.isLocalMode;
+  SaveBackupCheat.isLocalMode = () => true;
+
+  try {
+    assert.throws(
+      () =>
+        SaveBackupCheat.importFromJson(
+          JSON.stringify({
+            format: "cheat-save-backups",
+            version: 999,
+            backups: [],
+          }),
+        ),
+      /不支持的快照文件版本/,
+    );
+
+    assert.throws(
+      () =>
+        SaveBackupCheat.importFromJson(
+          JSON.stringify({
+            format: "cheat-save-backups",
+            version: 1,
+            backups: new Array(5001).fill(null),
+          }),
+        ),
+      /快照数量过多/,
+    );
+  } finally {
+    SaveBackupCheat.isLocalMode = originalIsLocalMode;
+  }
+});
+
 test("generateId：带 kind / 槽位且不与已有 ID 冲突", () => {
   const existing = new Set();
   const ids = new Set();

@@ -35,7 +35,7 @@ console.log(`Copied ${vuetifyFile} (${mode}) -> ${vuetifyDest}`);
 //  1. 去掉 sourceMappingURL 注释 —— 对应的 .map 不会被打包，留着只会让
 //     DevTools 打开时白发一次 404 请求。
 //  2. 只保留源码里真正用到的图标规则。全量 MDI 有 7447 条 `.mdi-xxx::before`
-//     规则 / 340KB，而这��面板一共只用 100 个左右。CSS 是无条件全量解析的，
+//     规则 / 340KB，而本项目的面板一共只用 100 个左右。CSS 是无条件全量解析的，
 //     这些多余规则会在游戏启动时白白付出解析和选择器匹配开销，并伴随整个
 //     游戏会话（这张表是被 import.js 注入游戏 <head> 的）。
 const mdiFile = useDev

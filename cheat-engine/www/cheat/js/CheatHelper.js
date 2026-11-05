@@ -459,7 +459,14 @@ export class SpeedCheat {
       return;
     }
 
+    // 与 GeneralPanel 的移动速度滑块保持一致（1-10）。
+    // 只校验 isFinite 不够：0 / 负数 / 1e9 也会被接受，固定速度定时器
+    // 每秒把角色速度设成这些值，轻则角色瞬移，重则游戏逻辑异常。
     if (typeof data.speed !== "number" || !Number.isFinite(data.speed)) {
+      return;
+    }
+
+    if (data.speed < 1 || data.speed > 10) {
       return;
     }
 
@@ -522,6 +529,61 @@ export class SceneCheat {
     }
   }
 
+  // 读档成功后补齐 Scene_Load 原本会做的收尾。
+  //
+  // 直接 DataManager.loadGame() + SceneManager.goto(Scene_Map) 会漏掉：
+  //   - MZ 的 Scene_Load.reloadMapIfUpdated()：游戏更新过地图数据后，
+  //     读档仍会停留在旧地图上；
+  //   - MZ 的 $gameSystem.onAfterLoad()：部分插件依赖它做读档后的初始化；
+  //   - 当前场景的 fadeOutAll()：读档时的淡出过渡。
+  // 这些步骤都不影响「存档已经加载成功」这个结果，所以任何一步失败都只
+  // 打警告，不把一次成功的读档判成失败。
+  static finishLoadIntoMap() {
+    const scene = SceneManager._scene;
+
+    try {
+      if (scene && typeof scene.fadeOutAll === "function") {
+        scene.fadeOutAll();
+      }
+    } catch (error) {
+      console.warn("[cheat plugin] 读档淡出失败", error);
+    }
+
+    try {
+      if (
+        typeof Scene_Load !== "undefined" &&
+        Scene_Load.prototype &&
+        typeof Scene_Load.prototype.reloadMapIfUpdated === "function"
+      ) {
+        // 当前场景通常不是 Scene_Load（可能在地图上按快捷键读档）。
+        // 用 Scene_Load 的原型对象做 this，插件若在方法里访问
+        // this.fadeOutAll() 之类的场景方法仍能找到。
+        const loadScene =
+          scene instanceof Scene_Load
+            ? scene
+            : Object.create(Scene_Load.prototype);
+
+        Scene_Load.prototype.reloadMapIfUpdated.call(loadScene);
+      }
+    } catch (error) {
+      console.warn("[cheat plugin] 读档后重载地图失败", error);
+    }
+
+    SceneManager.goto(Scene_Map);
+
+    try {
+      if (
+        typeof $gameSystem !== "undefined" &&
+        $gameSystem &&
+        typeof $gameSystem.onAfterLoad === "function"
+      ) {
+        $gameSystem.onAfterLoad();
+      }
+    } catch (error) {
+      console.warn("[cheat plugin] 读档后 onAfterLoad 失败", error);
+    }
+  }
+
   static async quickLoad(slot = 1) {
     try {
       const result = await DataManager.loadGame(slot);
@@ -530,7 +592,7 @@ export class SceneCheat {
         throw new Error("游戏拒绝了本次读档");
       }
 
-      SceneManager.goto(Scene_Map);
+      this.finishLoadIntoMap();
       Alert.success(`从存档 ${slot} 加载游戏`);
       return true;
     } catch (error) {

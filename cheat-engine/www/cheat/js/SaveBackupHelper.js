@@ -37,11 +37,25 @@ function getIndexFile() {
 const DEFAULT_AUTO_KEEP = 5;
 const MAX_NAME_LENGTH = 60;
 
+// 导入导出的文件格式版本。只在格式发生不兼容变化时递增。
+const IMPORT_EXPORT_FORMAT = "cheat-save-backups";
+const IMPORT_EXPORT_VERSION = 1;
+
+// 导入保护：先按文件大小拦截，避免 FileReader / JSON.parse 把超大文件
+// 整个读进内存；再限制快照条数，避免一次导入写爆磁盘 / 长时间卡住主线程。
+const MAX_IMPORT_BYTES = 64 * 1024 * 1024;
+const MAX_IMPORT_BACKUPS = 5000;
+
 // 时间机器自身出问题时不静默：这些只是提示文案，不参与控制流
 const WARN_NO_NWJS = "当前环境不是 nw.js，无法读写快照文件";
 
 export class SaveBackupCheat {
   /* ------------------------------------------------------------------ 环境 */
+
+  // 供面板在 FileReader 读取前先拦一次超大文件
+  static getMaxImportBytes() {
+    return MAX_IMPORT_BYTES;
+  }
 
   static isLocalMode() {
     try {
@@ -1971,15 +1985,14 @@ export class SaveBackupCheat {
       throw new Error(WARN_NO_NWJS);
     }
 
-    const fs = this.requireFs();
     const path = require("path");
     const dir = this.ensureBackupDir();
 
     const stamp = this.formatTime(Date.now()).replace(/[: ]/g, "-");
     const file = path.join(dir, `cheat-save-backups-${stamp}.json`);
     const payload = {
-      format: "cheat-save-backups",
-      version: 1,
+      format: IMPORT_EXPORT_FORMAT,
+      version: IMPORT_EXPORT_VERSION,
       exportedAt: Date.now(),
       gameVersion: this.getGameVersion(),
       backups: this.readIndex().map((entry) => {
@@ -1995,7 +2008,8 @@ export class SaveBackupCheat {
       }),
     };
 
-    fs.writeFileSync(file, JSON.stringify(payload), "utf-8");
+    // 导出文件可能很大，写一半崩溃时用原子写至少不会留下损坏的 JSON
+    writeTextAtomic(file, JSON.stringify(payload), "utf-8");
 
     return file;
   }
@@ -2006,20 +2020,45 @@ export class SaveBackupCheat {
       throw new Error(WARN_NO_NWJS);
     }
 
+    const textValue = String(text ?? "");
+    const byteLength =
+      typeof Buffer !== "undefined"
+        ? Buffer.byteLength(textValue, "utf8")
+        : textValue.length;
+
+    if (byteLength > MAX_IMPORT_BYTES) {
+      throw new Error(
+        `导入文件过大（${Math.ceil(byteLength / 1024 / 1024)} MB，` +
+          `上限 ${MAX_IMPORT_BYTES / 1024 / 1024} MB）`,
+      );
+    }
+
     let parsed;
 
     try {
-      parsed = JSON.parse(String(text || ""));
+      parsed = JSON.parse(textValue);
     } catch (error) {
       throw new Error("文件不是合法的 JSON", { cause: error });
     }
 
     if (
       !parsed ||
-      parsed.format !== "cheat-save-backups" ||
+      parsed.format !== IMPORT_EXPORT_FORMAT ||
       !Array.isArray(parsed.backups)
     ) {
       throw new Error("不是本插件导出的存档快照文件");
+    }
+
+    if (parsed.version !== IMPORT_EXPORT_VERSION) {
+      throw new Error(
+        `不支持的快照文件版本：${parsed.version}（当前支持 ${IMPORT_EXPORT_VERSION}）`,
+      );
+    }
+
+    if (parsed.backups.length > MAX_IMPORT_BACKUPS) {
+      throw new Error(
+        `快照数量过多（${parsed.backups.length}，上限 ${MAX_IMPORT_BACKUPS}）`,
+      );
     }
 
     const entries = this.readIndex();

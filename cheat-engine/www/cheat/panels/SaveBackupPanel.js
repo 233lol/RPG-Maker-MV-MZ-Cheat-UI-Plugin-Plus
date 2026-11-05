@@ -877,6 +877,15 @@ export default {
         return;
       }
 
+      const maxBytes = SaveBackupCheat.getMaxImportBytes();
+      if (file.size > maxBytes) {
+        Alert.error(
+          `导入文件过大（${Math.ceil(file.size / 1024 / 1024)} MB，` +
+            `上限 ${maxBytes / 1024 / 1024} MB）`,
+        );
+        return;
+      }
+
       const reader = new FileReader();
 
       reader.onload = () => {
