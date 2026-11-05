@@ -53,7 +53,7 @@ Code style: `pnpm run lint` (ESLint flat config), `pnpm run format` (Prettier), 
 | `cheat-engine/www/cheat/` | Cheat UI source. Vue 3 + Vuetify 4, ES module JS files. |
 | `cheat-engine/www/cheat/js/SettingsPath.js` | MV/MZ settings directory + legacy migration |
 | `cheat-engine/www/cheat/js/LockService.js` | Global switch/variable lock service (independent of panel lifetime) |
-| `cheat-engine/www/cheat/js/AtomicFile.js` | Atomic JSON/text file writes |
+| `cheat-engine/www/cheat/js/AtomicFile.js` | Atomic JSON/text file writes (temp file + `fsync` + rename, stale `.tmp` cleanup) |
 | `cheat-engine/www/cheat/js/GameState.js` | Game-data readiness checks for panels and shortcuts |
 | `cheat-engine/www/cheat/js/PaginationHelper.js` | Shared pagination math (including the `All` option) |
 | `cheat-engine/www/cheat/js/TablePanelMixin.js` | Shared search / pagination / panel-state mixin for table panels (`panelStateExtraKeys`) |
@@ -73,7 +73,10 @@ The cheat replaces the game's `main.js` with a version that loads `cheat/init/im
 
 Cheat-owned persistent settings live under the game's web root:
 - MV: `www/cheat-settings/` (`shortcuts.json`, `gameSpeed.json`, `speed.json`, `kv-storage.json`, `locale.json`, `panel-state.json`, `switch-locks.json`, `variable-locks.json`, `save-backups/`).
-- MZ: `cheat-settings/` at the game root (same files). An existing legacy `www/cheat-settings/` is migrated once on load.
+- MZ: `cheat-settings/` at the game root (same files). An existing legacy `www/cheat-settings/` is migrated once on load; the migration merges missing files and can resume after an interrupted copy.
+- Paths are resolved against `nw.App.startPath` (fallback `process.cwd()`), not the launcher's working directory.
+- Corrupt settings JSON is renamed to `<file>.corrupt-<timestamp>` before a fresh file is written.
+
 New features that need on-disk state should use `cheat/js/SettingsPath.js` instead of hardcoding a path.
 
 ## CI
