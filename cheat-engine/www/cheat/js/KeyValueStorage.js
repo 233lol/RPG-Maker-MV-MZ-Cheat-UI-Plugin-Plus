@@ -68,14 +68,35 @@ export class KeyValueStorage {
         // 只接受普通对象；数组/字符串等损坏内容按空数据处理
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
           data = parsed;
+        } else {
+          this.__quarantineCorruptFile(new Error("设置文件的顶层结构不是对象"));
         }
       } catch (e) {
-        data = {};
+        this.__quarantineCorruptFile(e);
       }
     }
 
     fileCache.set(this.filePath, data);
     return data;
+  }
+
+  // 文件损坏时先改名留档再当成空数据，避免下一次 setItem 用新对象
+  // 直接把原文件（里面可能还有其它可恢复的 key）整个覆盖掉。
+  __quarantineCorruptFile(error) {
+    try {
+      if (!this.fileSystem.existsSync(this.filePath)) {
+        return;
+      }
+
+      const backupPath = `${this.filePath}.corrupt-${Date.now()}`;
+      this.fileSystem.renameSync(this.filePath, backupPath);
+      console.warn(
+        `[cheat plugin] 设置文件损坏，已备份到 ${backupPath}`,
+        error,
+      );
+    } catch (renameError) {
+      console.warn("[cheat plugin] 设置文件损坏且无法备份", renameError);
+    }
   }
 
   __getItemFromFile(key) {
