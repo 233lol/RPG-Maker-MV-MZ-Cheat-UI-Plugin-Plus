@@ -575,14 +575,17 @@ export default {
   },
 
   deactivated() {
-    // 面板被缓存隐藏：暂停自动刷新，取消尚未执行的初始加载
+    // 面板被缓存隐藏：暂停自动刷新，取消尚未执行的搜索 / 初始加载
     this.stopAutoRefresh();
+    this.clearSearchTimer();
+    this.cancelDeepSearch();
     this.cancelInitialLoad();
   },
 
   beforeUnmount() {
     this.stopAutoRefresh();
     this.clearSearchTimer();
+    this.cancelDeepSearch();
     this.cancelInitialLoad();
   },
 
@@ -827,6 +830,14 @@ export default {
       this.path = Array.isArray(newPath) ? newPath.slice() : [];
       this.rebuildEntries();
 
+      // 先清空搜索，再按「未过滤」的列表算页码。
+      // 之前顺序反了：用带搜索词的 filteredEntries 算页，清空后列表变长，
+      // 高亮目标经常不在当前页。
+      this.search = "";
+      this.deepSearchResults = [];
+      this.deepSearchTruncated = false;
+      this.deepSearchLimitReason = "";
+
       const highlightKey = options.highlightKey;
       this.highlightKey =
         highlightKey === undefined || highlightKey === null
@@ -836,19 +847,13 @@ export default {
       const page =
         this.highlightKey === null ? 1 : this.findPageOfKey(this.highlightKey);
 
-      // 切换层级后清空搜索框与搜索结果，避免新层级里的变量被搜索词过滤。
-      // 清空搜索会触发 watcher 把分页重置到第 1 页，
-      // 因此分页定位与高亮滚动放到下一次 tick 执行。
-      this.search = "";
-      this.deepSearchResults = [];
-      this.deepSearchTruncated = false;
-      this.deepSearchLimitReason = "";
-
+      // 清空搜索会触发 watcher 把分页重置到第 1 页；分页定位放到下一次
+      // tick。滚动还要再等一帧，否则 $refs.row 仍是旧页的 DOM。
       this.$nextTick(() => {
         this.pagination.page = page;
 
         if (this.highlightKey !== null) {
-          this.scrollToHighlight();
+          this.$nextTick(() => this.scrollToHighlight());
         }
       });
     },
@@ -1141,6 +1146,7 @@ export default {
       this.clearSearchTimer();
 
       if (!this.searchActive) {
+        this.cancelDeepSearch();
         this.deepSearchResults = [];
         this.deepSearchTruncated = false;
         this.deepSearchLimitReason = "";
@@ -1150,6 +1156,13 @@ export default {
       this.searchTimer = window.setTimeout(() => {
         this.runDeepSearch(this.search);
       }, 300);
+    },
+
+    // 取消尚未开始 / 正在等待让出的深度搜索。
+    // searchGlobalTree 是同步的，无法中途打断，只能让结果在返回后被丢弃。
+    cancelDeepSearch() {
+      this.__deepSearchToken = (this.__deepSearchToken || 0) + 1;
+      this.deepSearching = false;
     },
 
     // 深度搜索的起点：在根层只搜索当前筛选出的全局变量，
@@ -1170,12 +1183,28 @@ export default {
       return root;
     },
 
-    runDeepSearch(keyword) {
+    async runDeepSearch(keyword) {
       if (!this.searchActive) {
         return;
       }
 
+      const token = (this.__deepSearchToken || 0) + 1;
+      this.__deepSearchToken = token;
       this.deepSearching = true;
+
+      // 先让出一帧让「搜索中...」渲染出来。searchGlobalTree 是同步的，
+      // 对较大的全局对象树最长会阻塞 2 秒，无法在扫描过程中更新 UI。
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      if (token !== this.__deepSearchToken) {
+        // 已有更新的搜索接管，deepSearching 由它负责
+        return;
+      }
+
+      if (!this.searchActive) {
+        this.deepSearching = false;
+        return;
+      }
 
       try {
         const { results, truncated, reason } = searchGlobalTree(
@@ -1195,7 +1224,9 @@ export default {
         this.deepSearchLimitReason = "";
         Alert.error(`搜索失败: ${String(error)}`);
       } finally {
-        this.deepSearching = false;
+        if (token === this.__deepSearchToken) {
+          this.deepSearching = false;
+        }
       }
     },
 
