@@ -470,12 +470,22 @@ export default {
     },
 
     async inspectCurrentEvent() {
+      // 连续点击时，先发后到的旧请求不能覆盖新结果
+      const token = (this.__eventInspectToken || 0) + 1;
+      this.__eventInspectToken = token;
+
+      const commandIndex = this.getCurrentEventCommandIndex();
+
       try {
         const eventId = this.getCurrentEventId();
         this.inspectedEventId = eventId;
-        this.inspectedEventCurrentIndex = this.getCurrentEventCommandIndex();
+        this.inspectedEventCurrentIndex = commandIndex;
 
         if (!eventId || eventId <= 0) {
+          if (token !== this.__eventInspectToken) {
+            return;
+          }
+
           this.inspectedEventRows = [];
           this.inspectedEventMessage = "当前没有正在执行的地图事件";
           this.showEventInspectDialog = true;
@@ -486,14 +496,29 @@ export default {
         const pageData =
           eventObject && eventObject.page ? eventObject.page() : null;
 
-        this.inspectedEventRows = await this.formatEventListEntries(
+        const rows = await this.formatEventListEntries(
           pageData && pageData.list ? pageData.list : [],
+          commandIndex,
         );
+
+        if (token !== this.__eventInspectToken) {
+          return;
+        }
+
+        this.inspectedEventRows = rows;
         this.inspectedEventMessage =
           this.inspectedEventRows.length === 0 ? "(empty event list)" : "";
       } catch (error) {
+        if (token !== this.__eventInspectToken) {
+          return;
+        }
+
         this.inspectedEventRows = [];
         this.inspectedEventMessage = `error: ${String(error)}`;
+      }
+
+      if (token !== this.__eventInspectToken) {
+        return;
       }
 
       this.showEventInspectDialog = true;
@@ -538,16 +563,14 @@ export default {
       });
     },
 
-    async formatEventListEntries(list) {
+    async formatEventListEntries(list, anchorIndex = -1) {
       if (!Array.isArray(list) || list.length === 0) {
         return [];
       }
 
       const anchor = Math.max(
         0,
-        Number.isInteger(this.inspectedEventCurrentIndex)
-          ? this.inspectedEventCurrentIndex
-          : 0,
+        Number.isInteger(anchorIndex) ? anchorIndex : 0,
       );
 
       return Promise.all(
