@@ -712,10 +712,20 @@ export class BattleCheat {
 
   static escape() {
     if (this.canExecuteBattleEndProcess()) {
-      $gameParty.performEscape();
-      SoundManager.playEscape();
-      BattleManager._escaped = true;
-      BattleManager.processEscape();
+      // processEscape 内部已经会 performEscape + playEscape，
+      // 这里再手动调用会重复播放动画 / 音效。
+      // _preemptive = true 让 MV/MZ 的逃跑判定直接成功，
+      // 否则「强制逃跑」仍会被 _escapeRatio 的随机数拦住。
+      const previousPreemptive = BattleManager._preemptive;
+
+      BattleManager._preemptive = true;
+
+      try {
+        BattleManager.processEscape();
+      } finally {
+        BattleManager._preemptive = previousPreemptive;
+      }
+
       Alert.success("强制逃跑...");
       return true;
     }
@@ -724,9 +734,7 @@ export class BattleCheat {
 
   static abort() {
     if (this.canExecuteBattleEndProcess()) {
-      $gameParty.performEscape();
-      SoundManager.playEscape();
-      BattleManager._escaped = true;
+      // processAbort 内部同样会播放逃跑音效并设置 _escaped
       BattleManager.processAbort();
       Alert.success("强制结束战斗");
       return true;
