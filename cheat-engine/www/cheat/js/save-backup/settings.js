@@ -132,6 +132,10 @@ export class SaveBackupSettings {
       return null;
     }
 
+    // 新游戏 / 读档后 _saveCount 会回退或从 0 重新递增，
+    // 必须在第一次存档时确保 reset 钩子已安装，避免旧标记误伤。
+    this.installAutoSnapshotResetHooks();
+
     const settings = this.getSettings();
 
     if (!settings.autoOnSave) {
@@ -141,7 +145,13 @@ export class SaveBackupSettings {
     // 存档后引擎的存档头已经写好，这里读到的时长 / 时间就是刚存下的那份
     const saveCount = this.getSaveCount();
 
-    if (this.getAutoSnapshotMarker().get(slot) === saveCount) {
+    // _saveCount 为 0（自动存档插件没调 onBeforeSave 等）时无法区分
+    // 「同一次存档」，不做去重，否则同槽位之后的所有自动快照都会被跳过。
+    if (
+      Number.isInteger(saveCount) &&
+      saveCount > 0 &&
+      this.getAutoSnapshotMarker().get(slot) === saveCount
+    ) {
       return null;
     }
 
@@ -168,6 +178,38 @@ export class SaveBackupSettings {
       );
       return null;
     }
+  }
+
+  // 新游戏 / 读档后清空去重标记。否则读一个旧档再玩到相同 _saveCount 时，
+  // 会被上一周目留下的标记误判为「已经留过快照」而静默跳过自动备份。
+  static installAutoSnapshotResetHooks() {
+    if (typeof DataManager === "undefined" || !DataManager) {
+      return false;
+    }
+
+    const host = this;
+
+    const wrap = (name) => {
+      const original = DataManager[name];
+
+      if (typeof original !== "function" || original.__cheatAutoSnapshotReset) {
+        return;
+      }
+
+      const wrapped = function (...args) {
+        const result = original.apply(this, args);
+        host.getAutoSnapshotMarker().clear();
+        return result;
+      };
+
+      wrapped.__cheatAutoSnapshotReset = true;
+      DataManager[name] = wrapped;
+    };
+
+    wrap("setupNewGame");
+    wrap("extractSaveContents");
+
+    return true;
   }
 
   // 接管引擎的存档函数。只在能拿到 DataManager 时执行，且只包一层。
@@ -225,6 +267,8 @@ export class SaveBackupSettings {
 
     this.saveHookOriginal = original;
     this.saveHookInstalled = true;
+
+    this.installAutoSnapshotResetHooks();
 
     return true;
   }

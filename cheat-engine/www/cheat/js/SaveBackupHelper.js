@@ -900,7 +900,8 @@ export class SaveBackupCheat {
     const saveCount = this.getSaveCount();
     const newest = this.findNewestAutoSnapshot(slot);
 
-    if (newest && Number(newest.saveCount) === saveCount) {
+    // saveCount 为 0 时无法判断是否同一次存档，不去重，宁可多留一份。
+    if (saveCount > 0 && newest && Number(newest.saveCount) === saveCount) {
       return { status: "skipped", reason: "deduped", snapshot: newest };
     }
 
