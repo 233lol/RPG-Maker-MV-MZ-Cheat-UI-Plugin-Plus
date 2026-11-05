@@ -260,17 +260,32 @@ export default {
         ) {
           this.locations = parsed;
         } else {
+          this.backupCorruptLocations(data);
           console.warn(
             "[cheat plugin] cheat.locations has unexpected structure, ignored",
           );
           this.locations = [];
         }
       } catch (error) {
+        this.backupCorruptLocations(data);
         console.warn(
           "[cheat plugin] Can't parse cheat.locations, reset to empty",
           error,
         );
         this.locations = [];
+      }
+    },
+
+    // 用户随后新增一个位置就会把空数组合写回 cheat.locations，
+    // 先把原始损坏内容另存一份，避免手工恢复的机会也被抹掉。
+    backupCorruptLocations(raw) {
+      try {
+        KEY_VALUE_STORAGE.setItem(
+          `cheat.locations.corrupt-${Date.now()}`,
+          typeof raw === "string" ? raw : JSON.stringify(raw),
+        );
+      } catch (error) {
+        console.warn("[cheat plugin] 备份损坏的保存位置数据失败", error);
       }
     },
 
