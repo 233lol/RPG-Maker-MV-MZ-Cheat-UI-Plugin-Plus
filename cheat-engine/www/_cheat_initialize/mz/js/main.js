@@ -129,6 +129,18 @@ class Main {
   }
 
   onWindowError(event) {
+    // 作弊模块是可选扩展：它加载 / 求值失败不应阻止游戏本身启动。
+    // 游戏核心脚本的错误仍然按原逻辑记录并显示。
+    const filename = String((event && event.filename) || "");
+
+    if (filename.includes("/cheat/") || filename.includes("cheat/init/")) {
+      console.warn(
+        "[cheat plugin] 作弊模块加载失败，游戏继续启动",
+        event && event.error,
+      );
+      return;
+    }
+
     if (!this.error) {
       this.error = event.error;
     }
