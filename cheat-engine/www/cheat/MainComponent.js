@@ -144,9 +144,10 @@ export default {
         }
       }
 
-      // 输入框里的按键交给输入框自己处理（复制 / 粘贴 / 光标移动），
-      // 作弊窗口的 #app 冒泡拦截会阻止它们传到游戏。
-      if (this.show && isEditableTarget(e.target)) {
+      // 输入框里的按键交给输入框自己处理（复制 / 粘贴 / 光标移动）。
+      // 不要求作弊窗口已打开：游戏插件可能用 DOM 输入框做文本输入，
+      // 窗口关闭时也不应该被 Ctrl+C / Ctrl+S 等全局快捷键抢走。
+      if (isEditableTarget(e.target)) {
         return;
       }
 
