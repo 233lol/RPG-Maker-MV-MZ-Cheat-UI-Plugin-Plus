@@ -25,9 +25,14 @@ function installFakeTimers() {
 }
 
 const bootstrapTimers = installFakeTimers();
-const [{ customizeRPGMakerFunctions }, { MessageCheat }] = await Promise.all([
+const [
+  { customizeRPGMakerFunctions, clearGameInput },
+  { MessageCheat },
+  { setGameInputBlocked },
+] = await Promise.all([
   import("../../cheat-engine/www/cheat/init/customize_functions.js"),
   import("../../cheat-engine/www/cheat/js/CheatHelper.js"),
+  import("../../cheat-engine/www/cheat/js/ClickGuard.js"),
 ]);
 bootstrapTimers.restore();
 
@@ -57,6 +62,13 @@ const gameTarget = {
   },
 };
 
+const editableTarget = {
+  tagName: "INPUT",
+  closest(selector) {
+    return selector.includes("input") ? {} : null;
+  },
+};
+
 function makeTouchInput() {
   const calls = [];
   const touchInput = {
@@ -71,26 +83,69 @@ function makeTouchInput() {
     };
   }
 
+  touchInput.update = function () {
+    calls.push({ name: "update", self: this });
+    return "original:update";
+  };
+
   return { touchInput, calls };
 }
 
+function makeInput() {
+  const calls = [];
+
+  const input = {
+    clear() {
+      calls.push({ name: "clear" });
+    },
+  };
+
+  for (const name of ["_onKeyDown", "_onKeyUp", "update"]) {
+    input[name] = function (event) {
+      calls.push({ name, self: this, event });
+      return `original:${name}`;
+    };
+  }
+
+  return { input, calls };
+}
+
 let originalTouchInput;
+let originalInput;
 let originalUtils;
 let originalInitialize;
+let originalDocument;
 
 beforeEach(() => {
   originalTouchInput = globalThis.TouchInput;
+  originalInput = globalThis.Input;
   originalUtils = globalThis.Utils;
   originalInitialize = MessageCheat.initialize;
+  originalDocument = globalThis.document;
 
   MessageCheat.initialize = () => {};
+  setGameInputBlocked(false);
 });
 
 afterEach(() => {
+  setGameInputBlocked(false);
+
+  if (originalDocument === undefined) {
+    delete globalThis.document;
+  } else {
+    globalThis.document = originalDocument;
+  }
+
   if (originalTouchInput === undefined) {
     delete globalThis.TouchInput;
   } else {
     globalThis.TouchInput = originalTouchInput;
+  }
+
+  if (originalInput === undefined) {
+    delete globalThis.Input;
+  } else {
+    globalThis.Input = originalInput;
   }
 
   if (originalUtils === undefined) {
@@ -202,4 +257,109 @@ test("customizeRPGMakerFunctions：缺失的回调直接跳过，MessageCheat �
 
   assert.equal(touchInput._onPointerUp, undefined);
   assert.equal(initializeCalls, 1);
+});
+
+test("customizeRPGMakerFunctions：作弊菜单打开时忽略键盘 / 鼠标输入，关闭后恢复", () => {
+  const { touchInput, calls: touchCalls } = makeTouchInput();
+  const { input, calls: inputCalls } = makeInput();
+  globalThis.TouchInput = touchInput;
+  globalThis.Input = input;
+  globalThis.Utils = { RPGMAKER_NAME: "MZ" };
+
+  customizeRPGMakerFunctions();
+
+  assert.equal(input._onKeyDown.__cheatInputGuard, true);
+  assert.equal(input._onKeyUp.__cheatInputGuard, true);
+  assert.equal(input.update.__cheatUpdateGuard, true);
+  assert.equal(touchInput.update.__cheatUpdateGuard, true);
+
+  setGameInputBlocked(true);
+
+  assert.equal(
+    input._onKeyDown.call(input, { target: gameTarget, keyCode: 39 }),
+    undefined,
+  );
+  assert.equal(
+    input._onKeyUp.call(input, { target: gameTarget, keyCode: 39 }),
+    undefined,
+  );
+  assert.equal(
+    touchInput._onMouseDown.call(touchInput, { target: gameTarget }),
+    undefined,
+  );
+  assert.equal(
+    touchInput._onWheel.call(touchInput, {
+      target: gameTarget,
+      deltaX: 1,
+      deltaY: 2,
+    }),
+    undefined,
+  );
+  assert.equal(inputCalls.length, 0);
+  assert.equal(touchCalls.length, 0);
+
+  // 主循环每帧调用 update：被阻断时清空引擎输入状态，不跑原始 update
+  assert.equal(input.update.call(input), undefined);
+  assert.deepEqual(
+    inputCalls.map((call) => call.name),
+    ["clear"],
+  );
+  assert.equal(touchInput.update.call(touchInput), undefined);
+  assert.deepEqual(
+    touchCalls.map((call) => call.name),
+    [],
+  );
+  assert.deepEqual(
+    inputCalls.map((call) => call.name),
+    ["clear", "clear"],
+  );
+
+  clearGameInput();
+  assert.deepEqual(
+    inputCalls.map((call) => call.name),
+    ["clear", "clear", "clear"],
+  );
+
+  setGameInputBlocked(false);
+
+  assert.equal(
+    input._onKeyDown.call(input, { target: gameTarget }),
+    "original:_onKeyDown",
+  );
+  assert.equal(
+    touchInput._onMouseDown.call(touchInput, { target: gameTarget }),
+    "original:_onMouseDown",
+  );
+  assert.equal(input.update.call(input), "original:update");
+  assert.equal(touchInput.update.call(touchInput), "original:update");
+});
+
+test("customizeRPGMakerFunctions：输入框里的按键不传给引擎", () => {
+  const { input, calls } = makeInput();
+  globalThis.TouchInput = makeTouchInput().touchInput;
+  globalThis.Input = input;
+  globalThis.Utils = { RPGMAKER_NAME: "MV" };
+
+  customizeRPGMakerFunctions();
+  setGameInputBlocked(false);
+
+  assert.equal(
+    input._onKeyDown.call(input, { target: editableTarget, keyCode: 39 }),
+    undefined,
+  );
+  assert.equal(calls.length, 0);
+
+  assert.equal(
+    input._onKeyDown.call(input, { target: gameTarget }),
+    "original:_onKeyDown",
+  );
+
+  // 地图事件面板放行输入时，如果焦点在输入框里，主循环仍要清空
+  // 引擎状态，避免方向键编辑文本时角色也跟着走。
+  globalThis.document = { activeElement: editableTarget };
+  assert.equal(input.update.call(input), undefined);
+  assert.deepEqual(
+    calls.map((call) => call.name),
+    ["_onKeyDown", "clear"],
+  );
 });

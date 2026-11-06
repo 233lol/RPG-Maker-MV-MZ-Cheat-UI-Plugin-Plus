@@ -1,7 +1,11 @@
-import test from "node:test";
+import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { isCheatUiTarget } from "../../cheat-engine/www/cheat/js/ClickGuard.js";
+import {
+  isCheatUiTarget,
+  isGameInputBlocked,
+  setGameInputBlocked,
+} from "../../cheat-engine/www/cheat/js/ClickGuard.js";
 
 function targetMatching(match) {
   return {
@@ -50,4 +54,22 @@ test("isCheatUiTarget：closest 抛错时不向调用方冒泡", () => {
   };
 
   assert.equal(isCheatUiTarget(target), false);
+});
+
+afterEach(() => setGameInputBlocked(false));
+
+test("setGameInputBlocked：默认放行，设为真后统一阻断游戏输入", () => {
+  assert.equal(isGameInputBlocked(), false);
+
+  setGameInputBlocked(true);
+  assert.equal(isGameInputBlocked(), true);
+
+  setGameInputBlocked(false);
+  assert.equal(isGameInputBlocked(), false);
+
+  // 非布尔值统一归一化
+  setGameInputBlocked(1);
+  assert.equal(isGameInputBlocked(), true);
+  setGameInputBlocked(null);
+  assert.equal(isGameInputBlocked(), false);
 });

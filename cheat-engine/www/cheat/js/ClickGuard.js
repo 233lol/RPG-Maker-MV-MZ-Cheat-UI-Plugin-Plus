@@ -25,3 +25,16 @@ export function isCheatUiTarget(target) {
     return false;
   }
 }
+
+// 作弊窗口打开且当前面板不是地图事件时，引擎层的键盘 / 鼠标输入会被整块忽略。
+// 只在 DOM 冒泡阶段拦截不够：游戏插件可能在 window / document 的捕获阶段监听，
+// 焦点在作弊菜单里时事件仍会被引擎的 Input / TouchInput 收到。
+let gameInputBlocked = false;
+
+export function setGameInputBlocked(blocked) {
+  gameInputBlocked = !!blocked;
+}
+
+export function isGameInputBlocked() {
+  return gameInputBlocked;
+}

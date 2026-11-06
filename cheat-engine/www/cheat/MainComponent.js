@@ -5,8 +5,11 @@ import { GeneralCheat } from "./js/CheatHelper.js";
 import { LockService } from "./js/LockService.js";
 import AlertSnackbar from "./components/AlertSnackbar.js";
 import ConfirmDialog from "./components/ConfirmDialog.js";
-import { customizeRPGMakerFunctions } from "./init/customize_functions.js";
-import { isCheatUiTarget } from "./js/ClickGuard.js";
+import {
+  clearGameInput,
+  customizeRPGMakerFunctions,
+} from "./init/customize_functions.js";
+import { isCheatUiTarget, setGameInputBlocked } from "./js/ClickGuard.js";
 import { installGameDataHooks } from "./js/GameDataState.js";
 import { loadPanelState, savePanelState } from "./js/PanelState.js";
 import { Key } from "./js/KeyCodes.js";
@@ -66,7 +69,25 @@ export default {
     };
   },
 
+  computed: {
+    // 地图事件面板需要边看地图边移动 / 点击游戏，其余面板打开时屏蔽游戏输入。
+    shouldBlockGameInput() {
+      return this.show && this.currentComponentName !== "map-event-panel";
+    },
+  },
+
   watch: {
+    shouldBlockGameInput: {
+      immediate: true,
+      handler(blocked) {
+        setGameInputBlocked(blocked);
+
+        if (blocked) {
+          clearGameInput();
+        }
+      },
+    },
+
     currentComponentName(value) {
       if (value) {
         savePanelState("main-window", { lastPanel: value });
@@ -103,6 +124,7 @@ export default {
   },
 
   beforeUnmount() {
+    setGameInputBlocked(false);
     this.releaseCurrentKey();
     window.removeEventListener("keydown", this.onGlobalKeyDown, true);
     window.removeEventListener("keyup", this.onGlobalKeyUp, true);
@@ -176,7 +198,7 @@ export default {
       }
 
       // 焦点不在作弊 UI 上时，阻止按键继续传给游戏
-      if (this.show && !isCheatUiTarget(e.target)) {
+      if (this.shouldBlockGameInput && !isCheatUiTarget(e.target)) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -188,13 +210,13 @@ export default {
       // 不要在 keyup 时再跑一次 enter：按住 Ctrl 再松开 C 会拿「剩下的
       // Ctrl」重新匹配一遍，可能误触发单键快捷键。
 
-      if (this.show && !isCheatUiTarget(e.target)) {
+      if (this.shouldBlockGameInput && !isCheatUiTarget(e.target)) {
         e.stopPropagation();
       }
     },
 
     onGlobalKeyPress(e) {
-      if (this.show && !isCheatUiTarget(e.target)) {
+      if (this.shouldBlockGameInput && !isCheatUiTarget(e.target)) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -208,7 +230,7 @@ export default {
       }
 
       this.__inputGuard = (event) => {
-        if (this.show) {
+        if (this.shouldBlockGameInput) {
           event.stopPropagation();
         }
       };
@@ -233,7 +255,7 @@ export default {
     },
 
     onDocumentFocusIn(event) {
-      if (!this.show || isCheatUiTarget(event.target)) {
+      if (!this.shouldBlockGameInput || isCheatUiTarget(event.target)) {
         return;
       }
 

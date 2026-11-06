@@ -20,6 +20,8 @@ const { default: MainComponent } =
 const { GLOBAL_SHORTCUT } =
   await import("../../cheat-engine/www/cheat/js/GlobalShortcut.js");
 const { Key } = await import("../../cheat-engine/www/cheat/js/KeyCodes.js");
+const { isGameInputBlocked, setGameInputBlocked } =
+  await import("../../cheat-engine/www/cheat/js/ClickGuard.js");
 
 globalThis.setInterval = originalSetInterval;
 globalThis.clearInterval = originalClearInterval;
@@ -34,6 +36,7 @@ function resetGlobals() {
   delete globalThis.window;
   delete globalThis.document;
   Object.assign(GLOBAL_SHORTCUT, originalShortcutMethods);
+  setGameInputBlocked(false);
 }
 
 beforeEach(resetGlobals);
@@ -56,6 +59,9 @@ function makeMain(overrides = {}) {
     show: false,
     currentComponentName: "general-panel",
     localeKey: 0,
+    get shouldBlockGameInput() {
+      return this.show && this.currentComponentName !== "map-event-panel";
+    },
     $refs: {},
     $nextTick(callback) {
       this.tick = callback;
@@ -461,6 +467,12 @@ test("MainComponent.setupInputGuard / teardownInputGuard", () => {
   });
   assert.equal(stops, 1);
 
+  // 地图事件面板需要边看地图边操作游戏，不禁用输入
+  panel.currentComponentName = "map-event-panel";
+  guard({ stopPropagation() {} });
+  assert.equal(stops, 1);
+
+  panel.currentComponentName = "general-panel";
   panel.show = false;
   guard({ stopPropagation() {} });
   assert.equal(stops, 1);
@@ -473,6 +485,25 @@ test("MainComponent.setupInputGuard / teardownInputGuard", () => {
   globalThis.document = { getElementById: () => null };
   assert.doesNotThrow(() => panel.setupInputGuard());
   assert.doesNotThrow(() => panel.teardownInputGuard());
+});
+
+test("MainComponent：面板切换同步引擎输入阻断状态", () => {
+  const panel = makeMain();
+  const handler = MainComponent.watch.shouldBlockGameInput.handler;
+
+  assert.equal(MainComponent.computed.shouldBlockGameInput.call(panel), false);
+
+  panel.show = true;
+  assert.equal(MainComponent.computed.shouldBlockGameInput.call(panel), true);
+
+  handler.call(panel, true);
+  assert.equal(isGameInputBlocked(), true);
+
+  panel.currentComponentName = "map-event-panel";
+  assert.equal(MainComponent.computed.shouldBlockGameInput.call(panel), false);
+
+  handler.call(panel, false);
+  assert.equal(isGameInputBlocked(), false);
 });
 
 test("MainComponent.onGlobalKeyPress：只在作弊窗口打开且焦点不在 UI 上时拦截", () => {
@@ -494,6 +525,12 @@ test("MainComponent.onGlobalKeyPress：只在作弊窗口打开且焦点不在 U
 
   panel.onGlobalKeyPress(event(false));
   assert.deepEqual(calls, ["prevent", "stop"]);
+
+  // 地图事件面板除外：不拦截游戏输入
+  calls.length = 0;
+  panel.currentComponentName = "map-event-panel";
+  panel.onGlobalKeyPress(event(false));
+  assert.deepEqual(calls, []);
 });
 
 test("MainComponent.onGlobalKeyDown：普通按键 / repeat / 输入框 / UI 焦点", () => {
