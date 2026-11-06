@@ -61,6 +61,8 @@ jobs:
         run: pnpm run format:check
       - name: unit tests
         run: pnpm run test:unit
+      - name: coverage check
+        run: pnpm run test:coverage:check
       - name: typecheck
         run: pnpm run typecheck
       - name: build and package

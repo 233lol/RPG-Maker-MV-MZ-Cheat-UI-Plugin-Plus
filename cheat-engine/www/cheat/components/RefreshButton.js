@@ -1,3 +1,4 @@
+// @ts-check
 import { t } from "../js/strings.js";
 
 // 面板通用的「重新加载游戏数据」按钮。

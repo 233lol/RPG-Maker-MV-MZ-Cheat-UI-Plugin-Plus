@@ -73,6 +73,8 @@ pnpm run format        # Prettier 自动格式化
 pnpm run format:check  # 只检查格式（CI 使用）
 pnpm run typecheck     # TypeScript 检查带 // @ts-check 的 JS 文件
 pnpm run test:unit     # node --test 单测（纯函数 / 设置迁移 / 启动入口），不需要游戏 / nwjs-sdk
+pnpm run test:coverage # 查看覆盖率报告（Node.js >= 22.8）
+pnpm run test:coverage:check # 覆盖率门槛（CI 使用）
 pnpm run test:packaging # 压缩包结构测试，需要先 make 生成 vendor 文件
 make check             # lint + format:check + test:unit + typecheck
 ```
@@ -347,7 +349,8 @@ GitHub Actions 在推送到 `main`、`vue-3`（以及相关 `pull_request`）时
 
 1. `pnpm run lint`、`pnpm run format:check`
 2. `pnpm run test:unit`（纯函数单测）
-3. `pnpm run typecheck`（`// @ts-check` 文件的 TypeScript 检查）
+3. `pnpm run test:coverage:check`（覆盖率报告与最低门槛）
+4. `pnpm run typecheck`（`// @ts-check` 文件的 TypeScript 检查）
 4. `make` 构建 MV / MZ 压缩包
 5. `pnpm run test:packaging` 校验压缩包目录结构与入口路径
 

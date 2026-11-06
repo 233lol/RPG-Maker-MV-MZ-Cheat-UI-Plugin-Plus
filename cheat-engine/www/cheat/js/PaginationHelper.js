@@ -1,3 +1,4 @@
+// @ts-check
 // 分页面板的统一计算。
 //
 // v-data-table 的 "All" 选项值是 -1，直接把 itemsPerPage 代入

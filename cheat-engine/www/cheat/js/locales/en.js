@@ -1,3 +1,4 @@
+// @ts-check
 // English UI copy.
 export default {
   common: {

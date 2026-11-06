@@ -1,3 +1,4 @@
+// @ts-check
 import CheatModal from "./CheatModal.js";
 import { GLOBAL_SHORTCUT } from "./js/GlobalShortcut.js";
 import { GeneralCheat } from "./js/CheatHelper.js";

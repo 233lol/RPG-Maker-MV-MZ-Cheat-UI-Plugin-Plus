@@ -1,3 +1,4 @@
+// @ts-check
 const MAX_PENDING = 20;
 
 export class Alert {

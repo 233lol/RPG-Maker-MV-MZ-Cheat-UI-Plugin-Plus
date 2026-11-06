@@ -1,3 +1,4 @@
+// @ts-check
 import { createItemDatabasePanel } from "./ItemDatabasePanel.js";
 
 export default createItemDatabasePanel({

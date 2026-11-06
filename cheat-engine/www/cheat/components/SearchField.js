@@ -1,3 +1,4 @@
+// @ts-check
 import { t } from "../js/strings.js";
 
 // 面板通用的搜索框：样式、聚焦全选、阻止快捷键冒泡统一在这里维护。

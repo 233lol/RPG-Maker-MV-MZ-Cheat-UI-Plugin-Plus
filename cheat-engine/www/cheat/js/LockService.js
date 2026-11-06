@@ -1,3 +1,4 @@
+// @ts-check
 import { KeyValueStorage } from "./KeyValueStorage.js";
 import { getCheatSettingsPath } from "./SettingsPath.js";
 

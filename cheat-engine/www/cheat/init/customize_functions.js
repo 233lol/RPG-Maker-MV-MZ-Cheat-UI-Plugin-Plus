@@ -1,3 +1,4 @@
+// @ts-check
 // customize mv functions
 import { MessageCheat } from "../js/CheatHelper.js";
 import { isCheatUiTarget } from "../js/ClickGuard.js";

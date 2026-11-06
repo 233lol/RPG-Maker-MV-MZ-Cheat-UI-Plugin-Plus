@@ -1,3 +1,4 @@
+// @ts-check
 // 表格类面板的公共状态：搜索词、分页、以及面板状态的默认持久化实现。
 //
 // 之前 8 个面板各写一份 search / pagination / totalCount / pageCount /

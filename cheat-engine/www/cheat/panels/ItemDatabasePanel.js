@@ -1,3 +1,4 @@
+// @ts-check
 import ItemTableTab from "./ItemTableTab.js";
 import { t } from "../js/strings.js";
 import { markRaw } from "../libs/vue.js";
@@ -10,7 +11,7 @@ import { markRaw } from "../libs/vue.js";
  *   name: string,
  *   stateKey: string,
  *   getItems: () => Array<unknown>,
- *   descTitle: string,
+ *   descTitleKey: string,
  * }} options
  */
 export function createItemDatabasePanel({

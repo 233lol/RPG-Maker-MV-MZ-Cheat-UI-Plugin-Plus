@@ -1,3 +1,4 @@
+// @ts-check
 import KeyInputField from "../components/KeyInputField.js";
 import PaginationFooter from "../components/PaginationFooter.js";
 import SearchField from "../components/SearchField.js";

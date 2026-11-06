@@ -27,10 +27,16 @@
 - 可访问性：主窗口补充 `role="dialog"` / `aria-modal` / `aria-label`，图标按钮补充可读标签，
   切换语言时同步 `<html lang>`。
 - 启动入口单测：低版本 NW.js 提示、ResizeObserver 循环错误过滤、重复加载保护。
+- 类型覆盖：`// @ts-check` 从 10 个文件扩展到 67 个运行时 JS 文件；新增 `types/rpgmaker.d.ts` /
+  `types/nwjs.d.ts` 声明 RPG Maker 运行时与 NW.js 全局，`jsconfig.json` 只检查作弊源码，避免测试里的假全局污染类型。
+- 新增 `pnpm run test:coverage` / `test:coverage:check`，用 Node 内置覆盖率设置最低门槛，并接入 CI。
+- 单元测试补充：TouchInput 鼠标 / 触摸 / 指针包装与幂等性、设置目录迁移的 rename 回退 / 异常吞掉 / 无 `require` 环境、
+  `cwd` 为空或抛错时的路径回退，以及 `// @ts-check` 覆盖守卫。
 
 ### Changed
 
 - 拆分超大模块：`SaveBackupHelper` → `save-backup/*`，`GlobalObjectHelper` → `global-object/*`，地图事件识别 → `map-event/classifier.js`，全局变量行构建 → `GlobalVariableRows.js`。
+- `SpeedCheat` 的固定速度定时器改为显式类字段声明，便于类型检查；NW.js >= 0.44 已支持该语法。
 - 构建与测试统一要求 Node.js >= 22，新增 `.nvmrc` 和 `package.json` 的 `engines` / `license` 字段。
 
 ### Fixed

@@ -1,3 +1,4 @@
+// @ts-check
 import PageJump from "./PageJump.js";
 import {
   getItemsPerPageOptions,
@@ -74,11 +75,19 @@ export default {
     },
 
     resolvedPageCount() {
-      return this.pageCount == null ? this.bounds.pageCount : this.pageCount;
+      // Vue unwraps computed getters at runtime; plain TS sees this.bounds as
+      // the getter function, so narrow it manually for the property access.
+      const bounds = /** @type {ReturnType<typeof getPageBounds>} */ (
+        /** @type {any} */ (this.bounds)
+      );
+      return this.pageCount == null ? bounds.pageCount : this.pageCount;
     },
 
     rangeText() {
-      return `${this.bounds.start}-${this.bounds.stop} / ${this.total}`;
+      const bounds = /** @type {ReturnType<typeof getPageBounds>} */ (
+        /** @type {any} */ (this.bounds)
+      );
+      return `${bounds.start}-${bounds.stop} / ${this.total}`;
     },
   },
 

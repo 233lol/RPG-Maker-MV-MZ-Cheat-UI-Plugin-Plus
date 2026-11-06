@@ -1,3 +1,4 @@
+// @ts-check
 import { t } from "./js/strings.js";
 import {
   clampGeometry as clampWindowGeometry,

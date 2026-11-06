@@ -1,3 +1,4 @@
+// @ts-check
 import PaginationFooter from "../components/PaginationFooter.js";
 import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
@@ -9,6 +10,10 @@ import { filterByKeyword } from "../js/SearchFilter.js";
 import { tablePanelMixin } from "../js/TablePanelMixin.js";
 import { markRaw } from "../libs/vue.js";
 import { t } from "../js/strings.js";
+
+// 部分静态方法由 applyStaticMethods 动态挂载，TS 看不到，面板侧统一走 any 别名。
+/** @type {any} */
+const BackupCheat = SaveBackupCheat;
 
 // 存档时间机器面板：手动/自动快照、一键回滚、导入导出。
 // 核心逻辑全在 js/SaveBackupHelper.js，这里只负责展示与二次确认。
@@ -472,29 +477,29 @@ export default {
     t,
 
     reload() {
-      this.available = SaveBackupCheat.isLocalMode();
-      this.settings = SaveBackupCheat.getSettings();
+      this.available = BackupCheat.isLocalMode();
+      this.settings = BackupCheat.getSettings();
       // 编辑框文本必须跟着磁盘值走，否则打开面板时显示的是上一次的残留
       this.intervalText = String(this.settings.autoSaveInterval);
       this.keepText = String(this.settings.autoKeep);
-      this.loadedSlot = SaveBackupCheat.getLoadedSlot();
-      this.playtimeText = SaveBackupCheat.getPlaytimeText();
+      this.loadedSlot = BackupCheat.getLoadedSlot();
+      this.playtimeText = BackupCheat.getPlaytimeText();
       this.currentMapName = this.getCurrentMapName();
       // 缓存必须清掉：否则刷新后仍然显示上一次读到的存档头
       this.savefileInfoCache = markRaw(new Map());
       // 没有明确「当前槽位」时，退回显示 1 号槽的信息（至少能看到有档可备份）
-      this.currentSavefileInfo = SaveBackupCheat.readSavefileInfo(
+      this.currentSavefileInfo = BackupCheat.readSavefileInfo(
         this.loadedSlot > 0 ? this.loadedSlot : 1,
       );
       // 旧版本建的快照没记时长 / 存档时间，这里用引擎存档头补一次。
       // 回填只是锦上添花，写盘失败（只读目录 / 磁盘满）不能让面板打不开。
       try {
-        SaveBackupCheat.backfillFromSavefileInfo();
+        BackupCheat.backfillFromSavefileInfo();
       } catch (error) {
         console.warn("[cheat plugin] 回填快照元数据失败", error);
       }
 
-      this.backups = SaveBackupCheat.listBackups();
+      this.backups = BackupCheat.listBackups();
 
       // 删除 / 还原 / 清空后刷新时，把已经不存在的快照从选择里剔除，
       // 避免「导出选中」写出空文件。
@@ -503,11 +508,11 @@ export default {
         existingIds.has(String(id)),
       );
 
-      const stats = SaveBackupCheat.getStats();
+      const stats = BackupCheat.getStats();
       this.stats = {
         count: stats.count,
         missingCount: stats.missingCount,
-        sizeText: SaveBackupCheat.formatBytes(stats.bytes),
+        sizeText: BackupCheat.formatBytes(stats.bytes),
       };
     },
 
@@ -586,7 +591,7 @@ export default {
 
     onSettingsChange() {
       try {
-        this.settings = SaveBackupCheat.writeSettings({
+        this.settings = BackupCheat.writeSettings({
           autoOnSave: this.settings.autoOnSave === true,
           autoSaveInterval: this.settings.autoSaveInterval,
           autoKeep: this.settings.autoKeep,
@@ -596,7 +601,7 @@ export default {
           t("saveBackup.settingsSaveFailed", { message: error.message }),
           error,
         );
-        this.settings = SaveBackupCheat.getSettings();
+        this.settings = BackupCheat.getSettings();
       }
     },
 
@@ -683,7 +688,7 @@ export default {
       }
 
       if (!this.savefileInfoCache.has(key)) {
-        this.savefileInfoCache.set(key, SaveBackupCheat.readSavefileInfo(key));
+        this.savefileInfoCache.set(key, BackupCheat.readSavefileInfo(key));
       }
 
       return this.savefileInfoCache.get(key);
@@ -724,7 +729,7 @@ export default {
         return;
       }
 
-      const max = SaveBackupCheat.maxSavefiles();
+      const max = BackupCheat.maxSavefiles();
       if (max > 0 && target > max) {
         Alert.warn(t("saveBackup.targetTooLarge", { max }));
         return;
@@ -742,11 +747,11 @@ export default {
     // 推荐的默认目标槽位：优先空槽位，都满了就顺延到下一个槽位
     getSuggestedTargetSlot(sourceSlot) {
       const source = Number(sourceSlot);
-      const max = SaveBackupCheat.maxSavefiles();
+      const max = BackupCheat.maxSavefiles();
       const limit = max > 0 ? max : source + 1;
 
       for (let slot = 1; slot <= limit; slot++) {
-        if (slot !== source && !SaveBackupCheat.hasSave(slot)) {
+        if (slot !== source && !BackupCheat.hasSave(slot)) {
           return slot;
         }
       }
@@ -763,7 +768,7 @@ export default {
     confirmRestore(item, targetSlot) {
       const sourceSlot = Number(item.slot);
       const isSameSlot = targetSlot === sourceSlot;
-      const hasTarget = SaveBackupCheat.hasSave(targetSlot);
+      const hasTarget = BackupCheat.hasSave(targetSlot);
       const progress = `${this.progressPrimary(item)} · ${this.progressSecondary(item)}`;
 
       let consequence;
@@ -826,7 +831,7 @@ export default {
 
     doRestore(item, targetSlot) {
       try {
-        SaveBackupCheat.restoreBackup(item.id, targetSlot);
+        BackupCheat.restoreBackup(item.id, targetSlot);
         this.reload();
       } catch (error) {
         Alert.error(
@@ -858,7 +863,7 @@ export default {
               ConfirmDialog.close();
 
               try {
-                SaveBackupCheat.deleteBackup(item.id);
+                BackupCheat.deleteBackup(item.id);
                 this.reload();
               } catch (error) {
                 Alert.error(
@@ -895,7 +900,7 @@ export default {
               ConfirmDialog.close();
 
               try {
-                const count = SaveBackupCheat.clearBackups(kind);
+                const count = BackupCheat.clearBackups(kind);
                 Alert.success(t("saveBackup.clearedCount", { count }));
                 this.reload();
               } catch (error) {
@@ -917,7 +922,7 @@ export default {
       }
 
       try {
-        const file = SaveBackupCheat.exportAll();
+        const file = BackupCheat.exportAll();
         Alert.success(t("saveBackup.exportedTo", { file }));
       } catch (error) {
         Alert.error(
@@ -934,7 +939,7 @@ export default {
       }
 
       try {
-        const file = SaveBackupCheat.exportSelected(this.selectedBackupIds);
+        const file = BackupCheat.exportSelected(this.selectedBackupIds);
         Alert.success(t("saveBackup.exportedTo", { file }));
       } catch (error) {
         Alert.error(
@@ -961,7 +966,7 @@ export default {
         return;
       }
 
-      const maxBytes = SaveBackupCheat.getMaxImportBytes();
+      const maxBytes = BackupCheat.getMaxImportBytes();
       if (file.size > maxBytes) {
         Alert.error(
           t("saveBackup.importTooLarge", {
@@ -976,7 +981,7 @@ export default {
 
       reader.onload = () => {
         try {
-          const result = SaveBackupCheat.importFromJson(String(reader.result));
+          const result = BackupCheat.importFromJson(String(reader.result));
           Alert.success(
             t("saveBackup.importDone", {
               added: result.added,

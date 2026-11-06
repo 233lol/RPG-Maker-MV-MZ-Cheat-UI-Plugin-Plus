@@ -1,3 +1,4 @@
+// @ts-check
 import { createApp } from "../libs/vue.js";
 import {
   createVuetify,

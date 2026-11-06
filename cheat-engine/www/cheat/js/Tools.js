@@ -1,3 +1,4 @@
+// @ts-check
 export function cloneObject(obj) {
   if (obj === null || typeof obj !== "object") {
     return obj;

@@ -1,3 +1,4 @@
+// @ts-check
 import PaginationFooter from "../components/PaginationFooter.js";
 import SearchField from "../components/SearchField.js";
 import { Alert } from "../js/AlertHelper.js";

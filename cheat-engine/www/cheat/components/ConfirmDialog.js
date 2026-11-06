@@ -1,3 +1,4 @@
+// @ts-check
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { t } from "../js/strings.js";
 

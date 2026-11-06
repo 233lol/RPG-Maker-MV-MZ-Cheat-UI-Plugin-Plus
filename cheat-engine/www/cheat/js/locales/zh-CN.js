@@ -1,3 +1,4 @@
+// @ts-check
 // 简体中文文案（默认语言）。
 export default {
   common: {

@@ -11,7 +11,7 @@
     "strict": false,
     "types": []
   },
-  "include": ["cheat-engine/www/cheat/**/*.js", "tests/unit/**/*.mjs"],
+  "include": ["cheat-engine/www/cheat/**/*.js", "types/**/*.d.ts"],
   "exclude": [
     "node_modules",
     "cheat-engine/www/cheat/libs/**",

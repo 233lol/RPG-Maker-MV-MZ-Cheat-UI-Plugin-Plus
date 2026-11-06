@@ -1,3 +1,4 @@
+// @ts-check
 import RefreshButton from "../components/RefreshButton.js";
 import { GeneralCheat } from "../js/CheatHelper.js";
 import { isPartyReady, requirePartyReady } from "../js/GameState.js";

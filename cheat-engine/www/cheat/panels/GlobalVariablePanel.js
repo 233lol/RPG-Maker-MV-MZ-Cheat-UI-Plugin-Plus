@@ -1,3 +1,4 @@
+// @ts-check
 import PaginationFooter from "../components/PaginationFooter.js";
 import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
@@ -934,7 +935,7 @@ export default {
       return (
         tagName === "INPUT" ||
         tagName === "TEXTAREA" ||
-        active.isContentEditable === true
+        /** @type {HTMLElement} */ (active).isContentEditable === true
       );
     },
 

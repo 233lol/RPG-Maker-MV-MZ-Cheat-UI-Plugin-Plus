@@ -1,3 +1,4 @@
+// @ts-check
 // Chromium 在 ResizeObserver 回调里同步修改布局时会派发
 // "ResizeObserver loop completed with undelivered notifications" 错误事件。
 // 它只是观察循环的提示，但 MZ/MV 的 SceneManager.onError 会把它当成致命错误：

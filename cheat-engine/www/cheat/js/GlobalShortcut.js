@@ -1,3 +1,4 @@
+// @ts-check
 import { Key } from "./KeyCodes.js";
 import { Alert } from "./AlertHelper.js";
 import { cloneObject } from "./Tools.js";

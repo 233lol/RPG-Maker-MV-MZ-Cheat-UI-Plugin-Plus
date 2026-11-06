@@ -1,3 +1,4 @@
+// @ts-check
 import { Alert } from "./AlertHelper.js";
 import { t } from "./strings.js";
 

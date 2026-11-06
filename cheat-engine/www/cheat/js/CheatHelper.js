@@ -1,3 +1,4 @@
+// @ts-check
 import { Alert } from "./AlertHelper.js";
 import { KeyValueStorage } from "./KeyValueStorage.js";
 import { getCheatSettingsPath } from "./SettingsPath.js";
@@ -404,7 +405,10 @@ export class GameSpeedCheat {
 }
 
 export class SpeedCheat {
-  // static fixed = null // WARN: declaring static variable occurs error in nw.js (why?)
+  // 固定速度定时器。显式声明为类字段，便于 @ts-check 识别；NW.js >= 0.44
+  // 已支持类字段语法，不再使用旧版的动态赋值写法。
+  /** @type {ReturnType<typeof setInterval> | undefined} */
+  static fixed;
 
   static isFixed() {
     return !!SpeedCheat.fixed;
@@ -416,7 +420,7 @@ export class SpeedCheat {
     }
 
     SpeedCheat.fixed = setInterval(() => {
-      SpeedCheat.__setSpeed(speed, false);
+      SpeedCheat.__setSpeed(speed);
     }, 1000);
   }
 

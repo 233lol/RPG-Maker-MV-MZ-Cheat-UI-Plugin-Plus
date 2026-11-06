@@ -1,3 +1,4 @@
+// @ts-check
 import { Key } from "../js/KeyCodes.js";
 import { t } from "../js/strings.js";
 

@@ -1,3 +1,4 @@
+// @ts-check
 import { getCheatSettingsPath } from "../SettingsPath.js";
 import { t } from "../strings.js";
 

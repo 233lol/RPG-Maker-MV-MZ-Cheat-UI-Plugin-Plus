@@ -1,3 +1,4 @@
+// @ts-check
 import { markRaw } from "../libs/vue.js";
 import { t } from "../js/strings.js";
 

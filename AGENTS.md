@@ -38,6 +38,8 @@ pnpm test           # headless MV + MZ + packaging
 pnpm test:mv        # MV only
 pnpm test:mz        # MZ only
 pnpm test:unit      # node --test pure-logic unit tests (no game / nwjs required)
+pnpm test:coverage  # coverage report (Node.js >= 22.8)
+pnpm test:coverage:check # coverage thresholds used by CI
 pnpm test:packaging # archive structure test (run `make` first for vendor files)
 pnpm run typecheck  # tsc project check for files marked // @ts-check
 ```

@@ -1,3 +1,4 @@
+// @ts-check
 // 日本語 UI 文案。
 export default {
   common: {

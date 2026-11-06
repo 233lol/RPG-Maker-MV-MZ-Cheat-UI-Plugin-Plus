@@ -1,3 +1,4 @@
+// @ts-check
 // 开关 / 变量面板的公共逻辑：列表构建、锁定状态、批量锁定、锁定表持久化。
 //
 // 这两个面板原本是逐字复制的两份实现（约 400 行重复）。真正的差异收敛成
@@ -21,6 +22,7 @@ import { t } from "./strings.js";
  * @returns {Record<string, { lockEnabled: true, lockValue: unknown }>}
  */
 export function buildLockPayload(items, isVariable) {
+  /** @type {Record<string, { lockEnabled: true, lockValue: unknown }>} */
   const payload = {};
   const list = Array.isArray(items) ? items : [];
 

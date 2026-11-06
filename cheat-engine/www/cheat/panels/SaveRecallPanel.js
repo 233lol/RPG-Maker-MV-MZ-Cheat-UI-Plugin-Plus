@@ -1,3 +1,4 @@
+// @ts-check
 import PaginationFooter from "../components/PaginationFooter.js";
 import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
@@ -183,7 +184,8 @@ export default {
     },
 
     filteredTableItems() {
-      return filterByKeyword(this.tableItems, this.search, (item) => [
+      const items = /** @type {any[]} */ (/** @type {any} */ (this).tableItems);
+      return filterByKeyword(items, this.search, (item) => [
         item.name,
         item.mapName,
       ]);

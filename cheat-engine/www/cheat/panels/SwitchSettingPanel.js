@@ -1,3 +1,4 @@
+// @ts-check
 import PaginationFooter from "../components/PaginationFooter.js";
 import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
@@ -149,9 +150,10 @@ export default {
     },
 
     allSwitchOn() {
-      const hasTurnOff = this.filteredTableItems.find(
-        (item) => item.value === false,
+      const items = /** @type {any[]} */ (
+        /** @type {any} */ (this).filteredTableItems
       );
+      const hasTurnOff = items.find((item) => item.value === false);
       return !hasTurnOff;
     },
 

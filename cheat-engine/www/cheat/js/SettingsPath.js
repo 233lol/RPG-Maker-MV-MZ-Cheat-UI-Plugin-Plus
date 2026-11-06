@@ -1,3 +1,4 @@
+// @ts-check
 // MV 与 MZ 的游戏根目录布局不同：
 //   MV：<游戏根>/www/index.html，所以设置放在 <游戏根>/www/cheat-settings
 //   MZ：<游戏根>/index.html，   所以设置放在 <游戏根>/cheat-settings

@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 把 Vue 的 errorCaptured / app.config.errorHandler 参数整理成可展示的文本。
  * 单独抽出来便于在不启动 Vue 的情况下做单元测试。

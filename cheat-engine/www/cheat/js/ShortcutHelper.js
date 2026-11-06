@@ -1,3 +1,4 @@
+// @ts-check
 import { MAX_KEY_CODE } from "./KeyCodes.js";
 
 export class ShortcutMap {
@@ -81,8 +82,7 @@ export class ShortcutMap {
   /**
    * run action on key
    *
-   * @param key
-   * @type Key
+   * @param {import("./KeyCodes.js").Key} key
    */
   runEnterAction(key) {
     const item = this.getItem(key);
@@ -95,6 +95,7 @@ export class ShortcutMap {
     return false;
   }
 
+  /** @param {import("./KeyCodes.js").Key} key */
   runRepeatAction(key) {
     const item = this.getItem(key);
 
@@ -106,6 +107,7 @@ export class ShortcutMap {
     return false;
   }
 
+  /** @param {import("./KeyCodes.js").Key} key */
   runLeaveAction(key) {
     const item = this.getItem(key);
 
@@ -117,6 +119,7 @@ export class ShortcutMap {
     return false;
   }
 
+  /** @param {import("./KeyCodes.js").Key} key */
   getItem(key) {
     const index = ShortcutMap.tableIndex(key);
 

@@ -1,3 +1,4 @@
+// @ts-check
 // 判断事件目标是否落在作弊 UI / 弹层上。
 //
 // 作弊窗口本身有 #cheat-modal，但确认框、JSON 编辑框、REPL、菜单、snackbar

@@ -1,3 +1,4 @@
+// @ts-check
 import RefreshButton from "../components/RefreshButton.js";
 import HealthSettingTab from "./HealthSettingTab.js";
 import { BattleCheat } from "../js/CheatHelper.js";

@@ -1,3 +1,4 @@
+// @ts-check
 import { t } from "./strings.js";
 
 export const CHAR_TO_CODE = {
