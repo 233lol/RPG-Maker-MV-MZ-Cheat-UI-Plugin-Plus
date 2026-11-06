@@ -49,6 +49,7 @@
 
 - 修复 `CheatModal` 模板缺少实例方法 `t` 导致整个作弊窗口渲染失败。
 - 修复 `GeneralPanel` 未导入 `Alert`，金币提示抛 `ReferenceError`。
+- 修复属性面板更换装备时，未在背包中的装备会被引擎的物品交易检查静默拒绝（下拉框已选但角色身上没变）；改为直接调用 `forceChangeEquip()`。
 - 修复标题画面 / 启动阶段点击「事件检查」时，`$gameMap` 或 `_interpreter` 尚未创建导致抛错。
 - 修复地图事件面板在 NW.js 下依赖 localStorage、可能与其他游戏共享设置的问题；设置现在只写入游戏目录下的 `map-event.json`。
 - 修复窗口失焦 / Esc 关闭时未执行 `leaveAction`，导致「跳过消息」与游戏加速状态永久残留。

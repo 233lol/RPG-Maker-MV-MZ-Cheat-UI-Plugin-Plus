@@ -461,7 +461,14 @@ export default {
         return;
       }
 
-      item._actor.changeEquip(slot.slotId, equip);
+      // 作弊面板允许直接换上数据库里的任意装备，不要求背包中已有该物品。
+      // 引擎的 changeEquip() 会先走物品交易；未持有装备时会静默失败，
+      // 表现为下拉框选了装备但角色身上没有变化。
+      if (typeof item._actor.forceChangeEquip === "function") {
+        item._actor.forceChangeEquip(slot.slotId, equip);
+      } else {
+        item._actor.changeEquip(slot.slotId, equip);
+      }
       this.initializeVariables();
     },
 

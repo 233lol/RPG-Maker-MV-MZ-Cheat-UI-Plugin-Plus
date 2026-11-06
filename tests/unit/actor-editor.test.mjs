@@ -331,6 +331,9 @@ function makeStatsActor(overrides = {}) {
   actor.changeEquip = (slotId, equip) => {
     actor.changedEquip = { slotId, equip };
   };
+  actor.forceChangeEquip = (slotId, equip) => {
+    actor.forcedEquip = { slotId, equip };
+  };
   actor.addState = (stateId) => {
     actor.addedState = stateId;
   };
@@ -401,13 +404,40 @@ test("StatsSettingPanel：身份 / 职业 / 装备 / 状态修改会写回引擎
   assert.equal(actor._nickname, "N");
   assert.equal(actor._profile, "P");
   assert.deepEqual(actor.changedClass, { classId: 3, keepExp: true });
+  assert.deepEqual(actor.forcedEquip, {
+    slotId: 1,
+    equip: globalThis.$dataArmors[1],
+  });
+  assert.equal(actor.changedEquip, undefined);
+  assert.equal(actor.addedState, 2);
+  assert.equal(actor.removedState, 2);
+  assert.equal(calls.length, 7);
+});
+
+test("StatsSettingPanel.onEquipChange：缺少 forceChangeEquip 时退回 changeEquip", () => {
+  const actor = makeStatsActor();
+  delete actor.forceChangeEquip;
+
+  let refreshed = 0;
+  const panel = makeStatsPanel({
+    initializeVariables() {
+      refreshed++;
+    },
+  });
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = { members: () => [actor] };
+  globalThis.$dataWeapons = [null, { id: 1, name: "Sword" }];
+  globalThis.$dataArmors = [null, { id: 1, name: "Shield" }];
+
+  panel.onEquipChange({ _actor: actor }, { slotId: 1 }, 1);
+
   assert.deepEqual(actor.changedEquip, {
     slotId: 1,
     equip: globalThis.$dataArmors[1],
   });
-  assert.equal(actor.addedState, 2);
-  assert.equal(actor.removedState, 2);
-  assert.equal(calls.length, 7);
+  assert.equal(actor.forcedEquip, undefined);
+  assert.equal(refreshed, 1);
 });
 
 /* --------------------------------------------------------------- Party panel */

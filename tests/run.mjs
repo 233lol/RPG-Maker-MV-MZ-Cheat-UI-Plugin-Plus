@@ -17,6 +17,8 @@ import { registerGlobalVariable } from "./specs/global-variable.mjs";
 import { registerShortcutPanel } from "./specs/shortcut-panel.mjs";
 import { registerStability } from "./specs/stability.mjs";
 import { registerSaveBackup } from "./specs/save-backup.mjs";
+import { registerActorEditor } from "./specs/actor-editor.mjs";
+import { registerSettingsLocale } from "./specs/settings-locale.mjs";
 import { registerPackaging } from "./specs/packaging.mjs";
 
 const repoRoot = path.resolve(
@@ -128,6 +130,8 @@ async function main() {
       registerShortcutPanel({ test: runner.test, page: game, type, state });
       registerStability({ test: runner.test, page: game, type, state });
       registerSaveBackup({ test: runner.test, page: game, type, state });
+      registerActorEditor({ test: runner.test, page: game, type, state });
+      registerSettingsLocale({ test: runner.test, page: game, type, state });
 
       const result = await runner.run();
       totalPassed += result.passed;
