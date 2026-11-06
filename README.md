@@ -12,7 +12,7 @@ Vue 2 + Vuetify 2 迁移至 Vue 3，UI 框架已升级至 Vuetify 4。
 - 添加了「全局变量」面板：以文件夹形式浏览 RPG Maker / 第三方插件定义的 JS 全局变量（自动过滤函数 / 方法），可进入嵌套对象（进入层级时自动清空搜索，避免内部变量被过滤）、直接修改数字 / 字符串 / 布尔值、用 JSON 编辑数组与对象、新增 / 删除属性，支持当前层搜索与递归深度搜索
 - 添加了「存档时间机器」面板：为任意存档槽留快照、一键回滚、导入导出（详见下文）
 - 界面支持简体中文 / English / 日本語 切换，覆盖导航、全部 15 个面板与提示文案
-- 主窗口支持拖动、缩放，并记住尺寸 / 位置；打开时自动聚焦并拦截键盘输入，避免打字时角色移动或误开菜单
+- 主窗口支持拖动、缩放，并记住尺寸 / 位置；打开时自动聚焦、Tab 焦点循环并拦截键盘输入，避免打字时角色移动或误开菜单；主窗口、导航当前项与图标按钮提供基础 ARIA 语义
 - 记住上次打开的面板
 - 面板的搜索词、过滤开关、分页大小和页码会持久化，下次打开保持上次状态
 - 读档 / 新游戏 / 战斗结束 / 地图切换后，当前面板会自动刷新
@@ -72,12 +72,14 @@ pnpm run lint          # ESLint
 pnpm run format        # Prettier 自动格式化
 pnpm run format:check  # 只检查格式（CI 使用）
 pnpm run typecheck     # TypeScript 检查带 // @ts-check 的 JS 文件
-pnpm run test:unit     # node --test 纯函数单测，不需要游戏 / nwjs-sdk
+pnpm run test:unit     # node --test 单测（纯函数 / 设置迁移 / 启动入口），不需要游戏 / nwjs-sdk
 pnpm run test:packaging # 压缩包结构测试，需要先 make 生成 vendor 文件
 make check             # lint + format:check + test:unit + typecheck
 ```
 
 代码风格配置见 `.editorconfig`、`.prettierrc.json`、`eslint.config.mjs`。RPG Maker 在运行时注入大量全局变量（`$gamePlayer`、`DataManager` 等），因此作弊源码关闭了 `no-undef`，其余推荐规则仍然启用。
+
+单元测试除纯函数外，还会用 `node:vm` 执行 classic script 形式的 `cheat/init/import.js`，覆盖低版本 NW.js 提示、ResizeObserver 循环错误过滤与重复加载保护；`MapEventPanel` 的旧 localStorage 设置迁移也有独立回归用例。
 
 共享文案（搜索、分页、刷新、导航名称等）集中在 `cheat-engine/www/cheat/js/strings.js`，通过 `t("common.search")` 读取；面板内的一次性游戏名词仍保留在各自模板中，避免为改一个词引入额外间接层。
 
@@ -179,7 +181,8 @@ pnpm test:mz        # 只测 MZ
 | `cheat-engine/www/_cheat_initialize/mz/` | MZ 替换用 `main.js` |
 | `tools/` | Vendor 构建脚本 |
 | `tests/` | nw.js 无头端到端测试（需要测试游戏与 nwjs-sdk） |
-| `tests/unit/` | `node --test` 纯函数单元测试（CI 可直接运行） |
+| `tests/unit/` | `node --test` 纯函数 / 设置迁移 / 启动逻辑单元测试（CI 可直接运行） |
+| `tests/unit/import-bootstrap.test.mjs` | 用 `node:vm` 执行 classic `init/import.js`，测试版本提示、错误过滤与重复加载保护 |
 | `tests/run-packaging.mjs` | 只跑压缩包结构测试，不需要测试游戏 |
 | `CHANGELOG.md` | 版本变更记录 |
 
@@ -188,6 +191,35 @@ pnpm test:mz        # 只测 MZ
 插件替换游戏原始的 `main.js`，加载 `cheat/init/import.js` → `cheat/init/setup.js` (ES Module) → 挂载 `MainComponent`。
 
 可通过点击对应按钮或快捷键呼出/隐藏作弊菜单。
+
+## 设置与数据目录
+
+作弊插件自己的持久化数据保存在游戏根目录下（不是游戏存档目录）：
+
+| 引擎 | 设置目录 |
+| --- | --- |
+| MV | `www/cheat-settings/` |
+| MZ | `cheat-settings/` |
+
+| 文件 | 内容 |
+| --- | --- |
+| `shortcuts.json` | 快捷键绑定与参数 |
+| `gameSpeed.json` | 游戏速度与生效场景 |
+| `speed.json` | 移动速度 / 固定速度 |
+| `locale.json` | 界面语言 |
+| `panel-state.json` | 面板搜索、过滤、分页、上次打开的面板与窗口几何 |
+| `map-event.json` | 地图事件面板的有限视野、点击传送、刷新间隔 |
+| `switch-locks.json` / `variable-locks.json` | 开关 / 变量锁定 |
+| `kv-storage.json` | 存读位置（保存的传送点） |
+| `save-backups/` | 存档时间机器快照与索引 |
+
+说明：
+
+- 路径按 `nw.App.startPath` 解析，避免启动器 / 快捷方式的工作目录不同导致写到游戏目录之外；
+- MZ 旧版本的 `www/cheat-settings/` 会在首次加载时自动迁移到游戏根目录的 `cheat-settings/`，迁移可从中断处继续；
+- 地图事件面板旧版本写在 `localStorage` 的 `mapEventPanel_*` 设置会在首次读取时迁移到 `map-event.json`，之后不再依赖 localStorage；
+- 写入使用「临时文件 + `fsync` + rename」原子写；JSON 损坏时先另存为 `<文件>.corrupt-<时间戳>`，不会直接覆盖原文件；
+- 浏览器模式（没有 nw.js 文件系统）按设置文件路径隔离 localStorage key，多个游戏不会互相覆盖。
 
 ## 存档时间机器
 

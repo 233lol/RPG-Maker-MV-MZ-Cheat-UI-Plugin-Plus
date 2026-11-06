@@ -66,7 +66,7 @@ Code style: `pnpm run lint` (ESLint flat config), `pnpm run format` (Prettier), 
 | `cheat-engine/www/_cheat_initialize/mz/` | MZ-specific `main.js` replacement |
 | `tools/` | Vendor build scripts (`build-shiki.mjs`, `copy-vue.mjs`, ...), `pack.mjs` (zip packaging), `Makefile` helpers (`gen-version.mjs`, `link-latest.mjs`, `clean.mjs`)|
 | `tests/` | Headless MV/MZ tests (`tests/run.mjs`, `tests/lib/nw.mjs`, `tests/specs/*`) |
-| `tests/unit/` | `node --test` unit tests for pure helpers (CI) |
+| `tests/unit/` | `node --test` unit tests for pure helpers, settings migration, and classic-script bootstrap logic (`import-bootstrap.test.mjs` runs `init/import.js` in `node:vm`) (CI) |
 | `CHANGELOG.md` | Semver release history; bump together with `package.json` |
 
 The cheat replaces the game's `main.js` with a version that loads `cheat/init/import.js` → `cheat/init/setup.js` (ES module) → mounts Vue 3 `MainComponent`.
@@ -75,6 +75,7 @@ Cheat-owned persistent settings live under the game's web root:
 - MV: `www/cheat-settings/` (`shortcuts.json`, `gameSpeed.json`, `speed.json`, `kv-storage.json`, `locale.json`, `panel-state.json`, `map-event.json`, `switch-locks.json`, `variable-locks.json`, `save-backups/`).
 - MZ: `cheat-settings/` at the game root (same files). An existing legacy `www/cheat-settings/` is migrated once on load; the migration merges missing files and can resume after an interrupted copy.
 - Paths are resolved against `nw.App.startPath` (fallback `process.cwd()`), not the launcher's working directory.
+- `map-event.json` stores the map-event panel display settings; legacy `mapEventPanel_*` localStorage values are migrated on first read.
 - Corrupt settings JSON is renamed to `<file>.corrupt-<timestamp>` before a fresh file is written.
 
 New features that need on-disk state should use `cheat/js/SettingsPath.js` instead of hardcoding a path.
