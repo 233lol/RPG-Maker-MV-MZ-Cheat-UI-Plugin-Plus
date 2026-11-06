@@ -119,6 +119,15 @@ export default {
             <v-btn
                 size="small"
                 variant="text"
+                color="indigo-lighten-1"
+                :disabled="!available || selectedBackupIds.length === 0"
+                @click="exportSelectedBackups">
+                <v-icon start size="small">mdi-export-variant</v-icon>
+                {{ t("saveBackup.exportSelected", { count: selectedBackupIds.length }) }}
+            </v-btn>
+            <v-btn
+                size="small"
+                variant="text"
                 color="deep-purple-lighten-2"
                 :disabled="!available"
                 @click="importBackups">
@@ -156,6 +165,9 @@ export default {
     <v-data-table
         class="cheat-save-backup-table"
         density="compact"
+        show-select
+        select-strategy="filtered"
+        v-model="selectedBackupIds"
         :headers="tableHeaders"
         :items="filteredTableItems"
         v-model:page="pagination.page"
@@ -307,6 +319,7 @@ export default {
       playtimeText: "",
 
       backups: [],
+      selectedBackupIds: [],
       stats: {
         count: 0,
         missingCount: 0,
@@ -482,6 +495,13 @@ export default {
       }
 
       this.backups = SaveBackupCheat.listBackups();
+
+      // 删除 / 还原 / 清空后刷新时，把已经不存在的快照从选择里剔除，
+      // 避免「导出选中」写出空文件。
+      const existingIds = new Set(this.backups.map((item) => String(item.id)));
+      this.selectedBackupIds = this.selectedBackupIds.filter((id) =>
+        existingIds.has(String(id)),
+      );
 
       const stats = SaveBackupCheat.getStats();
       this.stats = {
@@ -898,6 +918,23 @@ export default {
 
       try {
         const file = SaveBackupCheat.exportAll();
+        Alert.success(t("saveBackup.exportedTo", { file }));
+      } catch (error) {
+        Alert.error(
+          t("saveBackup.exportFailed", { message: error.message }),
+          error,
+        );
+      }
+    },
+
+    exportSelectedBackups() {
+      if (this.selectedBackupIds.length === 0) {
+        Alert.warn(t("saveBackup.exportSelectedEmpty"));
+        return;
+      }
+
+      try {
+        const file = SaveBackupCheat.exportSelected(this.selectedBackupIds);
         Alert.success(t("saveBackup.exportedTo", { file }));
       } catch (error) {
         Alert.error(

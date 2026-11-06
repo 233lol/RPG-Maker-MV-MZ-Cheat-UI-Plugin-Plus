@@ -4,6 +4,7 @@
 
 import { writeTextAtomic } from "../AtomicFile.js";
 import { t } from "../strings.js";
+import { filterBackupsForExport } from "./selection.js";
 import {
   BACKUP_KIND_AUTO,
   BACKUP_KIND_MANUAL,
@@ -18,14 +19,21 @@ import {
 export class SaveBackupTransfer {
   /* --------------------------------------------------------- 导入 / 导出 */
 
-  // 导出到快照目录下的一个 json 文件（含全部快照的原始数据），返回值供界面展示路径
-  static exportAll() {
+  // 导出到快照目录下的一个 json 文件（含快照的原始数据），返回值供界面展示路径。
+  // ids 为空时导出全部；指定 ids 时只导出选中的快照。
+  static exportBackups(ids = null) {
     if (!this.isLocalMode()) {
       throw new Error(WARN_NO_NWJS);
     }
 
     const path = require("path");
     const dir = this.ensureBackupDir();
+
+    const entries = filterBackupsForExport(this.readIndex(), ids);
+
+    if (ids !== null && ids !== undefined && entries.length === 0) {
+      throw new Error(t("saveBackup.exportSelectedEmpty"));
+    }
 
     const stamp = this.formatFileTimestamp(Date.now());
     const file = path.join(dir, `cheat-save-backups-${stamp}.json`);
@@ -34,7 +42,7 @@ export class SaveBackupTransfer {
       version: IMPORT_EXPORT_VERSION,
       exportedAt: Date.now(),
       gameVersion: this.getGameVersion(),
-      backups: this.readIndex().map((entry) => {
+      backups: entries.map((entry) => {
         let data = null;
 
         try {
@@ -51,6 +59,14 @@ export class SaveBackupTransfer {
     writeTextAtomic(file, JSON.stringify(payload), "utf-8");
 
     return file;
+  }
+
+  static exportAll() {
+    return this.exportBackups();
+  }
+
+  static exportSelected(ids) {
+    return this.exportBackups(ids);
   }
 
   // 返回 { added, skipped }；不覆盖已有快照，避免导入把现有记录冲掉

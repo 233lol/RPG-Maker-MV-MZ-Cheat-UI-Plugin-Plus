@@ -269,6 +269,8 @@ export default {
     keepPerSlot: "每槽保留",
     unit: "份",
     exportAll: "导出全部",
+    exportSelected: "导出选中 ({count})",
+    exportSelectedEmpty: "请先选择要导出的快照",
     import: "导入",
     clearAll: "清空全部",
     unavailable:

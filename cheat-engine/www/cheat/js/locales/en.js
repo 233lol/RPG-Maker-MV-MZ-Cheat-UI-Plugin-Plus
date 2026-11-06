@@ -271,6 +271,8 @@ export default {
     keepPerSlot: "Keep per slot",
     unit: "copies",
     exportAll: "Export all",
+    exportSelected: "Export selected ({count})",
+    exportSelectedEmpty: "Select at least one snapshot to export",
     import: "Import",
     clearAll: "Clear all",
     unavailable:

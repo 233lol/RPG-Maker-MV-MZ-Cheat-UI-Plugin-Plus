@@ -272,6 +272,8 @@ export default {
     keepPerSlot: "スロットごとに保持",
     unit: "件",
     exportAll: "すべてエクスポート",
+    exportSelected: "選択をエクスポート ({count})",
+    exportSelectedEmpty: "エクスポートするスナップショットを選択してください",
     import: "インポート",
     clearAll: "すべて削除",
     unavailable:
