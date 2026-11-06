@@ -11,7 +11,7 @@ Vue 2 + Vuetify 2 迁移至 Vue 3，UI 框架已升级至 Vuetify 4。
 - 添加了角色技能修改
 - 添加了「全局变量」面板：以文件夹形式浏览 RPG Maker / 第三方插件定义的 JS 全局变量（自动过滤函数 / 方法），可进入嵌套对象（进入层级时自动清空搜索，避免内部变量被过滤）、直接修改数字 / 字符串 / 布尔值、用 JSON 编辑数组与对象、新增 / 删除属性，支持当前层搜索与递归深度搜索
 - 添加了「存档时间机器」面板：为任意存档槽留快照、一键回滚、导入导出（详见下文）
-- 界面支持简体中文 / English / 日本語 切换（完整翻译仍在逐步迁移，导航与常用面板已覆盖）
+- 界面支持简体中文 / English / 日本語 切换，覆盖导航、全部 15 个面板与提示文案
 - 主窗口支持拖动、缩放，并记住尺寸 / 位置；打开时自动聚焦并拦截键盘输入，避免打字时角色移动或误开菜单
 - 记住上次打开的面板
 - 面板的搜索词、过滤开关、分页大小和页码会持久化，下次打开保持上次状态
@@ -35,7 +35,7 @@ Vue 2 + Vuetify 2 迁移至 Vue 3，UI 框架已升级至 Vuetify 4。
 
 ### 前置要求
 
-- [Node.js](https://nodejs.org/) >= 18（构建）/ >= 22（无头测试，使用内置 `WebSocket`）
+- [Node.js](https://nodejs.org/) >= 22（构建与无头测试；测试脚本使用内置 `WebSocket`）
 - [pnpm](https://pnpm.io/)
 - GNU Make（Windows 可通过 `winget install GnuWin32.Make`、`choco install make` 或 `scoop install make` 安装）
 
@@ -145,7 +145,7 @@ pnpm test:mz        # 只测 MZ
 - 覆盖稳定性回归：分页 `All` 边界与过滤后页码回收、原子写入失败清理、初始化提示队列及 20 条上限、弹层（菜单 / snackbar / tooltip）点击拦截、技能字段缺失、对象变量 JSON 编辑、传送坐标 / 地图校验、game-ready 保护、Vue `markRaw`、损坏的存读位置数据、物品数量与技能增删、恢复默认快捷键、自动快照保留份数裁剪与旧快照回填标记；
 - 校验 `tools/pack.mjs` 生成的 MV / MZ 压缩包目录结构、`main.js` 内容，以及 `main.js` 引用的入口路径确实存在于压缩包内。
 
-要求 Node.js >= 22（测试脚本使用内置 `WebSocket` 连接 nw.js 的 CDP）。
+要求 Node.js >= 22（测试脚本使用内置 `WebSocket` 连接 nw.js 的 CDP；仓库根目录提供了 `.nvmrc`）。
 
 ## 项目结构
 

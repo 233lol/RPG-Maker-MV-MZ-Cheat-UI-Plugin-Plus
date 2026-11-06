@@ -274,6 +274,24 @@ test("GeneralPanel.getCurrentEventId / getCurrentEventCommandIndex：解释器�
   assert.equal(panel.getCurrentEventCommandIndex(), -1);
 });
 
+test("GeneralPanel.getCurrentEventId / getCurrentEventCommandIndex：无地图或解释器时安全返回", () => {
+  const panel = makeGeneralPanel();
+
+  globalThis.$gameMap = null;
+  assert.equal(panel.getCurrentEventId(), 0);
+  assert.equal(panel.getCurrentEventCommandIndex(), -1);
+
+  // 地图已创建但解释器尚未就绪（启动 / 场景切换窗口）
+  globalThis.$gameMap = {};
+  assert.equal(panel.getCurrentEventId(), 0);
+  assert.equal(panel.getCurrentEventCommandIndex(), -1);
+
+  // 解释器存在但缺少 eventId()，按「无当前事件」处理
+  globalThis.$gameMap = { _interpreter: { _index: 2 } };
+  assert.equal(panel.getCurrentEventId(), 0);
+  assert.equal(panel.getCurrentEventCommandIndex(), 1);
+});
+
 test("GeneralPanel.scrollToCurrentEventEntry：兼容数组 / 单个 ref 与缺失节点", () => {
   const calls = [];
   const panel = makeGeneralPanel({

@@ -31,6 +31,7 @@ export default {
     milliseconds: "{count} ms",
     unknown: "不明",
     retry: "再試行",
+    jumpToPage: "ページへ移動",
     panelErrorTitle: "パネルの読み込みに失敗しました",
     panelErrorHint:
       "このパネルでエラーが発生しました。他のパネルとゲームには影響しません。再試行するか、開発者ツールでコンソールログを確認してください。",

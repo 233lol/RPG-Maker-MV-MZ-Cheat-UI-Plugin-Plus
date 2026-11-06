@@ -51,9 +51,10 @@ export default {
             :variant="variant"
             :class="btnClass"
             :style="btnStyle || undefined"
+            :aria-label="tooltip"
             v-bind="props"
             @click="$emit('click')">
-            <v-icon :size="iconSize || undefined">{{ icon }}</v-icon>
+            <v-icon :size="iconSize || undefined" aria-hidden="true">{{ icon }}</v-icon>
         </v-btn>
     </template>
     <span>{{ tooltip }}</span>

@@ -69,13 +69,41 @@ function makeLocalStorage(initial = {}) {
   };
 }
 
-test("MapEventPanel.loadSetting / saveSetting：JSON 往返与损坏值回退", () => {
-  globalThis.localStorage = makeLocalStorage({
+function makeSettingsStorage(initial = {}) {
+  const data = new Map(Object.entries(initial));
+
+  return {
+    data,
+    getItem(key) {
+      return data.has(key) ? data.get(key) : null;
+    },
+    setItem(key, value) {
+      data.set(key, String(value));
+    },
+  };
+}
+
+function makeMapEventPanel(storage, overrides = {}) {
+  return makePanel(MapEventPanel, {
+    getSettingsStorage: () => storage,
+    ...overrides,
+  });
+}
+
+test("MapEventPanel.loadSetting / saveSetting：读写统一设置存储并兼容旧 localStorage", () => {
+  // 新设置文件里已有 good；旧 localStorage 里也有 good（旧值），新值必须优先。
+  const storage = makeSettingsStorage({
     good: JSON.stringify({ a: 1 }),
     bad: "{bad",
   });
 
-  const panel = makePanel(MapEventPanel);
+  globalThis.window = {};
+  globalThis.localStorage = makeLocalStorage({
+    good: JSON.stringify({ a: 999 }),
+    legacy: JSON.stringify({ from: "localStorage" }),
+  });
+
+  const panel = makeMapEventPanel(storage);
   const originalWarn = console.warn;
   console.warn = () => {};
 
@@ -84,11 +112,29 @@ test("MapEventPanel.loadSetting / saveSetting：JSON 往返与损坏值回退", 
     assert.equal(panel.loadSetting("missing", 5), 5);
     assert.equal(panel.loadSetting("bad", "fallback"), "fallback");
 
+    // 旧值只在第一次读取时迁移，之后使用新设置文件。
+    assert.deepEqual(panel.loadSetting("legacy", null), {
+      from: "localStorage",
+    });
+    assert.equal(storage.getItem("legacy"), '{"from":"localStorage"}');
+    assert.equal(localStorage.getItem("legacy"), '{"from":"localStorage"}');
+
     panel.saveSetting("saved", { b: 2 });
-    assert.equal(localStorage.getItem("saved"), '{"b":2}');
+    assert.equal(storage.getItem("saved"), '{"b":2}');
   } finally {
     console.warn = originalWarn;
   }
+});
+
+test("MapEventPanel.loadSetting：没有 localStorage 时也能使用默认值", () => {
+  const storage = makeSettingsStorage({ saved: JSON.stringify([1, 2]) });
+  const panel = makeMapEventPanel(storage);
+
+  delete globalThis.window;
+  delete globalThis.localStorage;
+
+  assert.deepEqual(panel.loadSetting("saved", []), [1, 2]);
+  assert.equal(panel.loadSetting("missing", "default"), "default");
 });
 
 test("MapEventPanel：读取间隔会收敛到 100-1000ms", () => {
@@ -104,7 +150,7 @@ test("MapEventPanel：读取间隔会收敛到 100-1000ms", () => {
 });
 
 test("MapEventPanel.onReadIntervalChange：保存合法值并重建定时器", () => {
-  globalThis.localStorage = makeLocalStorage();
+  const storage = makeSettingsStorage();
 
   const timers = [];
   const cleared = [];
@@ -118,7 +164,7 @@ test("MapEventPanel.onReadIntervalChange：保存合法值并重建定时器", (
   };
   globalThis.clearInterval = (id) => cleared.push(id);
 
-  const panel = makePanel(MapEventPanel, {
+  const panel = makeMapEventPanel(storage, {
     readInterval: 50,
     renderIntervalId: 99,
     isCanvasVisible: false,
@@ -129,7 +175,7 @@ test("MapEventPanel.onReadIntervalChange：保存合法值并重建定时器", (
     panel.onReadIntervalChange();
 
     assert.equal(panel.readInterval, 100);
-    assert.equal(localStorage.getItem("mapEventPanel_readInterval"), "100");
+    assert.equal(storage.getItem("mapEventPanel_readInterval"), "100");
     assert.deepEqual(cleared, [99]);
     assert.equal(timers.length, 1);
     assert.equal(timers[0].ms, 100);

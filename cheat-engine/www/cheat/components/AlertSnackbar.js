@@ -1,4 +1,5 @@
 import { Alert } from "../js/AlertHelper.js";
+import { t } from "../js/strings.js";
 
 // AlertSnackbar 会覆盖 AlertHelper 里的原生 alert() 实现，而原生实现是会把 err
 // 拼进提示文本的。覆盖后必须自己补上，否则调用方传的 err 会被静默丢弃 ——
@@ -23,6 +24,8 @@ export default {
     :color="color"
     v-model="showSnackbar"
     :timeout="timeout"
+    role="status"
+    aria-live="polite"
     class="z-index-cheat-1">
     <span 
         v-for="(line, idx) in text"
@@ -36,8 +39,9 @@ export default {
         style="margin:0"
         color="white"
         icon
+        :aria-label="t('common.close')"
         @click="showSnackbar = false">
-        <v-icon size="small">mdi-close</v-icon>
+        <v-icon size="small" aria-hidden="true">mdi-close</v-icon>
     </v-btn>
     </template>
 </v-snackbar>
@@ -94,6 +98,8 @@ export default {
   },
 
   methods: {
+    t,
+
     show(options) {
       this.text = options.text.split("\n");
       this.timeout = options.timeout;

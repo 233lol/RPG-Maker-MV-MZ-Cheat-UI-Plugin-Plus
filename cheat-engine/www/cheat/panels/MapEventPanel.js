@@ -1,6 +1,35 @@
 import { MapEventClassifier } from "../js/map-event/classifier.js";
 import { markRaw } from "../libs/vue.js";
 import { t } from "../js/strings.js";
+import { KeyValueStorage } from "../js/KeyValueStorage.js";
+import { getCheatSettingsPath } from "../js/SettingsPath.js";
+
+const SETTINGS_FILE = "map-event.json";
+
+let settingsStorage = null;
+
+function getSharedSettingsStorage() {
+  if (!settingsStorage) {
+    settingsStorage = new KeyValueStorage(getCheatSettingsPath(SETTINGS_FILE));
+  }
+
+  return settingsStorage;
+}
+
+// 旧版本把面板设置直接写进游戏页面的 localStorage。NW.js 下所有游戏通常
+// 共享同一个 localStorage，浏览器模式也没有按设置文件隔离，多个游戏会互相
+// 串设置。这里只做一次性读取：读到旧值后写入新设置文件，之后不再回退。
+function readLegacyLocalStorageSetting(key) {
+  try {
+    if (typeof window === "undefined" || typeof localStorage === "undefined") {
+      return null;
+    }
+
+    return localStorage.getItem(key);
+  } catch (error) {
+    return null;
+  }
+}
 
 export default {
   name: "MapEventPanel",
@@ -184,11 +213,35 @@ export default {
   methods: {
     t,
 
-    // localStorage helper methods
+    // 设置读写统一走 KeyValueStorage（<游戏目录>/cheat-settings/map-event.json），
+    // 与面板状态 / 快捷键等保持一致，避免 NW.js 下多个游戏共用 localStorage。
+    getSettingsStorage() {
+      return getSharedSettingsStorage();
+    },
+
     loadSetting(key, defaultValue) {
       try {
-        const saved = localStorage.getItem(key);
-        return saved !== null ? JSON.parse(saved) : defaultValue;
+        const storage = this.getSettingsStorage();
+
+        // 新设置文件优先；只有旧版本留下的 localStorage 值才回退读取，
+        // 读到后立即迁移到新文件，下次启动不再依赖 localStorage。
+        let saved = storage.getItem(key);
+
+        if (saved === null || saved === undefined) {
+          const legacy = readLegacyLocalStorageSetting(key);
+
+          if (legacy !== null && legacy !== undefined) {
+            storage.setItem(key, legacy);
+            saved = legacy;
+          }
+        }
+
+        if (saved === null || saved === undefined) {
+          return defaultValue;
+        }
+
+        const parsed = JSON.parse(saved);
+        return parsed === undefined ? defaultValue : parsed;
       } catch (error) {
         console.warn("Failed to load setting:", key, error);
         return defaultValue;
@@ -197,7 +250,7 @@ export default {
 
     saveSetting(key, value) {
       try {
-        localStorage.setItem(key, JSON.stringify(value));
+        this.getSettingsStorage().setItem(key, JSON.stringify(value));
       } catch (error) {
         console.warn("Failed to save setting:", key, error);
       }

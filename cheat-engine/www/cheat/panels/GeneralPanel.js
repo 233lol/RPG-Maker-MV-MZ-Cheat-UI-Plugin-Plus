@@ -536,11 +536,29 @@ export default {
     },
 
     getCurrentEventId() {
-      return Number($gameMap._interpreter.eventId()) || 0;
+      // 标题画面 / 启动阶段还没有 $gameMap，按钮又是常驻的；
+      // 这里必须容错，否则点「事件检查」会在 try 之前直接抛错。
+      if (typeof $gameMap === "undefined" || !$gameMap) {
+        return 0;
+      }
+
+      const interpreter = $gameMap._interpreter;
+
+      if (!interpreter || typeof interpreter.eventId !== "function") {
+        return 0;
+      }
+
+      return Number(interpreter.eventId()) || 0;
     },
 
     getCurrentEventCommandIndex() {
-      const index = Number($gameMap._interpreter._index);
+      if (typeof $gameMap === "undefined" || !$gameMap) {
+        return -1;
+      }
+
+      const interpreter = $gameMap._interpreter;
+      const index = Number(interpreter && interpreter._index);
+
       if (!Number.isInteger(index) || index < 0) {
         return -1;
       }

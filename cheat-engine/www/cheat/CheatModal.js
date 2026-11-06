@@ -48,9 +48,12 @@ export default {
     ref="cardRoot"
     class="z-index-cheat-0 cheat-window d-flex flex-column"
     tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="t('common.cheatWindow')"
     :style="cardStyle">
     <div class="cheat-window-drag" @pointerdown="startDrag">
-        <v-icon size="small" class="mr-1">mdi-drag</v-icon>
+        <v-icon size="small" class="mr-1" aria-hidden="true">mdi-drag</v-icon>
         <span class="text-body-small text-grey-lighten-1">{{ t("common.cheatWindow") }}</span>
         <v-spacer></v-spacer>
         <v-btn
@@ -58,8 +61,9 @@ export default {
             size="x-small"
             variant="text"
             :title="t('common.close')"
+            :aria-label="t('common.close')"
             @click="$emit('close')">
-            <v-icon size="small">mdi-close</v-icon>
+            <v-icon size="small" aria-hidden="true">mdi-close</v-icon>
         </v-btn>
     </div>
     <div 
@@ -84,6 +88,7 @@ export default {
                             :prepend-icon="child.icon"
                             :title="child.name"
                             :active="modelValue === child.component"
+                            :aria-current="modelValue === child.component ? 'page' : undefined"
                             density="compact"
                             class="pl-4"
                             @click="onNavItemClick(child)"
@@ -94,6 +99,7 @@ export default {
                         :prepend-icon="item.icon"
                         :title="item.name"
                         :active="modelValue === item.component"
+                        :aria-current="modelValue === item.component ? 'page' : undefined"
                         density="compact"
                         @click="onNavItemClick(item)"
                     ></v-list-item>

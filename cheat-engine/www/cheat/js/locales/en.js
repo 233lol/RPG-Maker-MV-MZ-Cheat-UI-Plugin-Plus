@@ -31,6 +31,7 @@ export default {
     milliseconds: "{count} ms",
     unknown: "Unknown",
     retry: "Retry",
+    jumpToPage: "Go to page",
     panelErrorTitle: "Failed to load panel",
     panelErrorHint:
       "This panel hit an error. Other panels and the game are unaffected. Retry, or open DevTools and check the console log.",

@@ -76,6 +76,11 @@ const RPG_GLOBAL_NAME_PATTERN = /^\$(data|game|plugins)/;
 // 浏览器内置全局变量名（静态兜底 + 空白 iframe 动态检测）
 let builtinGlobalNameCache = null;
 
+// 测试 / 预热重新探测时使用；正常运行期间缓存会一直保留。
+export function invalidateBuiltinGlobalNamesCache() {
+  builtinGlobalNameCache = null;
+}
+
 export function getBuiltinGlobalNames() {
   if (builtinGlobalNameCache) {
     return builtinGlobalNameCache;
@@ -85,8 +90,10 @@ export function getBuiltinGlobalNames() {
 
   // 空白 iframe 里只有浏览器 / NW.js 内置变量，
   // 用它做差集可以准确识别游戏与第三方插件自定义的全局变量
+  let iframe = null;
+
   try {
-    const iframe = document.createElement("iframe");
+    iframe = document.createElement("iframe");
     iframe.style.cssText = "display: none; width: 0; height: 0; border: 0;";
     (document.body || document.documentElement).appendChild(iframe);
 
@@ -96,10 +103,17 @@ export function getBuiltinGlobalNames() {
         names.add(name);
       });
     }
-
-    iframe.remove();
   } catch (error) {
     // 无法创建 iframe 时仅使用静态列表
+  } finally {
+    // 枚举 contentWindow 抛错时也要移除，避免留下一个隐藏 iframe。
+    if (iframe) {
+      try {
+        iframe.remove();
+      } catch (error) {
+        // 已被外部移除 / 环境不支持 remove 时忽略
+      }
+    }
   }
 
   builtinGlobalNameCache = names;

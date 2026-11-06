@@ -122,6 +122,31 @@ test("setLocale：切换后 t() 立即变化，并通知订阅者", () => {
   }
 });
 
+test("setLocale：同步 <html lang>，没有 document 时不报错", () => {
+  const originalDocument = globalThis.document;
+  const documentElement = { lang: "" };
+
+  globalThis.document = { documentElement };
+
+  try {
+    assert.equal(setLocale("en"), true);
+    assert.equal(documentElement.lang, "en");
+
+    assert.equal(setLocale("ja"), true);
+    assert.equal(documentElement.lang, "ja");
+  } finally {
+    setLocale("zh-CN");
+
+    if (originalDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = originalDocument;
+    }
+  }
+
+  assert.equal(documentElement.lang, "zh-CN");
+});
+
 test("LocaleService：没有窗口环境时回退到默认中文", () => {
   assert.equal(detectLocale(), "zh-CN");
   assert.equal(loadSavedLocale(), "zh-CN");

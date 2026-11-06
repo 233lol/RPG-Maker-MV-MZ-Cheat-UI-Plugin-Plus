@@ -72,7 +72,7 @@ Code style: `pnpm run lint` (ESLint flat config), `pnpm run format` (Prettier), 
 The cheat replaces the game's `main.js` with a version that loads `cheat/init/import.js` → `cheat/init/setup.js` (ES module) → mounts Vue 3 `MainComponent`.
 
 Cheat-owned persistent settings live under the game's web root:
-- MV: `www/cheat-settings/` (`shortcuts.json`, `gameSpeed.json`, `speed.json`, `kv-storage.json`, `locale.json`, `panel-state.json`, `switch-locks.json`, `variable-locks.json`, `save-backups/`).
+- MV: `www/cheat-settings/` (`shortcuts.json`, `gameSpeed.json`, `speed.json`, `kv-storage.json`, `locale.json`, `panel-state.json`, `map-event.json`, `switch-locks.json`, `variable-locks.json`, `save-backups/`).
 - MZ: `cheat-settings/` at the game root (same files). An existing legacy `www/cheat-settings/` is migrated once on load; the migration merges missing files and can resume after an interrupted copy.
 - Paths are resolved against `nw.App.startPath` (fallback `process.cwd()`), not the launcher's working directory.
 - Corrupt settings JSON is renamed to `<file>.corrupt-<timestamp>` before a fresh file is written.

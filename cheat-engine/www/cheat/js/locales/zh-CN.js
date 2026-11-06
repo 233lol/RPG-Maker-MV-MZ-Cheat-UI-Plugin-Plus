@@ -31,6 +31,7 @@ export default {
     milliseconds: "{count} ms",
     unknown: "未知",
     retry: "重试",
+    jumpToPage: "跳转到页",
     panelErrorTitle: "面板加载失败",
     panelErrorHint:
       "这个面板出错了，其他面板和游戏不受影响。可以重试，或打开开发者工具查看控制台日志。",

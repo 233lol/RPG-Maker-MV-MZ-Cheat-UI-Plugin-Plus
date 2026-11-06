@@ -4,13 +4,33 @@ import assert from "node:assert/strict";
 import {
   ROOT_FILTERS,
   formatPathText,
+  getBuiltinGlobalNames,
   getRootNamesByFilter,
+  invalidateBuiltinGlobalNamesCache,
   invalidateRootScanCache,
   resolvePathValue,
   scanRootGlobals,
   scanRootGlobalsCached,
   searchGlobalTree,
 } from "../../cheat-engine/www/cheat/js/global-object/scan.js";
+
+function withDocument(documentStub, callback) {
+  const originalDocument = globalThis.document;
+
+  globalThis.document = documentStub;
+
+  try {
+    return callback();
+  } finally {
+    if (originalDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = originalDocument;
+    }
+
+    invalidateBuiltinGlobalNamesCache();
+  }
+}
 
 test("scanRootGlobals：区分 RPG 全局、插件全局与浏览器内置", () => {
   const root = {
@@ -50,6 +70,63 @@ test("scanRootGlobals：插件全局属性读取抛错时跳过", () => {
 
   assert.equal(result.plugin.includes("BrokenPlugin"), false);
   assert.equal(result.rpg.includes("BrokenPlugin"), false);
+});
+
+test("getBuiltinGlobalNames：成功枚举后移除临时 iframe", () => {
+  invalidateBuiltinGlobalNamesCache();
+
+  let removed = 0;
+  const iframe = {
+    style: {},
+    contentWindow: { FakeBuiltinGlobal: 1 },
+    remove() {
+      removed += 1;
+    },
+  };
+
+  const names = withDocument(
+    {
+      createElement: () => iframe,
+      body: { appendChild() {} },
+    },
+    () => getBuiltinGlobalNames(),
+  );
+
+  assert.equal(removed, 1);
+  assert.ok(names.has("FakeBuiltinGlobal"));
+});
+
+test("getBuiltinGlobalNames：枚举抛错时也会移除 iframe", () => {
+  invalidateBuiltinGlobalNamesCache();
+
+  let removed = 0;
+  const contentWindow = new Proxy(
+    {},
+    {
+      ownKeys() {
+        throw new Error("boom");
+      },
+    },
+  );
+  const iframe = {
+    style: {},
+    contentWindow,
+    remove() {
+      removed += 1;
+    },
+  };
+
+  const names = withDocument(
+    {
+      createElement: () => iframe,
+      body: { appendChild() {} },
+    },
+    () => getBuiltinGlobalNames(),
+  );
+
+  assert.equal(removed, 1);
+  // 枚举失败时仍保留静态兜底列表
+  assert.ok(names.size > 0);
 });
 
 test("scanRootGlobalsCached：TTL 内复用结果，invalidate 后重新扫描", () => {

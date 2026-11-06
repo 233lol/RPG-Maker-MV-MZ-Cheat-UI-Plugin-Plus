@@ -43,6 +43,24 @@ const PLURAL_FORMS = new Set(["zero", "one", "two", "few", "many", "other"]);
 let currentLocale = loadSavedLocale();
 const localeChangeListeners = new Set();
 
+// 同步 <html lang>，让屏幕阅读器 / 拼写检查按当前界面语言工作。
+// 单元测试与构建脚本没有 document，静默跳过。
+function applyDocumentLanguage(locale) {
+  try {
+    if (
+      typeof document !== "undefined" &&
+      document &&
+      document.documentElement
+    ) {
+      document.documentElement.lang = locale;
+    }
+  } catch (error) {
+    // 沙箱环境不允许改 documentElement 时忽略
+  }
+}
+
+applyDocumentLanguage(currentLocale);
+
 export function getLocale() {
   return currentLocale;
 }
@@ -64,6 +82,7 @@ export function setLocale(locale) {
   }
 
   currentLocale = locale;
+  applyDocumentLanguage(locale);
 
   for (const listener of localeChangeListeners) {
     try {

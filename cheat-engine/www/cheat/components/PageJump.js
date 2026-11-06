@@ -1,3 +1,5 @@
+import { t } from "../js/strings.js";
+
 export default {
   name: "PageJump",
 
@@ -10,6 +12,7 @@ export default {
     :max="pageCount"
     density="compact"
     hide-details
+    :aria-label="t('common.jumpToPage')"
     class="page-jump-input"
     style="width: 60px; max-width: 60px; margin: 0 1px;"
     @keydown.self.stop
@@ -20,8 +23,9 @@ export default {
     size="x-small"
     icon
     class="mx-0"
+    :aria-label="t('common.jumpToPage')"
     @click="jump">
-    <v-icon size="x-small">mdi-arrow-right-bold</v-icon>
+    <v-icon size="x-small" aria-hidden="true">mdi-arrow-right-bold</v-icon>
   </v-btn>
 </span>
   `,
@@ -46,6 +50,8 @@ export default {
   },
 
   methods: {
+    t,
+
     jump() {
       const p = Number(this.inputVal);
       if (p >= 1 && p <= this.pageCount) {

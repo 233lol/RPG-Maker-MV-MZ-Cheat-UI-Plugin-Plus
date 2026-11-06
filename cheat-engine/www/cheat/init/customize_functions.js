@@ -24,7 +24,7 @@ function guardTouchInputMethod(name) {
   TouchInput[name] = wrapped;
 }
 
-export function customizeRPGMakerFunctions(mainComponent) {
+export function customizeRPGMakerFunctions() {
   if (Utils.RPGMAKER_NAME === "MV") {
     // WARN: directly changing engine code can be dangerous
     // remove preventDefault

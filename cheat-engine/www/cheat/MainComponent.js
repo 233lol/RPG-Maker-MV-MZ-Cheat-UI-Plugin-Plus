@@ -74,7 +74,7 @@ export default {
   },
 
   created() {
-    customizeRPGMakerFunctions(this);
+    customizeRPGMakerFunctions();
     installGameDataHooks();
     LockService.ensureLoaded();
 

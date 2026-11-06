@@ -1,4 +1,5 @@
 import { Key } from "../js/KeyCodes.js";
+import { t } from "../js/strings.js";
 
 export default {
   name: "KeyInputField",
@@ -19,8 +20,9 @@ export default {
             :disabled="!canDelete"
             size="x-small"
             icon
+            :aria-label="t('common.delete')"
             @click="onDeleteClick">
-            <v-icon size="small">mdi-close-circle</v-icon>
+            <v-icon size="small" aria-hidden="true">mdi-close-circle</v-icon>
         </v-btn>
     </template>
 </v-text-field>
@@ -93,6 +95,8 @@ export default {
   },
 
   methods: {
+    t,
+
     onDeleteClick() {
       // canDelete 已经把「不可删除 / 无内容」两种情况都挡住了，这里再挡一次，
       // 避免以后有人改了 canDelete 就静默失效。
