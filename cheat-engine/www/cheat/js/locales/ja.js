@@ -30,6 +30,12 @@ export default {
     seconds: { one: "{count} 秒", other: "{count} 秒" },
     milliseconds: "{count} ms",
     unknown: "不明",
+    retry: "再試行",
+    panelErrorTitle: "パネルの読み込みに失敗しました",
+    panelErrorHint:
+      "このパネルでエラーが発生しました。他のパネルとゲームには影響しません。再試行するか、開発者ツールでコンソールログを確認してください。",
+    unexpectedError:
+      "UI で未処理のエラーが発生しました。詳細はコンソールを確認してください。",
   },
 
   nav: {

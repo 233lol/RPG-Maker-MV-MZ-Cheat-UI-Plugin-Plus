@@ -4,6 +4,7 @@ import {
   getDefaultGeometry,
 } from "./js/CheatWindowGeometry.js";
 import { panelStateMixin } from "./js/PanelState.js";
+import PanelErrorBoundary from "./components/PanelErrorBoundary.js";
 import GeneralPanel from "./panels/GeneralPanel.js";
 import HealthSettingPanel from "./panels/HealthSettingPanel.js";
 import StatsSettingPanel from "./panels/StatsSettingPanel.js";
@@ -24,6 +25,7 @@ export default {
   name: "CheatModal",
 
   components: {
+    PanelErrorBoundary,
     GeneralPanel,
     HealthSettingPanel,
     StatsSettingPanel,
@@ -103,9 +105,11 @@ export default {
             :style="'width: calc(100% - ' + navWidth + 'px - 1px);'"
             class="fill-height d-inline pa-2 overflow-y-auto hide-scrollbar">
             <!-- 只缓存全局变量面板：切走再切回不再销毁重建（该面板初始化要扫描 window） -->
-            <keep-alive :include="['GlobalVariablePanel']">
-                <component :is="modelValue"></component>
-            </keep-alive>
+            <panel-error-boundary :panel-name="modelValue">
+                <keep-alive :include="['GlobalVariablePanel']">
+                    <component :is="modelValue"></component>
+                </keep-alive>
+            </panel-error-boundary>
         </div>
     </div>
 </v-card>

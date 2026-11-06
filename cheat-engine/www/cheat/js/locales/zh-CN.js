@@ -30,6 +30,11 @@ export default {
     seconds: { one: "{count} 秒", other: "{count} 秒" },
     milliseconds: "{count} ms",
     unknown: "未知",
+    retry: "重试",
+    panelErrorTitle: "面板加载失败",
+    panelErrorHint:
+      "这个面板出错了，其他面板和游戏不受影响。可以重试，或打开开发者工具查看控制台日志。",
+    unexpectedError: "界面发生未处理的错误，详情见控制台",
   },
 
   nav: {

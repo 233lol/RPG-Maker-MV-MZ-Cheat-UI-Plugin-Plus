@@ -30,6 +30,12 @@ export default {
     seconds: { one: "{count} second", other: "{count} seconds" },
     milliseconds: "{count} ms",
     unknown: "Unknown",
+    retry: "Retry",
+    panelErrorTitle: "Failed to load panel",
+    panelErrorHint:
+      "This panel hit an error. Other panels and the game are unaffected. Retry, or open DevTools and check the console log.",
+    unexpectedError:
+      "An unhandled UI error occurred. See the console for details.",
   },
 
   nav: {
