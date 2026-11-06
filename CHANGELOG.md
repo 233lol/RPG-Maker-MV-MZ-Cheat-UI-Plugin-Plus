@@ -23,7 +23,7 @@
 - 单元测试补充快捷键边界（未知键码 / 右侧 Meta）、标题画面就绪判断、极小视口窗口几何、存档核心字段校验与快照大小统计等回归用例。
 - 单元测试新增 i18n 守卫：三份文案的 key 与占位符必须一致、源码里 `t()` 用到的 key 必须存在、
   面板模板与面向用户的提示里不得写死中文。
-- 地图事件面板设置迁移到 `cheat-settings/map-event.json`，并自动读取旧 localStorage 值。
+- 地图事件面板设置迁移到 `cheat-settings/map-event.json`，不再读写会跨游戏共享的 localStorage。
 - 可访问性：主窗口补充 `role="dialog"` / `aria-modal` / `aria-label`，图标按钮补充可读标签，
   切换语言时同步 `<html lang>`。
 - 启动入口单测：低版本 NW.js 提示、ResizeObserver 循环错误过滤、重复加载保护。
@@ -40,6 +40,7 @@
 - 修复 `CheatModal` 模板缺少实例方法 `t` 导致整个作弊窗口渲染失败。
 - 修复 `GeneralPanel` 未导入 `Alert`，金币提示抛 `ReferenceError`。
 - 修复标题画面 / 启动阶段点击「事件检查」时，`$gameMap` 或 `_interpreter` 尚未创建导致抛错。
+- 修复地图事件面板在 NW.js 下依赖 localStorage、可能与其他游戏共享设置的问题；设置现在只写入游戏目录下的 `map-event.json`。
 - 修复窗口失焦 / Esc 关闭时未执行 `leaveAction`，导致「跳过消息」与游戏加速状态永久残留。
 - 修复拖动主窗口时在窗口外松开鼠标后仍跟随光标的问题（指针捕获 + `pointercancel` + `buttons` 检查）。
 - 修复触摸 / 指针事件未拦截，点作弊 UI 时同时触发游戏操作；引擎补丁现在可以重复执行而不会层层包装。

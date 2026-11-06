@@ -75,7 +75,7 @@ Cheat-owned persistent settings live under the game's web root:
 - MV: `www/cheat-settings/` (`shortcuts.json`, `gameSpeed.json`, `speed.json`, `kv-storage.json`, `locale.json`, `panel-state.json`, `map-event.json`, `switch-locks.json`, `variable-locks.json`, `save-backups/`).
 - MZ: `cheat-settings/` at the game root (same files). An existing legacy `www/cheat-settings/` is migrated once on load; the migration merges missing files and can resume after an interrupted copy.
 - Paths are resolved against `nw.App.startPath` (fallback `process.cwd()`), not the launcher's working directory.
-- `map-event.json` stores the map-event panel display settings; legacy `mapEventPanel_*` localStorage values are migrated on first read.
+- `map-event.json` stores the map-event panel display settings. NW.js never uses `localStorage` for settings: all games share the same NW.js user data directory, so `localStorage` would leak settings across games. Use `SettingsPath` / `KeyValueStorage` instead.
 - Corrupt settings JSON is renamed to `<file>.corrupt-<timestamp>` before a fresh file is written.
 
 New features that need on-disk state should use `cheat/js/SettingsPath.js` instead of hardcoding a path.

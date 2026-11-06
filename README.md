@@ -79,7 +79,7 @@ make check             # lint + format:check + test:unit + typecheck
 
 代码风格配置见 `.editorconfig`、`.prettierrc.json`、`eslint.config.mjs`。RPG Maker 在运行时注入大量全局变量（`$gamePlayer`、`DataManager` 等），因此作弊源码关闭了 `no-undef`，其余推荐规则仍然启用。
 
-单元测试除纯函数外，还会用 `node:vm` 执行 classic script 形式的 `cheat/init/import.js`，覆盖低版本 NW.js 提示、ResizeObserver 循环错误过滤与重复加载保护；`MapEventPanel` 的旧 localStorage 设置迁移也有独立回归用例。
+单元测试除纯函数外，还会用 `node:vm` 执行 classic script 形式的 `cheat/init/import.js`，覆盖低版本 NW.js 提示、ResizeObserver 循环错误过滤与重复加载保护；地图事件面板「只写设置文件、不碰 localStorage」也有独立回归用例。
 
 共享文案（搜索、分页、刷新、导航名称等）集中在 `cheat-engine/www/cheat/js/strings.js`，通过 `t("common.search")` 读取；面板内的一次性游戏名词仍保留在各自模板中，避免为改一个词引入额外间接层。
 
@@ -217,9 +217,9 @@ pnpm test:mz        # 只测 MZ
 
 - 路径按 `nw.App.startPath` 解析，避免启动器 / 快捷方式的工作目录不同导致写到游戏目录之外；
 - MZ 旧版本的 `www/cheat-settings/` 会在首次加载时自动迁移到游戏根目录的 `cheat-settings/`，迁移可从中断处继续；
-- 地图事件面板旧版本写在 `localStorage` 的 `mapEventPanel_*` 设置会在首次读取时迁移到 `map-event.json`，之后不再依赖 localStorage；
+- NW.js 下所有设置都写入游戏目录下的文件，不使用 localStorage —— NW.js 的所有游戏共用一个用户目录，localStorage 会跨游戏串设置；
 - 写入使用「临时文件 + `fsync` + rename」原子写；JSON 损坏时先另存为 `<文件>.corrupt-<时间戳>`，不会直接覆盖原文件；
-- 浏览器模式（没有 nw.js 文件系统）按设置文件路径隔离 localStorage key，多个游戏不会互相覆盖。
+- 浏览器模式（没有 nw.js 文件系统）才退回 localStorage，并按设置文件路径隔离 key；NW.js 始终走文件。
 
 ## 存档时间机器
 

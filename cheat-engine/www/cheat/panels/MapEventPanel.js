@@ -16,21 +16,6 @@ function getSharedSettingsStorage() {
   return settingsStorage;
 }
 
-// 旧版本把面板设置直接写进游戏页面的 localStorage。NW.js 下所有游戏通常
-// 共享同一个 localStorage，浏览器模式也没有按设置文件隔离，多个游戏会互相
-// 串设置。这里只做一次性读取：读到旧值后写入新设置文件，之后不再回退。
-function readLegacyLocalStorageSetting(key) {
-  try {
-    if (typeof window === "undefined" || typeof localStorage === "undefined") {
-      return null;
-    }
-
-    return localStorage.getItem(key);
-  } catch (error) {
-    return null;
-  }
-}
-
 export default {
   name: "MapEventPanel",
 
@@ -213,28 +198,16 @@ export default {
   methods: {
     t,
 
-    // 设置读写统一走 KeyValueStorage（<游戏目录>/cheat-settings/map-event.json），
-    // 与面板状态 / 快捷键等保持一致，避免 NW.js 下多个游戏共用 localStorage。
+    // 设置读写统一走 KeyValueStorage（<游戏目录>/cheat-settings/map-event.json）。
+    // NW.js 下所有游戏共用一个用户目录，localStorage 会跨游戏串设置，
+    // 因此这里不使用 localStorage，也不保留旧 localStorage 的读取/迁移。
     getSettingsStorage() {
       return getSharedSettingsStorage();
     },
 
     loadSetting(key, defaultValue) {
       try {
-        const storage = this.getSettingsStorage();
-
-        // 新设置文件优先；只有旧版本留下的 localStorage 值才回退读取，
-        // 读到后立即迁移到新文件，下次启动不再依赖 localStorage。
-        let saved = storage.getItem(key);
-
-        if (saved === null || saved === undefined) {
-          const legacy = readLegacyLocalStorageSetting(key);
-
-          if (legacy !== null && legacy !== undefined) {
-            storage.setItem(key, legacy);
-            saved = legacy;
-          }
-        }
+        const saved = this.getSettingsStorage().getItem(key);
 
         if (saved === null || saved === undefined) {
           return defaultValue;
@@ -279,7 +252,7 @@ export default {
       }, this.readInterval);
     },
 
-    // localStorage 里的值可能是旧版本 / 手改 / 空串，直接进 setInterval
+    // 设置文件里的值可能是旧版本 / 手改 / 空串，直接进 setInterval
     // 会变成 0ms 忙循环，必须先按界面允许的范围收敛。
     normalizeReadInterval(value) {
       const parsed = parseInt(value, 10);

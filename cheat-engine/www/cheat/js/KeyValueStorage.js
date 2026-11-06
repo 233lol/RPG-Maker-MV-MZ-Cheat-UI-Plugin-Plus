@@ -8,11 +8,31 @@ import { writeJsonAtomic } from "./AtomicFile.js";
 const fileCache = new Map();
 
 function isNwjs() {
-  return (
-    typeof Utils !== "undefined" &&
-    typeof Utils.isNwjs === "function" &&
-    Utils.isNwjs()
-  );
+  try {
+    if (
+      typeof Utils !== "undefined" &&
+      typeof Utils.isNwjs === "function" &&
+      Utils.isNwjs()
+    ) {
+      return true;
+    }
+  } catch (error) {
+    // 继续用进程信息探测
+  }
+
+  // Utils 尚未初始化时也要识别出 NW.js：所有游戏共用一个用户目录，
+  // 一旦误用 localStorage，设置会跨游戏互相覆盖。
+  try {
+    return (
+      typeof require === "function" &&
+      typeof process === "object" &&
+      process !== null &&
+      !!process.versions &&
+      !!process.versions["node-webkit"]
+    );
+  } catch (error) {
+    return false;
+  }
 }
 
 export class KeyValueStorage {

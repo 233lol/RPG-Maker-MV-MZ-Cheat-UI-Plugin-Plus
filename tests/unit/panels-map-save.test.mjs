@@ -55,20 +55,6 @@ afterEach(() => {
 
 /* ---------------------------------------------------------------- MapEventPanel */
 
-function makeLocalStorage(initial = {}) {
-  const data = new Map(Object.entries(initial));
-
-  return {
-    data,
-    getItem(key) {
-      return data.has(key) ? data.get(key) : null;
-    },
-    setItem(key, value) {
-      data.set(key, String(value));
-    },
-  };
-}
-
 function makeSettingsStorage(initial = {}) {
   const data = new Map(Object.entries(initial));
 
@@ -90,17 +76,10 @@ function makeMapEventPanel(storage, overrides = {}) {
   });
 }
 
-test("MapEventPanel.loadSetting / saveSetting：读写统一设置存储并兼容旧 localStorage", () => {
-  // 新设置文件里已有 good；旧 localStorage 里也有 good（旧值），新值必须优先。
+test("MapEventPanel.loadSetting / saveSetting：只读写统一设置存储", () => {
   const storage = makeSettingsStorage({
     good: JSON.stringify({ a: 1 }),
     bad: "{bad",
-  });
-
-  globalThis.window = {};
-  globalThis.localStorage = makeLocalStorage({
-    good: JSON.stringify({ a: 999 }),
-    legacy: JSON.stringify({ from: "localStorage" }),
   });
 
   const panel = makeMapEventPanel(storage);
@@ -112,13 +91,6 @@ test("MapEventPanel.loadSetting / saveSetting：读写统一设置存储并兼�
     assert.equal(panel.loadSetting("missing", 5), 5);
     assert.equal(panel.loadSetting("bad", "fallback"), "fallback");
 
-    // 旧值只在第一次读取时迁移，之后使用新设置文件。
-    assert.deepEqual(panel.loadSetting("legacy", null), {
-      from: "localStorage",
-    });
-    assert.equal(storage.getItem("legacy"), '{"from":"localStorage"}');
-    assert.equal(localStorage.getItem("legacy"), '{"from":"localStorage"}');
-
     panel.saveSetting("saved", { b: 2 });
     assert.equal(storage.getItem("saved"), '{"b":2}');
   } finally {
@@ -126,15 +98,28 @@ test("MapEventPanel.loadSetting / saveSetting：读写统一设置存储并兼�
   }
 });
 
-test("MapEventPanel.loadSetting：没有 localStorage 时也能使用默认值", () => {
-  const storage = makeSettingsStorage({ saved: JSON.stringify([1, 2]) });
+test("MapEventPanel：不读写 localStorage（NW.js 多个游戏共用一个用户目录）", () => {
+  let touched = 0;
+
+  globalThis.window = {};
+  globalThis.localStorage = {
+    getItem() {
+      touched += 1;
+      return "should-not-be-read";
+    },
+    setItem() {
+      touched += 1;
+    },
+  };
+
+  const storage = makeSettingsStorage();
   const panel = makeMapEventPanel(storage);
 
-  delete globalThis.window;
-  delete globalThis.localStorage;
-
-  assert.deepEqual(panel.loadSetting("saved", []), [1, 2]);
   assert.equal(panel.loadSetting("missing", "default"), "default");
+  panel.saveSetting("saved", 1);
+
+  assert.equal(touched, 0);
+  assert.equal(storage.getItem("saved"), "1");
 });
 
 test("MapEventPanel：读取间隔会收敛到 100-1000ms", () => {

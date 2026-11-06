@@ -45,6 +45,40 @@ test("KeyValueStorage：读写 JSON 文件并原子落盘", async () => {
   }
 });
 
+test("KeyValueStorage：nw.js 下只写文件，不读写 localStorage", async () => {
+  const dir = tempDir();
+  const file = path.join(dir, "nwjs.json");
+  let touched = 0;
+
+  globalThis.localStorage = {
+    getItem() {
+      touched += 1;
+      return "should-not-be-read";
+    },
+    setItem() {
+      touched += 1;
+    },
+  };
+
+  try {
+    setNwjs(true);
+
+    const { KeyValueStorage } =
+      await import("../../cheat-engine/www/cheat/js/KeyValueStorage.js");
+    const storage = new KeyValueStorage(file);
+
+    storage.setItem("a", "1");
+
+    assert.equal(storage.getItem("a"), "1");
+    assert.equal(touched, 0);
+    assert.deepEqual(readJson(file), { a: "1" });
+  } finally {
+    setNwjs(false);
+    delete globalThis.localStorage;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("KeyValueStorage：写入前重新读盘合并外部修改", async () => {
   const dir = tempDir();
   const file = path.join(dir, "merge.json");
