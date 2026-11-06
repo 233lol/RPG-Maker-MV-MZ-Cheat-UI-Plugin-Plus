@@ -53,6 +53,7 @@ Code style: `pnpm run lint` (ESLint flat config), `pnpm run format` (Prettier), 
 | Path | Purpose |
 |---|---|
 | `cheat-engine/www/cheat/` | Cheat UI source. Vue 3 + Vuetify 4, ES module JS files. |
+| `cheat-engine/www/cheat/js/actor/` | Actor / party / equipment pure helpers |
 | `cheat-engine/www/cheat/js/SettingsPath.js` | MV/MZ settings directory + legacy migration |
 | `cheat-engine/www/cheat/js/LockService.js` | Global switch/variable lock service (independent of panel lifetime) |
 | `cheat-engine/www/cheat/js/AtomicFile.js` | Atomic JSON/text file writes (temp file + `fsync` + rename, stale `.tmp` cleanup) |

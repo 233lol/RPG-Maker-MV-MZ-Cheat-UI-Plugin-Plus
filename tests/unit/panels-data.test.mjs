@@ -33,6 +33,11 @@ afterEach(() => {
     "$gameTroop",
     "$gameMap",
     "$gameSystem",
+    "$dataClasses",
+    "$dataWeapons",
+    "$dataArmors",
+    "$dataStates",
+    "$dataActors",
   ]) {
     delete globalThis[name];
   }
@@ -469,7 +474,9 @@ test("VariableSettingPanel.onItemChange：数字 / 字符串 / 复杂值分别�
 function makeStatsPanel(overrides = {}) {
   return makePanel(StatsSettingPanel, {
     selectedTab: null,
+    selectedSubTab: "attributes",
     paramNames: [],
+    classOptions: [],
     actors: [],
     ...overrides,
   });
@@ -480,6 +487,9 @@ function makeActor(id = 1) {
 
   actor._actorId = id;
   actor._name = `Actor ${id}`;
+  actor._nickname = "";
+  actor._profile = "";
+  actor._classId = 1;
   actor.level = 5;
   actor._paramPlus = [1, 2, 3];
   actor.param = (paramId) => paramId * 10;
@@ -487,6 +497,31 @@ function makeActor(id = 1) {
   actor.paramBase = (paramId) => paramId * 5;
   actor.paramGrowth = (paramId) => paramId;
   actor.equips = () => [{ params: [1, 2, 3] }, null];
+  actor.equipSlots = () => [1, 2];
+  actor.currentClass = () => ({ name: "Hero" });
+  actor.setName = (name) => {
+    actor._name = name;
+  };
+  actor.setNickname = (nickname) => {
+    actor._nickname = nickname;
+  };
+  actor.setProfile = (profile) => {
+    actor._profile = profile;
+  };
+  actor.changeClass = (classId) => {
+    actor._classId = classId;
+  };
+  actor.changeEquip = (slotId, equip) => {
+    actor.lastEquip = { slotId, equip };
+  };
+  actor.states = () => [];
+  actor.isStateAffected = () => false;
+  actor.addState = (stateId) => {
+    actor.lastAddedState = stateId;
+  };
+  actor.removeState = (stateId) => {
+    actor.lastRemovedState = stateId;
+  };
   actor.changeLevel = (level) => {
     actor.level = level;
   };
@@ -613,13 +648,24 @@ test("StatsSettingPanel.onGodModeChange：切换无敌并刷新", () => {
   assert.equal(panel.refreshed, true);
 });
 
-test("StatsSettingPanel：面板状态只保存 / 恢复 selectedTab", () => {
-  const panel = makeStatsPanel({ selectedTab: 3 });
+test("StatsSettingPanel：面板状态保存 / 恢复 selectedTab 与 selectedSubTab", () => {
+  const panel = makeStatsPanel({
+    selectedTab: 3,
+    selectedSubTab: "equipment",
+  });
 
-  assert.deepEqual(panel.getPanelStateSnapshot(), { selectedTab: 3 });
+  assert.deepEqual(panel.getPanelStateSnapshot(), {
+    selectedTab: 3,
+    selectedSubTab: "equipment",
+  });
 
-  panel.applyPanelState({ selectedTab: 9 });
+  panel.applyPanelState({ selectedTab: 9, selectedSubTab: "states" });
   assert.equal(panel.selectedTab, 9);
+  assert.equal(panel.selectedSubTab, "states");
+
+  panel.applyPanelState({ selectedTab: 1, selectedSubTab: "unknown" });
+  assert.equal(panel.selectedSubTab, "attributes");
+
   assert.equal(StatsSettingPanel.computed.panelStateId.call(panel), "stats");
 });
 

@@ -11,7 +11,9 @@
 
 ### Added
 
-- 界面多语言：简体中文 / English / 日本語，覆盖导航、全部 15 个面板、表格表头、确认框、快捷键名称与参数说明、
+- 角色 / 队伍 / 装备编辑器：角色页新增姓名、昵称、简介、职业切换、装备槽更换、状态增删；
+  新增「队伍」面板，可添加 / 移除成员、调整顺序并标记战斗成员。
+- 界面多语言：简体中文 / English / 日本語，覆盖导航、全部 16 个面板、表格表头、确认框、快捷键名称与参数说明、
   存档时间机器提示与全局变量类型名 / 错误提示；语言可在「常用」面板切换并持久化。
 - `t()` 支持 `{count}` 复数（按 `Intl.PluralRules` 选择形式）、`{name}` 占位符，并提供
   `formatNumber()` / `formatDateTime()` 按当前语言格式化数字与时间。
@@ -32,11 +34,13 @@
 - 新增 `pnpm run test:coverage` / `test:coverage:check`，用 Node 内置覆盖率设置最低门槛，并接入 CI。
 - 单元测试补充：TouchInput 鼠标 / 触摸 / 指针包装与幂等性、设置目录迁移的 rename 回退 / 异常吞掉 / 无 `require` 环境、
   `cwd` 为空或抛错时的路径回退，以及 `// @ts-check` 覆盖守卫。
+- 单元测试补充角色装备槽过滤、状态过滤、队伍增删 / 顺序 / 最后成员保护，以及角色信息 / 职业 / 装备 / 状态的写回。
 
 ### Changed
 
 - 拆分超大模块：`SaveBackupHelper` → `save-backup/*`，`GlobalObjectHelper` → `global-object/*`，地图事件识别 → `map-event/classifier.js`，全局变量行构建 → `GlobalVariableRows.js`。
 - `SpeedCheat` 的固定速度定时器改为显式类字段声明，便于类型检查；NW.js >= 0.44 已支持该语法。
+- 角色 / 装备 / 状态 / 队伍逻辑抽到 `js/actor/*`，面板只负责展示与写回。
 - 构建与测试统一要求 Node.js >= 22，新增 `.nvmrc` 和 `package.json` 的 `engines` / `license` 字段。
 
 ### Fixed

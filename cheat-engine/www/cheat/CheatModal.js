@@ -9,6 +9,7 @@ import PanelErrorBoundary from "./components/PanelErrorBoundary.js";
 import GeneralPanel from "./panels/GeneralPanel.js";
 import HealthSettingPanel from "./panels/HealthSettingPanel.js";
 import StatsSettingPanel from "./panels/StatsSettingPanel.js";
+import PartyPanel from "./panels/PartyPanel.js";
 import ItemSettingPanel from "./panels/ItemSettingPanel.js";
 import WeaponSettingPanel from "./panels/WeaponSettingPanel.js";
 import ArmorSettingPanel from "./panels/ArmorSettingPanel.js";
@@ -30,6 +31,7 @@ export default {
     GeneralPanel,
     HealthSettingPanel,
     StatsSettingPanel,
+    PartyPanel,
     ItemSettingPanel,
     WeaponSettingPanel,
     ArmorSettingPanel,
@@ -153,6 +155,11 @@ export default {
           name: t("nav.stats"),
           icon: "mdi-sword-cross",
           component: "stats-setting-panel",
+        },
+        {
+          name: t("nav.party"),
+          icon: "mdi-account-group",
+          component: "party-panel",
         },
         {
           name: t("nav.items"),
