@@ -34,10 +34,10 @@ Vendor scripts (all available via `pnpm run vendor:*`):
 ## Test
 
 ```shell
-pnpm test           # headless MV + MZ + packaging
+pnpm test           # headless MV + MZ + packaging (regenerates missing vendor artifacts)
 pnpm test:mv        # MV only
 pnpm test:mz        # MZ only
-pnpm test:unit      # node --test pure-logic unit tests (no game / nwjs required)
+pnpm test:unit      # node --test pure-logic unit tests (no game / nwjs required; regenerates missing vendor artifacts)
 pnpm test:coverage  # coverage report (Node.js >= 22.8)
 pnpm test:coverage:check # coverage thresholds used by CI
 pnpm test:packaging # archive structure test (run `make` first for vendor files)
