@@ -8,7 +8,8 @@ import path from "node:path";
 // SettingsPath 在 nw.js 里用全局 require 拿 fs/path，Node 测试里补一个等价的。
 globalThis.require = createRequire(import.meta.url);
 
-const SETTINGS_MODULE = "../../cheat-engine/www/cheat/js/SettingsPath.js";
+import * as mod from "../../cheat-engine/www/cheat/js/SettingsPath.js";
+
 const originalCwd = process.cwd();
 const dirs = [];
 
@@ -39,12 +40,12 @@ after(() => {
 
 afterEach(() => {
   restoreGlobals();
-  if (process.cwd !== originalCwd) {
+  if (process.cwd() !== originalCwd) {
     process.chdir(originalCwd);
   }
 });
 
-test("SettingsPath：没有 require（浏览器环境）时迁移直接跳过", async () => {
+test("SettingsPath：没有 require（浏览器环境）时迁移直接跳过", () => {
   withTempGame();
   globalThis.Utils = { RPGMAKER_NAME: "MZ" };
 
@@ -52,7 +53,6 @@ test("SettingsPath：没有 require（浏览器环境）时迁移直接跳过", 
   delete globalThis.require;
 
   try {
-    const mod = await import(`${SETTINGS_MODULE}?no-require`);
     assert.equal(mod.migrateLegacySettings(), false);
   } finally {
     if (originalRequire !== undefined) {
@@ -61,17 +61,15 @@ test("SettingsPath：没有 require（浏览器环境）时迁移直接跳过", 
   }
 });
 
-test("SettingsPath：旧目录不存在时不创建新目录", async () => {
+test("SettingsPath：旧目录不存在时不创建新目录", () => {
   const root = withTempGame();
   globalThis.Utils = { RPGMAKER_NAME: "MZ" };
-
-  const mod = await import(`${SETTINGS_MODULE}?legacy-missing`);
 
   assert.equal(mod.migrateLegacySettings(), false);
   assert.equal(fs.existsSync(path.join(root, "cheat-settings")), false);
 });
 
-test("SettingsPath：rename 失败时退化为复制，并清理旧目录", async () => {
+test("SettingsPath：rename 失败时退化为复制，并清理旧目录", () => {
   const root = withTempGame();
   writeFile(path.join(root, "www", "cheat-settings", "a.json"), "a");
   writeFile(path.join(root, "www", "cheat-settings", "nested", "b.json"), "b");
@@ -84,9 +82,7 @@ test("SettingsPath：rename 失败时退化为复制，并清理旧目录", asyn
   };
 
   try {
-    const mod = await import(`${SETTINGS_MODULE}?rename-fallback`);
-
-    assert.equal(mod.migrateLegacySettings(), false);
+    assert.equal(mod.migrateLegacySettings(), true);
   } finally {
     fs.renameSync = originalRenameSync;
   }
@@ -105,7 +101,7 @@ test("SettingsPath：rename 失败时退化为复制，并清理旧目录", asyn
   assert.equal(fs.existsSync(path.join(root, "www", "cheat-settings")), false);
 });
 
-test("SettingsPath：迁移过程抛错时吞掉异常并只打警告", async () => {
+test("SettingsPath：迁移过程抛错时吞掉异常并只打警告", () => {
   const root = withTempGame();
   writeFile(path.join(root, "www", "cheat-settings", "a.json"), "a");
   globalThis.Utils = { RPGMAKER_NAME: "MZ" };
@@ -120,8 +116,6 @@ test("SettingsPath：迁移过程抛错时吞掉异常并只打警告", async ()
   };
 
   try {
-    const mod = await import(`${SETTINGS_MODULE}?migration-throws`);
-
     assert.equal(mod.migrateLegacySettings(), false);
   } finally {
     fs.existsSync = originalExistsSync;
@@ -136,7 +130,7 @@ test("SettingsPath：迁移过程抛错时吞掉异常并只打警告", async ()
   );
 });
 
-test("SettingsPath.getAppRoot：cwd 为空或抛错时退回当前目录标记 .", async () => {
+test("SettingsPath.getAppRoot：cwd 为空或抛错时退回当前目录标记 .", () => {
   restoreGlobals();
   globalThis.Utils = { RPGMAKER_NAME: "MV" };
 
@@ -144,14 +138,12 @@ test("SettingsPath.getAppRoot：cwd 为空或抛错时退回当前目录标记 .
 
   try {
     process.cwd = () => "";
-    let mod = await import(`${SETTINGS_MODULE}?cwd-empty`);
     assert.equal(mod.getAppRoot(), ".");
     assert.equal(mod.getCheatSettingsDir(), "./www/cheat-settings");
 
     process.cwd = () => {
       throw new Error("cwd unavailable");
     };
-    mod = await import(`${SETTINGS_MODULE}?cwd-throws`);
     assert.equal(mod.getAppRoot(), ".");
     assert.equal(mod.getCheatSettingsDir(), "./www/cheat-settings");
   } finally {

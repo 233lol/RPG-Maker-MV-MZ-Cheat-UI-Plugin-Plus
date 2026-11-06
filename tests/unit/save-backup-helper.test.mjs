@@ -654,3 +654,258 @@ test("SaveBackupCheat.isSnapshotPresent / getGameVersion", () => {
     assert.equal(SaveBackupCheat.getGameVersion(), "");
   });
 });
+
+/* ------------------------------------------------------- 元数据回填 */
+
+function patchIndexEntry(id, patch) {
+  const entries = SaveBackupCheat.readIndex();
+  const entry = entries.find((item) => item.id === id);
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) {
+      delete entry[key];
+    } else {
+      entry[key] = value;
+    }
+  }
+
+  SaveBackupCheat.writeIndex(entries);
+  return entry;
+}
+
+function findIndexEntry(id) {
+  return SaveBackupCheat.readIndex().find((item) => item.id === id);
+}
+
+test("SaveBackupCheat.backfillFromSavefileInfo：用存档头补时长 / 存档时间", () => {
+  withTempCwd(() => {
+    writeSaveFile(1, saveText(4, 1200));
+    const snapshot = SaveBackupCheat.createSnapshot(1, "manual");
+
+    // 模拟早期版本建立的快照：没有时长 / 存档时间字段
+    patchIndexEntry(snapshot.id, {
+      playtimeFrames: undefined,
+      playtime: undefined,
+      savefileTime: undefined,
+      savefileTimeText: undefined,
+    });
+
+    globalThis.DataManager = {
+      loadSavefileInfo: (slot) => ({
+        playtime: slot === 1 ? 3600 : 0,
+        timestamp: 1700000000000,
+      }),
+    };
+
+    const patched = SaveBackupCheat.backfillFromSavefileInfo();
+    const entry = findIndexEntry(snapshot.id);
+
+    assert.ok(patched >= 1);
+    assert.equal(entry.playtimeFrames, 3600);
+    assert.equal(entry.playtime, "00:01:00");
+    assert.equal(entry.savefileTime, 1700000000000);
+    assert.equal(
+      entry.savefileTimeText,
+      SaveBackupCheat.formatDateTime(1700000000000),
+    );
+    assert.equal(entry.backfillChecked, true);
+
+    // 元数据文件也同步更新，下次重建索引不会丢
+    const meta = SaveBackupCheat.readMeta(snapshot.id);
+    assert.equal(meta.playtimeFrames, 3600);
+    assert.equal(meta.savefileTime, 1700000000000);
+  });
+});
+
+test("SaveBackupCheat.backfillFromSavefileInfo：跳过已补过 / 字段齐全 / 非当前存档", () => {
+  withTempCwd(() => {
+    writeSaveFile(1, saveText(4, 1200));
+    const checked = SaveBackupCheat.createSnapshot(1, "manual");
+    patchIndexEntry(checked.id, {
+      backfillChecked: true,
+      playtimeFrames: undefined,
+      playtime: undefined,
+      savefileTime: undefined,
+      savefileTimeText: undefined,
+    });
+
+    writeSaveFile(2, saveText(5, 600));
+    const completeSnapshot = SaveBackupCheat.createSnapshot(2, "manual");
+    // 时长 / 存档时间都已有记录，不需要回填
+    patchIndexEntry(completeSnapshot.id, {
+      savefileTime: 1700000000000,
+      savefileTimeText: "2023-11-15 06:13:20",
+    });
+
+    writeSaveFile(3, saveText(6, 600));
+    const stale = SaveBackupCheat.createSnapshot(3, "manual");
+    patchIndexEntry(stale.id, {
+      playtimeFrames: undefined,
+      playtime: undefined,
+      savefileTime: undefined,
+      savefileTimeText: undefined,
+      // 快照建立很久以后又保存过档，不能拿现在的存档头回填旧快照
+      createdAt: Date.now() - 60 * 60 * 1000,
+    });
+
+    globalThis.DataManager = {
+      loadSavefileInfo: () => ({ playtime: 9999, timestamp: 1700000000000 }),
+    };
+
+    SaveBackupCheat.backfillFromSavefileInfo();
+
+    assert.equal(findIndexEntry(checked.id).backfillChecked, true);
+    assert.equal(findIndexEntry(checked.id).playtimeFrames, undefined);
+
+    const complete = findIndexEntry(
+      SaveBackupCheat.readIndex().find((item) => item.slot === 2).id,
+    );
+    assert.equal(complete.playtimeFrames, 600);
+    assert.equal(complete.backfillChecked, undefined);
+
+    const staleEntry = findIndexEntry(stale.id);
+    assert.equal(staleEntry.playtimeFrames, undefined);
+    assert.equal(staleEntry.backfillChecked, undefined);
+  });
+});
+
+test("SaveBackupCheat.backfillFromSavefileInfo：非本地模式 / 读不到存档头 / 非法槽位", () => {
+  withTempCwd(() => {
+    assert.equal(SaveBackupCheat.backfillFromSavefileInfo(), 0);
+
+    const originalRequire = globalThis.require;
+    globalThis.require = undefined;
+
+    try {
+      assert.equal(SaveBackupCheat.backfillFromSavefileInfo(), 0);
+    } finally {
+      globalThis.require = originalRequire;
+    }
+
+    // 索引里混入非法槽位 / 读不到存档头的条目：不报错、不写字段
+    writeSaveFile(1);
+    const real = SaveBackupCheat.createSnapshot(1, "manual");
+    patchIndexEntry(real.id, {
+      playtimeFrames: undefined,
+      playtime: undefined,
+      savefileTime: undefined,
+      savefileTimeText: undefined,
+      // 关掉载荷回填，专注验证「读不到存档头」这一条路径
+      payloadBackfillChecked: true,
+    });
+    const originalIndex = SaveBackupCheat.readIndex();
+    originalIndex.push({ id: "invalid-slot", slot: 0 });
+    SaveBackupCheat.writeIndex(originalIndex);
+    delete globalThis.DataManager;
+
+    assert.doesNotThrow(() => SaveBackupCheat.backfillFromSavefileInfo());
+    assert.equal(findIndexEntry(real.id).playtimeFrames, undefined);
+  });
+});
+
+test("SaveBackupCheat.backfillMapFromIndex：从快照载荷补地图 / 时长", () => {
+  withTempCwd(() => {
+    writeSaveFile(1, saveText(9, 900));
+    const snapshot = SaveBackupCheat.createSnapshot(1, "manual");
+
+    patchIndexEntry(snapshot.id, {
+      mapId: 0,
+      mapName: "",
+      playtimeFrames: undefined,
+      playtime: undefined,
+    });
+    globalThis.$dataMapInfos = { 9: { name: "王城" } };
+
+    const entries = SaveBackupCheat.readIndex();
+    assert.equal(SaveBackupCheat.backfillMapFromIndex(entries), true);
+
+    const updated = entries.find((item) => item.id === snapshot.id);
+    const meta = SaveBackupCheat.readMeta(snapshot.id);
+
+    assert.equal(updated.mapId, 9);
+    assert.equal(updated.mapName, "王城");
+    assert.equal(updated.playtimeFrames, 900);
+    assert.equal(updated.playtime, "00:00:15");
+    assert.equal(updated.payloadBackfillChecked, true);
+    assert.equal(meta.mapId, 9);
+    assert.equal(meta.playtimeFrames, 900);
+    assert.equal(meta.payloadBackfillChecked, true);
+  });
+});
+
+test("SaveBackupCheat.backfillMapFromIndex：顶层 map._mapId / 存档头时长优先", () => {
+  withTempCwd(() => {
+    // 直接写一份只有顶层 map 的旧式载荷
+    writeSaveFile(
+      1,
+      JSON.stringify({
+        system: { _framesOnSave: 300 },
+        party: { _gold: 0 },
+        map: { _mapId: 12 },
+      }),
+    );
+    const snapshot = SaveBackupCheat.createSnapshot(1, "manual");
+    patchIndexEntry(snapshot.id, {
+      mapId: 0,
+      mapName: "",
+      playtimeFrames: undefined,
+      playtime: undefined,
+    });
+
+    // 存档头给出更长的权威时长时，不能被 _framesOnSave 覆盖
+    globalThis.DataManager = {
+      loadSavefileInfo: () => ({ playtime: 900, timestamp: 0 }),
+    };
+    SaveBackupCheat.backfillFromSavefileInfo();
+
+    const entry = findIndexEntry(snapshot.id);
+    assert.equal(entry.mapId, 12);
+    assert.equal(entry.playtimeFrames, 900);
+  });
+});
+
+test("SaveBackupCheat.backfillMapFromIndex：跳过已检查 / 字段齐全 / 载荷缺失", () => {
+  withTempCwd(() => {
+    writeSaveFile(1);
+    const checked = SaveBackupCheat.createSnapshot(1, "manual");
+    patchIndexEntry(checked.id, {
+      mapId: 0,
+      mapName: "",
+      payloadBackfillChecked: true,
+    });
+
+    writeSaveFile(2);
+    const complete = SaveBackupCheat.createSnapshot(2, "manual");
+
+    writeSaveFile(3);
+    const missing = SaveBackupCheat.createSnapshot(3, "manual");
+    patchIndexEntry(missing.id, { mapId: 0, mapName: "" });
+    fs.rmSync(missing.payloadFile, { force: true });
+
+    const entries = SaveBackupCheat.readIndex();
+    const untouched = complete.id;
+
+    assert.equal(SaveBackupCheat.backfillMapFromIndex(entries), false);
+    assert.equal(findIndexEntry(checked.id).mapId, 0);
+    assert.equal(findIndexEntry(untouched).mapId, 1);
+  });
+});
+
+test("SaveBackupCheat.backfillMapFromIndex：载荷无法解析时只警告不标记", () => {
+  withTempCwd(() => {
+    writeSaveFile(1);
+    const snapshot = SaveBackupCheat.createSnapshot(1, "manual");
+    patchIndexEntry(snapshot.id, { mapId: 0, mapName: "" });
+
+    // 覆盖载荷内容为不可解析的文本
+    fs.writeFileSync(snapshot.payloadFile, "not-json", "utf8");
+
+    const { result, warnings } = silenceWarn(() =>
+      SaveBackupCheat.backfillMapFromIndex(SaveBackupCheat.readIndex()),
+    );
+
+    assert.equal(result, false);
+    assert.equal(findIndexEntry(snapshot.id).payloadBackfillChecked, undefined);
+    assert.ok(warnings.length > 0);
+  });
+});

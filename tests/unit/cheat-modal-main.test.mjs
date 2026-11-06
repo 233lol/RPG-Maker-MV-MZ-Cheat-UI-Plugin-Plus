@@ -35,6 +35,7 @@ const originalShortcutMethods = {
 function resetGlobals() {
   delete globalThis.window;
   delete globalThis.document;
+  delete globalThis.ResizeObserver;
   Object.assign(GLOBAL_SHORTCUT, originalShortcutMethods);
   setGameInputBlocked(false);
 }
@@ -311,6 +312,65 @@ test("CheatModal：面板状态保存 / 恢复与导航点击", () => {
 });
 
 /* ---------------------------------------------------------------- MainComponent */
+
+test("MainComponent.data：恢复上次面板 / 语言重建键 / 空输入状态", () => {
+  const data = MainComponent.data.call({});
+
+  assert.equal(data.show, false);
+  assert.equal(data.localeKey, 0);
+  assert.ok(data.currentKey);
+  assert.equal(typeof data.currentComponentName, "string");
+  assert.ok(data.currentComponentName.length > 0);
+  assert.equal(data.currentComponentName.includes("-panel"), true);
+});
+
+test("MainComponent.watch.currentComponentName：有值才写入面板状态", () => {
+  assert.doesNotThrow(() =>
+    MainComponent.watch.currentComponentName.call({}, null),
+  );
+  assert.doesNotThrow(() =>
+    MainComponent.watch.currentComponentName.call({}, "teleport-panel"),
+  );
+});
+
+test("MainComponent.beforeUnmount：移除全局监听并取消语言订阅", () => {
+  const removed = [];
+  globalThis.window = {
+    removeEventListener(...args) {
+      removed.push(args[0]);
+    },
+  };
+  globalThis.document = {
+    removeEventListener(...args) {
+      removed.push(args[0]);
+    },
+  };
+
+  let unsubscribed = 0;
+  const panel = makeMain({
+    __unsubscribeLocaleChange() {
+      unsubscribed++;
+    },
+    teardownInputGuard() {
+      this.guardTornDown = true;
+    },
+    releaseCurrentKey() {
+      this.keyReleased = true;
+    },
+  });
+
+  MainComponent.beforeUnmount.call(panel);
+
+  assert.equal(panel.keyReleased, true);
+  assert.equal(panel.guardTornDown, true);
+  assert.equal(unsubscribed, 1);
+  assert.equal(panel.__unsubscribeLocaleChange, null);
+  assert.ok(removed.includes("keydown"));
+  assert.ok(removed.includes("keyup"));
+  assert.ok(removed.includes("keypress"));
+  assert.ok(removed.includes("blur"));
+  assert.ok(removed.includes("focusin"));
+});
 
 test("MainComponent.openCheatModal / toggleCheatModal / closeCheatModal", () => {
   const releases = [];
@@ -590,6 +650,25 @@ test("MainComponent.onGlobalKeyDown：普通按键 / repeat / 输入框 / UI 焦
     ["leave", "ctrl c"],
     ["enter", "ctrl c"],
   ]);
+
+  // 焦点不在作弊 UI 上时，普通面板要阻止按键继续传给游戏
+  calls.length = 0;
+  panel.onGlobalKeyDown(makeEvent());
+  assert.deepEqual(calls, [
+    ["leave", "ctrl c"],
+    ["enter", "ctrl c"],
+    "prevent",
+    "stop",
+  ]);
+
+  // 地图事件面板打开时放行，不阻止事件
+  calls.length = 0;
+  panel.currentComponentName = "map-event-panel";
+  panel.onGlobalKeyDown(makeEvent());
+  assert.deepEqual(calls, [
+    ["leave", "ctrl c"],
+    ["enter", "ctrl c"],
+  ]);
 });
 
 test("MainComponent.onGlobalKeyDown：Tab 在窗口内循环，Esc 关闭窗口", () => {
@@ -680,4 +759,309 @@ test("MainComponent.onGlobalKeyUp / onWindowBlur", () => {
 
   panel.onWindowBlur();
   assert.equal(panel.currentKey.isEmpty(), true);
+});
+
+/* ------------------------------------------------- CheatModal 生命周期 */
+
+test("CheatModal.mounted：非法面板回退到第一个导航项并注册 resize / 聚焦", () => {
+  const emitted = [];
+  const listeners = [];
+  let focused = 0;
+
+  globalThis.window = {
+    addEventListener(type, handler) {
+      listeners.push(["add", type, handler]);
+    },
+    removeEventListener() {},
+  };
+
+  const modal = makeModal({
+    modelValue: "missing-panel",
+    componentNameToNavItem: {
+      "general-panel": { component: "general-panel" },
+      "teleport-panel": { component: "teleport-panel" },
+    },
+    $emit(event, value) {
+      emitted.push([event, value]);
+    },
+    setupResizeObserver() {
+      this.observerSetup = true;
+    },
+    focusModal() {
+      focused++;
+    },
+  });
+
+  CheatModal.mounted.call(modal);
+
+  assert.deepEqual(emitted, [["update:modelValue", "general-panel"]]);
+  assert.equal(modal.observerSetup, true);
+  assert.ok(
+    listeners.some(([action, type]) => action === "add" && type === "resize"),
+  );
+  assert.equal(focused, 1);
+
+  // 合法面板不回退、不 emit
+  emitted.length = 0;
+  modal.modelValue = "teleport-panel";
+  CheatModal.mounted.call(modal);
+  assert.deepEqual(emitted, []);
+});
+
+test("CheatModal.beforeUnmount：清理尺寸同步定时器 / 观察者 / resize 监听", () => {
+  const cleared = [];
+  const removed = [];
+  let disconnected = 0;
+  let stopped = 0;
+
+  globalThis.window = {
+    clearTimeout(id) {
+      cleared.push(id);
+    },
+    removeEventListener(type) {
+      removed.push(type);
+    },
+  };
+
+  const modal = makeModal({
+    stopDrag() {
+      stopped++;
+    },
+    __sizeSyncTimer: 42,
+    __pendingSize: { width: 100, height: 200 },
+    __resizeObserver: {
+      disconnect() {
+        disconnected++;
+      },
+    },
+  });
+
+  CheatModal.beforeUnmount.call(modal);
+
+  assert.equal(stopped, 1);
+  assert.deepEqual(cleared, [42]);
+  assert.equal(modal.__sizeSyncTimer, null);
+  assert.equal(modal.__pendingSize, null);
+  assert.equal(disconnected, 1);
+  assert.equal(modal.__resizeObserver, null);
+  assert.deepEqual(removed, ["resize"]);
+});
+
+test("CheatModal.trapFocus：没有可聚焦元素 / 焦点在外部 / 首尾循环", () => {
+  const events = [];
+  const el = (name) => ({
+    name,
+    offsetParent: {},
+    focus(options) {
+      events.push([name, options]);
+    },
+  });
+  const first = el("first");
+  const middle = el("middle");
+  const last = el("last");
+
+  const root = {
+    contains() {
+      return false;
+    },
+    querySelectorAll() {
+      return [first, middle, last];
+    },
+  };
+
+  globalThis.document = { activeElement: middle };
+
+  let focused = 0;
+  const modal = makeModal({
+    $refs: { cardRoot: { $el: root } },
+    focusModal() {
+      focused++;
+    },
+  });
+
+  const event = () => ({
+    shiftKey: false,
+    prevented: false,
+    preventDefault() {
+      this.prevented = true;
+    },
+  });
+
+  // 没有 root：直接返回
+  CheatModal.methods.trapFocus.call(makeModal(), event());
+
+  // 没有可聚焦元素：阻止默认行为并把焦点放到窗口
+  root.querySelectorAll = () => [];
+  let ev = event();
+  modal.trapFocus(ev);
+  assert.equal(ev.prevented, true);
+  assert.equal(focused, 1);
+
+  // 焦点不在窗口里：移动到首个元素
+  root.querySelectorAll = () => [first, middle, last];
+  root.contains = () => false;
+  ev = event();
+  modal.trapFocus(ev);
+  assert.equal(ev.prevented, true);
+  assert.deepEqual(events.at(-1), ["first", { preventScroll: true }]);
+
+  // 焦点就是根节点：Shift+Tab -> 最后一个，Tab -> 第一个
+  root.contains = (element) => element === root;
+  globalThis.document.activeElement = root;
+  ev = { ...event(), shiftKey: true };
+  modal.trapFocus(ev);
+  assert.deepEqual(events.at(-1), ["last", { preventScroll: true }]);
+
+  ev = event();
+  modal.trapFocus(ev);
+  assert.deepEqual(events.at(-1), ["first", { preventScroll: true }]);
+
+  // 焦点在第一个 + Shift+Tab -> 最后一个；在最后一个 + Tab -> 第一个
+  root.contains = (element) => element === first || element === last;
+  globalThis.document.activeElement = first;
+  ev = { ...event(), shiftKey: true };
+  modal.trapFocus(ev);
+  assert.deepEqual(events.at(-1), ["last", { preventScroll: true }]);
+
+  globalThis.document.activeElement = last;
+  ev = event();
+  modal.trapFocus(ev);
+  assert.deepEqual(events.at(-1), ["first", { preventScroll: true }]);
+});
+
+test("CheatModal.trapFocus：焦点在中间时不拦截", () => {
+  const focused = [];
+  const first = { offsetParent: {}, focus: (options) => focused.push(options) };
+  const middle = { offsetParent: {}, focus: () => {} };
+  const last = { offsetParent: {}, focus: () => {} };
+
+  const root = {
+    contains: (element) => element === middle,
+    querySelectorAll: () => [first, middle, last],
+  };
+
+  globalThis.document = { activeElement: middle };
+
+  const modal = makeModal({ $refs: { cardRoot: root } });
+  const event = {
+    shiftKey: false,
+    preventDefault() {
+      throw new Error("不应该阻止默认行为");
+    },
+  };
+
+  modal.trapFocus(event);
+  assert.deepEqual(focused, []);
+});
+
+test("CheatModal.setupResizeObserver：无 API / 无根节点时安全返回", () => {
+  const modal = makeModal();
+
+  assert.doesNotThrow(() => modal.setupResizeObserver());
+
+  globalThis.ResizeObserver = class {};
+  assert.doesNotThrow(() => modal.setupResizeObserver());
+  assert.equal(modal.__resizeObserver, undefined);
+});
+
+test("CheatModal.setupResizeObserver：尺寸有效且变化时才安排同步", () => {
+  const observed = [];
+  let callback = null;
+
+  globalThis.ResizeObserver = class {
+    constructor(handler) {
+      callback = handler;
+    }
+    observe(element) {
+      observed.push(element);
+    }
+  };
+
+  const root = {
+    getBoundingClientRect: () => ({ width: 640.4, height: 480.6 }),
+  };
+  const scheduled = [];
+  const modal = makeModal({
+    $refs: { cardRoot: root },
+    geometry: { x: 0, y: 0, width: 500, height: 400 },
+    scheduleSizeSync(width, height) {
+      scheduled.push([width, height]);
+    },
+  });
+
+  modal.setupResizeObserver();
+
+  assert.deepEqual(observed, [root]);
+  assert.ok(modal.__resizeObserver);
+
+  // 空 entries / 尺寸为 0 / 尺寸未变化都不应同步
+  callback([]);
+  callback([
+    { target: { getBoundingClientRect: () => ({ width: 0, height: 0 }) } },
+  ]);
+  callback([
+    { target: { getBoundingClientRect: () => ({ width: 500, height: 400 }) } },
+  ]);
+  assert.deepEqual(scheduled, []);
+
+  callback([{ target: root }]);
+  // 四舍五入后写入，避免 CSS 小数尺寸导致布局抖动
+  assert.deepEqual(scheduled, [[640, 481]]);
+});
+
+test("CheatModal.scheduleSizeSync：合并多次请求，只取下一次任务的最新尺寸", () => {
+  const timers = [];
+  globalThis.window = {
+    setTimeout(callback) {
+      timers.push(callback);
+      return timers.length;
+    },
+  };
+
+  const updates = [];
+  const modal = makeModal({
+    geometry: { x: 0, y: 0, width: 500, height: 400 },
+    updateGeometry(patch) {
+      updates.push(patch);
+    },
+  });
+
+  modal.scheduleSizeSync(600, 500);
+  modal.scheduleSizeSync(700, 600);
+
+  assert.equal(timers.length, 1);
+  assert.deepEqual(modal.__pendingSize, { width: 700, height: 600 });
+
+  timers[0]();
+
+  assert.equal(modal.__sizeSyncTimer, null);
+  assert.equal(modal.__pendingSize, null);
+  assert.deepEqual(updates, [{ width: 700, height: 600 }]);
+});
+
+test("CheatModal.scheduleSizeSync：尺寸没变 / 请求已清空时不写回", () => {
+  const timers = [];
+  globalThis.window = {
+    setTimeout(callback) {
+      timers.push(callback);
+      return timers.length;
+    },
+  };
+
+  const modal = makeModal({
+    geometry: { x: 0, y: 0, width: 500, height: 400 },
+    updateGeometry() {
+      throw new Error("不应该写回尺寸");
+    },
+  });
+
+  modal.scheduleSizeSync(500, 400);
+  timers[0]();
+
+  // 定时器执行前请求被其它路径清空
+  modal.scheduleSizeSync(640, 480);
+  modal.__pendingSize = null;
+  timers[1]();
+
+  assert.equal(modal.__pendingSize, null);
 });

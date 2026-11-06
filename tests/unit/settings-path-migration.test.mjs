@@ -7,6 +7,9 @@ import path from "node:path";
 
 globalThis.require = createRequire(import.meta.url);
 
+// 迁移函数本身可以重复调用；不需要用 `?query` 重新导入模块。
+import * as mod from "../../cheat-engine/www/cheat/js/SettingsPath.js";
+
 const cwd = process.cwd();
 const dirs = [];
 
@@ -31,10 +34,11 @@ test.after(() => {
   for (const dir of dirs) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+  delete globalThis.Utils;
 });
 
-test("migrateLegacySettings：MZ 旧目录整体迁移到新目录", async () => {
-  await withTempGame(async (root) => {
+test("migrateLegacySettings：MZ 旧目录整体迁移到新目录", () => {
+  withTempGame((root) => {
     writeFile(path.join(root, "www", "cheat-settings", "a.json"), "a");
     writeFile(
       path.join(root, "www", "cheat-settings", "nested", "b.json"),
@@ -42,9 +46,8 @@ test("migrateLegacySettings：MZ 旧目录整体迁移到新目录", async () =>
     );
 
     globalThis.Utils = { RPGMAKER_NAME: "MZ" };
-    const mod =
-      await import("../../cheat-engine/www/cheat/js/SettingsPath.js?mz-rename");
 
+    assert.equal(mod.migrateLegacySettings(), true);
     assert.equal(fs.existsSync(path.join(root, "cheat-settings")), true);
     assert.equal(
       fs.existsSync(path.join(root, "www", "cheat-settings")),
@@ -61,16 +64,16 @@ test("migrateLegacySettings：MZ 旧目录整体迁移到新目录", async () =>
   });
 });
 
-test("migrateLegacySettings：新目录已存在时只补缺失文件，不覆盖", async () => {
-  await withTempGame(async (root) => {
+test("migrateLegacySettings：新目录已存在时只补缺失文件，不覆盖", () => {
+  withTempGame((root) => {
     writeFile(path.join(root, "www", "cheat-settings", "same.json"), "legacy");
     writeFile(path.join(root, "www", "cheat-settings", "missing.json"), "new");
     writeFile(path.join(root, "cheat-settings", "same.json"), "current");
     writeFile(path.join(root, "www", "keep.txt"), "keep");
 
     globalThis.Utils = { RPGMAKER_NAME: "MZ" };
-    await import("../../cheat-engine/www/cheat/js/SettingsPath.js?mz-merge");
 
+    assert.equal(mod.migrateLegacySettings(), true);
     assert.equal(
       readFile(path.join(root, "cheat-settings", "same.json")),
       "current",
@@ -93,15 +96,14 @@ test("migrateLegacySettings：新目录已存在时只补缺失文件，不覆�
   });
 });
 
-test("migrateLegacySettings：MV 不执行迁移", async () => {
-  await withTempGame(async (root) => {
+test("migrateLegacySettings：MV 不执行迁移", () => {
+  withTempGame((root) => {
     writeFile(path.join(root, "www", "cheat-settings", "a.json"), "a");
 
     globalThis.Utils = { RPGMAKER_NAME: "MV" };
-    const mod =
-      await import("../../cheat-engine/www/cheat/js/SettingsPath.js?mv-no-migrate");
 
     assert.equal(mod.isMZEngine(), false);
+    assert.equal(mod.migrateLegacySettings(), false);
     assert.equal(
       fs.existsSync(path.join(root, "www", "cheat-settings", "a.json")),
       true,
@@ -110,8 +112,8 @@ test("migrateLegacySettings：MV 不执行迁移", async () => {
   });
 });
 
-test("migrateLegacySettings：新路径被同名文件占用时跳过并保留旧数据", async () => {
-  await withTempGame(async (root) => {
+test("migrateLegacySettings：新路径被同名文件占用时跳过并保留旧数据", () => {
+  withTempGame((root) => {
     writeFile(path.join(root, "www", "cheat-settings", "a.json"), "a");
     fs.writeFileSync(path.join(root, "cheat-settings"), "not a directory");
 
@@ -121,9 +123,6 @@ test("migrateLegacySettings：新路径被同名文件占用时跳过并保留�
     console.warn = (...args) => warnings.push(args);
 
     try {
-      const mod =
-        await import("../../cheat-engine/www/cheat/js/SettingsPath.js?mz-blocked");
-
       assert.equal(mod.migrateLegacySettings(), false);
     } finally {
       console.warn = originalWarn;
@@ -134,6 +133,36 @@ test("migrateLegacySettings：新路径被同名文件占用时跳过并保留�
       fs.existsSync(path.join(root, "www", "cheat-settings", "a.json")),
       true,
       "迁移失败时旧目录必须保留",
+    );
+  });
+});
+
+test("migrateLegacySettings：新目录是文件时返回 false 且保留旧目录", () => {
+  withTempGame((root) => {
+    writeFile(path.join(root, "www", "cheat-settings", "a.json"), "a");
+    // 新目录被同名文件占位：不能递归复制到文件上
+    fs.writeFileSync(path.join(root, "cheat-settings"), "blocked");
+
+    globalThis.Utils = { RPGMAKER_NAME: "MZ" };
+    const originalWarn = console.warn;
+    console.warn = () => {};
+
+    try {
+      assert.equal(mod.migrateLegacySettings(), false);
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    assert.equal(
+      fs.readFileSync(
+        path.join(root, "www", "cheat-settings", "a.json"),
+        "utf8",
+      ),
+      "a",
+    );
+    assert.equal(
+      fs.readFileSync(path.join(root, "cheat-settings"), "utf8"),
+      "blocked",
     );
   });
 });
