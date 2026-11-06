@@ -5,13 +5,10 @@
 // pageCount 全错。这里统一把它当成「全部」。
 import { t } from "./strings.js";
 
-export const ITEMS_PER_PAGE_OPTIONS = [
-  5,
-  10,
-  15,
-  20,
-  { title: t("common.all"), value: -1 },
-];
+// 分页选项在每次调用时按当前语言生成，避免切换语言后「全部」仍是旧文案。
+export function getItemsPerPageOptions() {
+  return [5, 10, 15, 20, { title: t("common.all"), value: -1 }];
+}
 
 // 返回 0 表示「全部」
 export function normalizeItemsPerPage(value) {

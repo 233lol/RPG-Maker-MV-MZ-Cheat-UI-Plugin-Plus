@@ -1,8 +1,9 @@
 // @ts-check
 // 共享 UI 文案 + 轻量国际化。
 //
-// 默认语言是简体中文；`t()` 每次调用都会按当前语言查表，因此组件重新渲染时
-// 会显示新语言。切换语言后界面会刷新窗口，让模块级常量（分页选项等）也重新求值。
+// 默认语言是简体中文；`t()` 每次调用都会按当前语言查表。
+// 切换语言时调用 `setLocale()`，主界面会订阅变更并重挂作弊 UI（不重载游戏），
+// 因此模块级常量不能直接保存 `t()` 的结果，应改成函数 / getter 按需求值。
 //
 // 用法：
 //   import { t } from "../js/strings.js";
@@ -39,10 +40,58 @@ const INTL_LOCALES = {
 // 复数形式条目只允许出现这些键，用来和普通嵌套对象区分开
 const PLURAL_FORMS = new Set(["zero", "one", "two", "few", "many", "other"]);
 
-const currentLocale = loadSavedLocale();
+let currentLocale = loadSavedLocale();
+const localeChangeListeners = new Set();
 
 export function getLocale() {
   return currentLocale;
+}
+
+/**
+ * 切换当前界面语言，并通知订阅者（主界面会重挂作弊 UI）。
+ * 只接受 DICTIONARIES 里存在的语言；返回是否真的发生了变化。
+ *
+ * @param {string} locale
+ * @returns {boolean}
+ */
+export function setLocale(locale) {
+  if (
+    typeof locale !== "string" ||
+    !Object.hasOwnProperty.call(DICTIONARIES, locale) ||
+    locale === currentLocale
+  ) {
+    return false;
+  }
+
+  currentLocale = locale;
+
+  for (const listener of localeChangeListeners) {
+    try {
+      listener(locale);
+    } catch (error) {
+      console.warn("[cheat plugin] 语言变更监听器执行失败", error);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * 订阅界面语言变化。返回取消订阅函数。
+ *
+ * @param {(locale: string) => void} listener
+ * @returns {() => void}
+ */
+export function subscribeLocaleChange(listener) {
+  if (typeof listener !== "function") {
+    return () => {};
+  }
+
+  localeChangeListeners.add(listener);
+
+  return () => {
+    localeChangeListeners.delete(listener);
+  };
 }
 
 export function getAvailableLocales() {

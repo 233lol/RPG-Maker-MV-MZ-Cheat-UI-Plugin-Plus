@@ -6,7 +6,7 @@
 //   - 提供 `filteredTableItems`（或自己覆盖 `totalCount`）；
 //   - 用 `panelStateExtraKeys` 声明除 search / pagination 外要记住的字段。
 import {
-  ITEMS_PER_PAGE_OPTIONS,
+  getItemsPerPageOptions,
   getPageCount,
   paginationWatcherMixin,
 } from "./PaginationHelper.js";
@@ -19,7 +19,7 @@ export const tablePanelMixin = {
     return {
       search: "",
       pagination: { page: 1, itemsPerPage: 5 },
-      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
+      itemsPerPageOptions: getItemsPerPageOptions(),
       // 除 search / pagination 之外，还需要写进 panel-state.json 的字段名
       panelStateExtraKeys: [],
     };

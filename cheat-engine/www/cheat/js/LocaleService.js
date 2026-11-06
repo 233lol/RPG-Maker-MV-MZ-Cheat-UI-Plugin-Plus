@@ -1,8 +1,8 @@
 // @ts-check
 // 界面语言的检测与持久化。
 //
-// 语言存到 <设置目录>/locale.json。切换语言后由界面刷新窗口，
-// 让所有模块级文案（导航、分页选项等）重新按新语言求值。
+// 语言存到 <设置目录>/locale.json。切换语言由 strings.js 的 setLocale() 负责
+// 更新运行时状态并通知界面，这里只做持久化，不再重载游戏窗口。
 import { KeyValueStorage } from "./KeyValueStorage.js";
 import { getCheatSettingsPath } from "./SettingsPath.js";
 

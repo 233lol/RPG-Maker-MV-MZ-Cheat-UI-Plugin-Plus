@@ -3,7 +3,7 @@ import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
 import { markRaw } from "../libs/vue.js";
 import {
-  ITEMS_PER_PAGE_OPTIONS,
+  getItemsPerPageOptions,
   getPageCount,
 } from "../js/PaginationHelper.js";
 import { isPartyReady, requirePartyReady } from "../js/GameState.js";
@@ -129,7 +129,7 @@ export default {
       selectedTab: null,
       actors: [],
       allSkills: [],
-      itemsPerPageOptions: ITEMS_PER_PAGE_OPTIONS,
+      itemsPerPageOptions: getItemsPerPageOptions(),
       skillHeaders: [
         {
           title: t("skill.learned"),

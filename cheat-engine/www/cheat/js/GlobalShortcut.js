@@ -128,8 +128,8 @@ export function isInValueInRange(value, lowerBound, upperBound) {
 // immutable
 const shortcutConfig = {
   toggleCheatModal: {
-    name: t("shortcutAction.toggleCheatModal"),
-    desc: t("shortcut.necessary"),
+    nameKey: "shortcutAction.toggleCheatModal",
+    descKey: "shortcut.necessary",
     necessary: true,
     enterAction(param) {
       GeneralCheat.toggleCheatModal();
@@ -137,7 +137,7 @@ const shortcutConfig = {
   },
 
   toggleCheatModalToSaveLocationComponent: {
-    name: t("shortcutAction.toggleCheatModalToSaveLocationComponent"),
+    nameKey: "shortcutAction.toggleCheatModalToSaveLocationComponent",
     desc: "",
     enterAction(param) {
       GeneralCheat.toggleCheatModal("save-recall-panel");
@@ -145,20 +145,26 @@ const shortcutConfig = {
   },
 
   toggleCheatModalToSaveBackupComponent: {
-    name: t("shortcutAction.toggleCheatModalToSaveBackupComponent"),
-    desc: t("shortcutAction.toggleCheatModalToSaveBackupComponentDesc"),
+    nameKey: "shortcutAction.toggleCheatModalToSaveBackupComponent",
+    descKey: "shortcutAction.toggleCheatModalToSaveBackupComponentDesc",
     enterAction(param) {
       GeneralCheat.toggleCheatModal("save-backup-panel");
     },
   },
 
   quickSave: {
-    name: t("shortcutAction.quickSave"),
-    desc: t("shortcutAction.quickSaveDesc"),
+    nameKey: "shortcutAction.quickSave",
+    descKey: "shortcutAction.quickSaveDesc",
     param: {
       slot: {
-        name: t("shortcutAction.slotParam"),
-        desc: t("shortcutAction.slotSaveDesc"),
+        nameKey: "shortcutAction.slotParam",
+        descKey: "shortcutAction.slotSaveDesc",
+        get name() {
+          return t(this.nameKey);
+        },
+        get desc() {
+          return t(this.descKey);
+        },
         isInvalidValue(value) {
           return isInValueInRange(value, 1, DataManager.maxSavefiles());
         },
@@ -173,12 +179,18 @@ const shortcutConfig = {
   },
 
   quickLoad: {
-    name: t("shortcutAction.quickLoad"),
-    desc: t("shortcutAction.quickLoadDesc"),
+    nameKey: "shortcutAction.quickLoad",
+    descKey: "shortcutAction.quickLoadDesc",
     param: {
       slot: {
-        name: t("shortcutAction.slotParam"),
-        desc: t("shortcutAction.slotLoadDesc"),
+        nameKey: "shortcutAction.slotParam",
+        descKey: "shortcutAction.slotLoadDesc",
+        get name() {
+          return t(this.nameKey);
+        },
+        get desc() {
+          return t(this.descKey);
+        },
         isInvalidValue(value) {
           return isInValueInRange(value, 1, DataManager.maxSavefiles());
         },
@@ -193,7 +205,7 @@ const shortcutConfig = {
   },
 
   openSaveScene: {
-    name: t("shortcutAction.openSaveScene"),
+    nameKey: "shortcutAction.openSaveScene",
     desc: "",
     enterAction(param) {
       SceneCheat.toggleSaveScene();
@@ -201,7 +213,7 @@ const shortcutConfig = {
   },
 
   openLoadScene: {
-    name: t("shortcutAction.openLoadScene"),
+    nameKey: "shortcutAction.openLoadScene",
     desc: "",
     enterAction(param) {
       SceneCheat.toggleLoadScene();
@@ -209,7 +221,7 @@ const shortcutConfig = {
   },
 
   gotoTitle: {
-    name: t("shortcutAction.gotoTitle"),
+    nameKey: "shortcutAction.gotoTitle",
     desc: "",
     enterAction(param) {
       SceneCheat.gotoTitle();
@@ -217,7 +229,7 @@ const shortcutConfig = {
   },
 
   forceVictory: {
-    name: t("shortcutAction.forceVictory"),
+    nameKey: "shortcutAction.forceVictory",
     desc: "",
     enterAction(param) {
       BattleCheat.victory();
@@ -225,7 +237,7 @@ const shortcutConfig = {
   },
 
   forceDefeat: {
-    name: t("shortcutAction.forceDefeat"),
+    nameKey: "shortcutAction.forceDefeat",
     desc: "",
     enterAction(param) {
       BattleCheat.defeat();
@@ -233,7 +245,7 @@ const shortcutConfig = {
   },
 
   forceEscape: {
-    name: t("shortcutAction.forceEscape"),
+    nameKey: "shortcutAction.forceEscape",
     desc: "",
     enterAction(param) {
       BattleCheat.escape();
@@ -241,7 +253,7 @@ const shortcutConfig = {
   },
 
   toggleNoClip: {
-    name: t("shortcutAction.toggleNoClip"),
+    nameKey: "shortcutAction.toggleNoClip",
     desc: "",
     enterAction(param) {
       GeneralCheat.toggleNoClip(true);
@@ -249,7 +261,7 @@ const shortcutConfig = {
   },
 
   enemyWound: {
-    name: t("shortcutAction.enemyWound"),
+    nameKey: "shortcutAction.enemyWound",
     desc: "",
     enterAction(param) {
       BattleCheat.changeAllEnemyHealth(1);
@@ -257,15 +269,15 @@ const shortcutConfig = {
   },
 
   enemyRecovery: {
-    name: t("shortcutAction.enemyRecovery"),
-    desc: t("shortcutAction.enemyRecoveryDesc"),
+    nameKey: "shortcutAction.enemyRecovery",
+    descKey: "shortcutAction.enemyRecoveryDesc",
     enterAction(param) {
       BattleCheat.recoverAllEnemy();
     },
   },
 
   partyWound: {
-    name: t("shortcutAction.partyWound"),
+    nameKey: "shortcutAction.partyWound",
     desc: "",
     enterAction(param) {
       BattleCheat.changeAllPartyHealth(1);
@@ -273,20 +285,26 @@ const shortcutConfig = {
   },
 
   partyRecovery: {
-    name: t("shortcutAction.partyRecovery"),
-    desc: t("shortcutAction.partyRecoveryDesc"),
+    nameKey: "shortcutAction.partyRecovery",
+    descKey: "shortcutAction.partyRecoveryDesc",
     enterAction(param) {
       BattleCheat.recoverAllParty();
     },
   },
 
   setSpeed: {
-    name: t("shortcutAction.setSpeed"),
-    desc: t("shortcutAction.setSpeedDesc"),
+    nameKey: "shortcutAction.setSpeed",
+    descKey: "shortcutAction.setSpeedDesc",
     param: {
       speed: {
-        name: t("shortcutAction.speedParam"),
-        desc: t("shortcutAction.speedParamDesc"),
+        nameKey: "shortcutAction.speedParam",
+        descKey: "shortcutAction.speedParamDesc",
+        get name() {
+          return t(this.nameKey);
+        },
+        get desc() {
+          return t(this.descKey);
+        },
         isInvalidValue(value) {
           return isInValueInRange(value, 1, 10);
         },
@@ -302,13 +320,19 @@ const shortcutConfig = {
   },
 
   skipMessage: {
-    name: t("shortcutAction.skipMessage"),
+    nameKey: "shortcutAction.skipMessage",
     desc: "",
     combiningKeyAlone: true,
     param: {
       accelerate: {
-        name: t("shortcutAction.accelerateParam"),
-        desc: t("shortcutAction.accelerateParamDesc"),
+        nameKey: "shortcutAction.accelerateParam",
+        descKey: "shortcutAction.accelerateParamDesc",
+        get name() {
+          return t(this.nameKey);
+        },
+        get desc() {
+          return t(this.descKey);
+        },
         isInvalidValue(value) {
           return isInValueInRange(value, 1, 50);
         },
@@ -327,8 +351,8 @@ const shortcutConfig = {
   },
 
   openDevTool: {
-    name: t("shortcutAction.openDevTool"),
-    desc: t("shortcutAction.openDevToolDesc"),
+    nameKey: "shortcutAction.openDevTool",
+    descKey: "shortcutAction.openDevToolDesc",
     enterAction(param) {
       // `require("nw.gui")` 是 nwjs 0.12 时代的 API，0.13 起已被 `nw.Window` 取代；
       // 本项目 init/import.js 要求 nwjs >= 0.44.0，走新 API（与 mz/main.js 一致）。
@@ -342,10 +366,10 @@ const shortcutConfig = {
 class ShortcutConfig {
   constructor(id, config) {
     this.id = id;
+    this.nameKey = config.nameKey || "";
+    this.descKey = config.descKey || "";
 
     const fields = [
-      "name",
-      "desc",
       "necessary",
       "combiningKeyAlone",
       "param",
@@ -364,6 +388,15 @@ class ShortcutConfig {
     if (!this.enterAction) this.enterAction = (param) => {};
     if (!this.repeatAction) this.repeatAction = (param) => {};
     if (!this.leaveAction) this.leaveAction = (param) => {};
+  }
+
+  // 名称 / 描述按当前语言实时解析：切换语言后不需要重建配置对象。
+  get name() {
+    return this.nameKey ? t(this.nameKey) : "";
+  }
+
+  get desc() {
+    return this.descKey ? t(this.descKey) : "";
   }
 
   getEnterAction(shortcutSetting) {

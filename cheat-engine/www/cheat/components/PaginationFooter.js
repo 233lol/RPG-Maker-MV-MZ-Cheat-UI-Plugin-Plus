@@ -1,6 +1,6 @@
 import PageJump from "./PageJump.js";
 import {
-  ITEMS_PER_PAGE_OPTIONS,
+  getItemsPerPageOptions,
   getPageBounds,
 } from "../js/PaginationHelper.js";
 import { t } from "../js/strings.js";
@@ -34,7 +34,7 @@ export default {
     },
     itemsPerPageOptions: {
       type: Array,
-      default: () => ITEMS_PER_PAGE_OPTIONS,
+      default: () => getItemsPerPageOptions(),
     },
     totalVisible: {
       type: Number,

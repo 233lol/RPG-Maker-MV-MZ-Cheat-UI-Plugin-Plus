@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  ITEMS_PER_PAGE_OPTIONS,
+  getItemsPerPageOptions,
   clampPage,
   getPageBounds,
   getPageCount,
@@ -80,8 +80,8 @@ test("paginate：返回当前页切片，All 返回全部", () => {
   assert.deepEqual(paginate(null, 1, 5), []);
 });
 
-test("ITEMS_PER_PAGE_OPTIONS 末项为「全部」", () => {
-  const last = ITEMS_PER_PAGE_OPTIONS.at(-1);
+test("getItemsPerPageOptions 末项为「全部」", () => {
+  const last = getItemsPerPageOptions().at(-1);
 
   assert.equal(last.value, -1);
   assert.equal(last.title, "全部");

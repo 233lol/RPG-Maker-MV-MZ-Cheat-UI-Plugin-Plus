@@ -11,7 +11,7 @@ import { Alert } from "../js/AlertHelper.js";
 import interpretCodes from "../js/eventCodes.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { saveLocale } from "../js/LocaleService.js";
-import { getAvailableLocales, getLocale, t } from "../js/strings.js";
+import { getAvailableLocales, getLocale, setLocale, t } from "../js/strings.js";
 import * as BuildVersion from "../version.js";
 
 // shiki 体积较大，改为首次使用时动态加载并缓存，避免随面板启动解析
@@ -363,11 +363,9 @@ export default {
       }
 
       saveLocale(locale);
-
-      // 导航、分页选项等模块级常量在加载时求值，刷新一次最省事
-      if (typeof window !== "undefined" && window.location) {
-        window.location.reload();
-      }
+      // 只切换运行时语言并通知主界面重挂作弊 UI；不重载游戏窗口，
+      // 否则玩家当前未保存的进度会丢失。
+      setLocale(locale);
     },
 
     initializeVariables() {

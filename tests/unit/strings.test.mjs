@@ -6,6 +6,8 @@ import {
   formatNumber,
   getAvailableLocales,
   getLocale,
+  setLocale,
+  subscribeLocaleChange,
   t,
 } from "../../cheat-engine/www/cheat/js/strings.js";
 import {
@@ -94,6 +96,28 @@ test("getLocale / getAvailableLocales：默认语言与支持列表", () => {
     getAvailableLocales().map((item) => item.title),
     ["简体中文", "English", "日本語"],
   );
+});
+
+test("setLocale：切换后 t() 立即变化，并通知订阅者", () => {
+  const seen = [];
+  const unsubscribe = subscribeLocaleChange((locale) => seen.push(locale));
+
+  try {
+    assert.equal(setLocale("en"), true);
+    assert.equal(getLocale(), "en");
+    assert.equal(t("common.search"), "Search...");
+    assert.equal(t("common.perPage"), "Per page");
+
+    assert.equal(setLocale("zh-CN"), true);
+    assert.equal(t("common.search"), "搜索...");
+    assert.deepEqual(seen, ["en", "zh-CN"]);
+
+    assert.equal(setLocale("not-a-locale"), false);
+    assert.equal(getLocale(), "zh-CN");
+  } finally {
+    unsubscribe();
+    setLocale("zh-CN");
+  }
 });
 
 test("LocaleService：没有窗口环境时回退到默认中文", () => {
