@@ -8,6 +8,7 @@ import {
   getPageCount,
   normalizeItemsPerPage,
   paginate,
+  paginationWatcherMixin,
 } from "../../cheat-engine/www/cheat/js/PaginationHelper.js";
 
 test("normalizeItemsPerPage：-1 / 非正数 / 非数字都按「全部」处理", () => {
@@ -85,4 +86,24 @@ test("getItemsPerPageOptions 末项为「全部」", () => {
 
   assert.equal(last.value, -1);
   assert.equal(last.title, "全部");
+  assert.deepEqual(getItemsPerPageOptions().slice(0, 4), [5, 10, 15, 20]);
+});
+
+test("paginationWatcherMixin：页数变少时把当前页收回范围内", () => {
+  const watchPageCount = paginationWatcherMixin.watch.pageCount;
+
+  const panel = { pagination: { page: 5 } };
+  watchPageCount.call(panel, 3);
+  assert.equal(panel.pagination.page, 3);
+
+  watchPageCount.call(panel, 8);
+  assert.equal(panel.pagination.page, 3, "页数变大不改变当前页");
+
+  watchPageCount.call(panel, 0);
+  watchPageCount.call(panel, Number.NaN);
+  watchPageCount.call(panel, "bad");
+  assert.equal(panel.pagination.page, 3);
+
+  assert.doesNotThrow(() => watchPageCount.call({}, 1));
+  assert.doesNotThrow(() => watchPageCount.call({ pagination: null }, 1));
 });

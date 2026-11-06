@@ -11,6 +11,7 @@ async function loadModule(caseName) {
 function restoreGlobals() {
   delete globalThis.Utils;
   delete globalThis.DataManager;
+  delete globalThis.nw;
 }
 
 test("SettingsPath：优先使用 Utils.RPGMAKER_NAME 判断引擎", async () => {
@@ -63,6 +64,64 @@ test("SettingsPath：没有任何引擎标记时按 MV 处理", async () => {
       mod.getCheatSettingsDir(),
       `${process.cwd()}/www/cheat-settings`,
     );
+  } finally {
+    restoreGlobals();
+  }
+});
+
+test("SettingsPath.getAppRoot：nw.App.startPath 优先，并去掉尾随分隔符", async () => {
+  restoreGlobals();
+
+  try {
+    globalThis.Utils = { RPGMAKER_NAME: "MV" };
+    globalThis.nw = { App: { startPath: "/games/MyGame///" } };
+
+    let mod = await loadModule("nw-mv");
+    assert.equal(mod.getAppRoot(), "/games/MyGame");
+    assert.equal(mod.getCheatSettingsDir(), "/games/MyGame/www/cheat-settings");
+
+    globalThis.Utils = { RPGMAKER_NAME: "MZ" };
+    mod = await loadModule("nw-mz");
+    assert.equal(
+      mod.getCheatSettingsPath("save-backups/index.json"),
+      "/games/MyGame/cheat-settings/save-backups/index.json",
+    );
+
+    // 空 startPath 退回当前工作目录
+    globalThis.nw = { App: { startPath: "" } };
+    mod = await loadModule("nw-empty");
+    assert.equal(mod.getAppRoot(), process.cwd());
+
+    // startPath 不是字符串也退回 cwd
+    globalThis.nw = { App: { startPath: 42 } };
+    mod = await loadModule("nw-invalid");
+    assert.equal(mod.getAppRoot(), process.cwd());
+
+    // 访问 nw 抛错时同样退回 cwd
+    globalThis.nw = {
+      get App() {
+        throw new Error("nw unavailable");
+      },
+    };
+    mod = await loadModule("nw-throws");
+    assert.equal(mod.getAppRoot(), process.cwd());
+  } finally {
+    restoreGlobals();
+  }
+});
+
+test("SettingsPath：DataManager 探测抛错时按 MV 处理", async () => {
+  restoreGlobals();
+
+  try {
+    globalThis.DataManager = {
+      get makeSavename() {
+        throw new Error("not ready");
+      },
+    };
+
+    const mod = await loadModule("dm-throws");
+    assert.equal(mod.isMZEngine(), false);
   } finally {
     restoreGlobals();
   }

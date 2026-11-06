@@ -63,3 +63,27 @@ test("writeTextAtomic：写入失败时清理临时文件并抛错", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("writeTextAtomic：清理一天前的同前缀临时文件，保留新文件", () => {
+  const dir = tempDir();
+  const target = path.join(dir, "data.json");
+  const oldTemp = `${target}.111.old.tmp`;
+  const newTemp = `${target}.222.new.tmp`;
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  try {
+    fs.writeFileSync(oldTemp, "old");
+    fs.writeFileSync(newTemp, "new");
+    fs.utimesSync(oldTemp, (now - 2 * day) / 1000, (now - 2 * day) / 1000);
+    fs.utimesSync(newTemp, now / 1000, now / 1000);
+
+    writeTextAtomic(target, "ok");
+
+    assert.equal(fs.readFileSync(target, "utf8"), "ok");
+    assert.equal(fs.existsSync(oldTemp), false);
+    assert.equal(fs.existsSync(newTemp), true);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

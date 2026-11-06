@@ -3,12 +3,19 @@ import assert from "node:assert/strict";
 
 import { Alert } from "../../cheat-engine/www/cheat/js/AlertHelper.js";
 import {
+  getGameMap,
+  getGameParty,
+  getGamePlayer,
+  getGameSwitches,
+  getGameVariables,
   isGameReady,
   isPartyReady,
   isSwitchesReady,
   isVariablesReady,
   requireGameReady,
   requirePartyReady,
+  requireSwitchesReady,
+  requireVariablesReady,
 } from "../../cheat-engine/www/cheat/js/GameState.js";
 
 const GLOBAL_NAMES = [
@@ -126,4 +133,80 @@ test("GameState：requireXxx 就绪时直接返回 true，不提示", () => {
   Alert.handler = null;
   Alert.pending = [];
   clearGlobals();
+});
+
+test("GameState.getGameXxx：读取全局对象，缺失时返回 null", () => {
+  clearGlobals();
+
+  assert.equal(getGamePlayer(), null);
+  assert.equal(getGameParty(), null);
+  assert.equal(getGameMap(), null);
+  assert.equal(getGameSwitches(), null);
+  assert.equal(getGameVariables(), null);
+
+  const player = {};
+  const party = {};
+  const map = {};
+  const switches = {};
+  const variables = {};
+
+  globalThis.$gamePlayer = player;
+  globalThis.$gameParty = party;
+  globalThis.$gameMap = map;
+  globalThis.$gameSwitches = switches;
+  globalThis.$gameVariables = variables;
+
+  assert.equal(getGamePlayer(), player);
+  assert.equal(getGameParty(), party);
+  assert.equal(getGameMap(), map);
+  assert.equal(getGameSwitches(), switches);
+  assert.equal(getGameVariables(), variables);
+
+  clearGlobals();
+});
+
+test("GameState：开关 / 变量 require 包装会提示具体功能名", () => {
+  clearGlobals();
+
+  const warnings = [];
+  Alert.setHandler((level, msg) => warnings.push({ level, msg }));
+
+  assert.equal(requireSwitchesReady("修改开关"), false);
+  assert.equal(requireVariablesReady("修改变量"), false);
+  assert.equal(warnings.length, 2);
+  assert.match(warnings[0].msg, /修改开关/);
+  assert.match(warnings[1].msg, /修改变量/);
+
+  globalThis.$gameSwitches = {};
+  globalThis.$gameVariables = {};
+
+  assert.equal(requireSwitchesReady("修改开关"), true);
+  assert.equal(requireVariablesReady("修改变量"), true);
+  assert.equal(warnings.length, 2);
+
+  Alert.handler = null;
+  Alert.pending = [];
+  clearGlobals();
+});
+
+test("GameState：SceneManager 访问异常时按游戏就绪处理", () => {
+  clearGlobals();
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = {};
+  globalThis.$gameMap = {};
+  globalThis.$gameSystem = {};
+
+  try {
+    globalThis.SceneManager = {
+      get _scene() {
+        throw new Error("scene unavailable");
+      },
+    };
+
+    assert.equal(isGameReady(), true);
+  } finally {
+    delete globalThis.SceneManager;
+    clearGlobals();
+  }
 });

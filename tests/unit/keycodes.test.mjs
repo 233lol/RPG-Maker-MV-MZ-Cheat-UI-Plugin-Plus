@@ -104,3 +104,123 @@ test("MAX_KEY_CODE 覆盖所有可分配键码", () => {
   assert.equal(MAX_KEY_CODE, UNASSIGNED_KEY_CODE);
   assert.ok(MAX_KEY_CODE > 222);
 });
+
+test("Key.fromKey / createEmpty：复制字段且不共享引用", () => {
+  const source = Key.fromString("ctrl shift c");
+  const copy = Key.fromKey(source);
+
+  assert.notEqual(copy, source);
+  assert.equal(copy.equals(source), true);
+
+  copy.ctrl = false;
+  assert.equal(source.ctrl, true);
+
+  const empty = Key.createEmpty();
+  assert.equal(empty.isEmpty(), true);
+  assert.equal(empty.asStringArray().length, 0);
+  assert.equal(empty.asDisplayString(), "");
+});
+
+test("Key.fromEvent：普通键与组合键分支", () => {
+  const normal = Key.fromEvent({
+    keyCode: 67,
+    ctrlKey: true,
+    altKey: false,
+    shiftKey: true,
+    metaKey: false,
+  });
+  assert.equal(normal.asString(), "ctrl shift c");
+
+  const rightMeta = Key.fromEvent({
+    keyCode: 92,
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    metaKey: true,
+  });
+  assert.equal(rightMeta.isCombiningKey(), true);
+  assert.equal(rightMeta.asString(), "meta");
+
+  const ctrlAlone = Key.fromEvent({
+    keyCode: 17,
+    ctrlKey: false,
+    altKey: true,
+    shiftKey: true,
+    metaKey: false,
+  });
+  assert.equal(ctrlAlone.asString(), "ctrl alt shift");
+});
+
+test("Key.adjustCombiningKey：同步事件里的修饰键状态", () => {
+  const key = Key.fromString("ctrl c");
+
+  key.adjustCombiningKey({
+    ctrlKey: false,
+    altKey: true,
+    shiftKey: false,
+    metaKey: true,
+  });
+
+  assert.equal(key.ctrl, false);
+  assert.equal(key.alt, true);
+  assert.equal(key.meta, true);
+  assert.equal(key.code, 67);
+});
+
+test("Key.countPressingKeys / check：按键数量与事件匹配", () => {
+  assert.equal(Key.createEmpty().countPressingKeys(), 0);
+  assert.equal(Key.fromString("ctrl").countPressingKeys(), 1);
+  assert.equal(Key.fromString("ctrl shift c").countPressingKeys(), 3);
+
+  const key = Key.fromString("ctrl c");
+  assert.equal(
+    key.check({
+      keyCode: 67,
+      ctrlKey: true,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+    }),
+    true,
+  );
+  assert.equal(
+    key.check({
+      keyCode: 67,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+    }),
+    false,
+  );
+});
+
+test("Key.remove / add：修饰键与未分配键码", () => {
+  const key = Key.fromString("ctrl alt shift meta c");
+
+  key.remove(18);
+  assert.equal(key.alt, false);
+  key.remove(16);
+  assert.equal(key.shift, false);
+  key.remove(91);
+  assert.equal(key.meta, false);
+  key.remove(91);
+  assert.equal(key.meta, false);
+
+  key.add(92);
+  assert.equal(key.meta, true);
+
+  // 未分配的普通键码不改变组合键
+  const empty = Key.createEmpty();
+  empty.remove(67);
+  assert.equal(empty.isEmpty(), true);
+});
+
+test("Key.capitalize：空值 / 单字符 / 普通字符串", () => {
+  const key = Key.createEmpty();
+
+  assert.equal(key.capitalize(""), "");
+  assert.equal(key.capitalize(null), "");
+  assert.equal(key.capitalize("c"), "C");
+  assert.equal(key.capitalize("ctrl"), "Ctrl");
+});

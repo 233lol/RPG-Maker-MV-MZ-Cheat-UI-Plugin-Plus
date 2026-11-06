@@ -5,7 +5,9 @@ import {
   formatDateTime,
   formatNumber,
   getAvailableLocales,
+  getIntlLocale,
   getLocale,
+  hasTranslation,
   setLocale,
   subscribeLocaleChange,
   t,
@@ -209,4 +211,80 @@ test("所有文案都不为空，且占位符在三种语言里保持一致", ()
     assert.equal(placeholders(enTexts[key]), placeholders(entry), key);
     assert.equal(placeholders(jaTexts[key]), placeholders(entry), key);
   }
+});
+
+test("hasTranslation / getIntlLocale：判断文案并映射 Intl 语言标签", () => {
+  assert.equal(hasTranslation("common.search"), true);
+  assert.equal(hasTranslation("common.notExist"), false);
+  assert.equal(hasTranslation("nope"), false);
+
+  try {
+    assert.equal(getIntlLocale(), "zh-CN");
+    setLocale("en");
+    assert.equal(getIntlLocale(), "en-US");
+    setLocale("ja");
+    assert.equal(getIntlLocale(), "ja-JP");
+  } finally {
+    setLocale("zh-CN");
+  }
+});
+
+test("subscribeLocaleChange：忽略非函数监听器，取消订阅后不再通知", () => {
+  assert.doesNotThrow(() => subscribeLocaleChange(null));
+
+  const seen = [];
+  const unsubscribe = subscribeLocaleChange((locale) => seen.push(locale));
+
+  try {
+    setLocale("en");
+    assert.deepEqual(seen, ["en"]);
+
+    unsubscribe();
+    setLocale("zh-CN");
+    assert.deepEqual(seen, ["en"]);
+  } finally {
+    unsubscribe();
+    setLocale("zh-CN");
+  }
+});
+
+test("setLocale：异常监听器不影响其他监听器与语言切换", () => {
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  const seen = [];
+  const unsubscribeBad = subscribeLocaleChange(() => {
+    throw new Error("listener boom");
+  });
+  const unsubscribeGood = subscribeLocaleChange((locale) => seen.push(locale));
+
+  try {
+    assert.equal(setLocale("en"), true);
+    assert.deepEqual(seen, ["en"]);
+    assert.equal(warnings.length, 1);
+    assert.equal(getLocale(), "en");
+  } finally {
+    unsubscribeBad();
+    unsubscribeGood();
+    console.warn = originalWarn;
+    setLocale("zh-CN");
+  }
+});
+
+test("formatNumber / formatDateTime：非有限值与 Date 实例", () => {
+  assert.equal(formatNumber(Number.NaN), "NaN");
+  assert.equal(formatNumber(Number.POSITIVE_INFINITY), "Infinity");
+  assert.equal(formatNumber(undefined), "undefined");
+
+  assert.equal(formatDateTime("bad"), "");
+  assert.equal(formatDateTime(Number.NaN), "");
+  assert.equal(
+    formatDateTime(new Date(2026, 0, 2, 3, 4, 5).getTime(), {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }),
+    "2026/01/02",
+  );
 });

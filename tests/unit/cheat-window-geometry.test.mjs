@@ -6,6 +6,7 @@ import {
   MIN_WINDOW_WIDTH,
   clampGeometry,
   getDefaultGeometry,
+  getViewportSize,
 } from "../../cheat-engine/www/cheat/js/CheatWindowGeometry.js";
 
 test("getDefaultGeometry：居中且不超过最大尺寸", () => {
@@ -67,4 +68,38 @@ test("clampGeometry：限制最小尺寸并拉回视口", () => {
 
   assert.equal(offscreen.x, 1280 - 775);
   assert.equal(offscreen.y, 800 - 550);
+});
+
+test("getViewportSize：有 window 时读取 innerWidth / innerHeight，否则回退默认值", () => {
+  assert.deepEqual(getViewportSize(), { width: 1280, height: 800 });
+
+  try {
+    globalThis.window = { innerWidth: 1024, innerHeight: 768 };
+    assert.deepEqual(getViewportSize(), { width: 1024, height: 768 });
+
+    globalThis.window = { innerWidth: 0, innerHeight: 0 };
+    assert.deepEqual(getViewportSize(), { width: 1280, height: 800 });
+
+    globalThis.window = {};
+    assert.deepEqual(getViewportSize(), { width: 1280, height: 800 });
+  } finally {
+    delete globalThis.window;
+  }
+});
+
+test("clampGeometry：非数字尺寸 / 坐标回退到最小值", () => {
+  const geometry = clampGeometry(
+    {
+      x: Number.NaN,
+      y: "bad",
+      width: "bad",
+      height: Number.POSITIVE_INFINITY,
+    },
+    { width: 1280, height: 800 },
+  );
+
+  assert.equal(geometry.x, 0);
+  assert.equal(geometry.y, 0);
+  assert.equal(geometry.width, MIN_WINDOW_WIDTH);
+  assert.equal(geometry.height, 800 - 8);
 });
