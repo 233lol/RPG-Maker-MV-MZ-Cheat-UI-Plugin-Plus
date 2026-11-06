@@ -41,6 +41,7 @@
 - 拆分超大模块：`SaveBackupHelper` → `save-backup/*`，`GlobalObjectHelper` → `global-object/*`，地图事件识别 → `map-event/classifier.js`，全局变量行构建 → `GlobalVariableRows.js`。
 - `SpeedCheat` 的固定速度定时器改为显式类字段声明，便于类型检查；NW.js >= 0.44 已支持该语法。
 - 角色 / 装备 / 状态 / 队伍逻辑抽到 `js/actor/*`，面板只负责展示与写回。
+- 常用面板的界面语言选择由大号下拉框改为紧凑的语言按钮 + 弹出菜单，菜单行高与字号同步收窄，减少底部占位。
 - 构建与测试统一要求 Node.js >= 22，新增 `.nvmrc` 和 `package.json` 的 `engines` / `license` 字段。
 
 ### Fixed

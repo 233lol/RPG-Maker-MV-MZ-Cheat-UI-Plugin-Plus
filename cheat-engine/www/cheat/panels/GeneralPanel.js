@@ -264,17 +264,32 @@ export default {
 
     <v-card-text class="py-0 d-flex align-center">
         <span class="text-body-small text-grey-lighten-1 mr-2">{{ t("general.language") }}</span>
-        <v-select
-            v-model="locale"
-            :items="localeOptions"
-            item-title="title"
-            item-value="value"
-            density="compact"
-            variant="outlined"
-            hide-details
-            style="max-width: 160px;"
-            @update:model-value="onLocaleChange">
-        </v-select>
+        <v-menu location="top" :attach="'#app'" :min-width="0">
+            <template #activator="{ props }">
+                <v-btn
+                    v-bind="props"
+                    size="x-small"
+                    variant="tonal"
+                    class="text-none"
+                    append-icon="mdi-menu-down">
+                    {{ localeTitle }}
+                </v-btn>
+            </template>
+            <v-list
+                density="compact"
+                :selected="[locale]"
+                class="cheat-locale-menu py-0">
+                <v-list-item
+                    v-for="option in localeOptions"
+                    :key="option.value"
+                    :value="option.value"
+                    density="compact"
+                    class="cheat-locale-menu-item"
+                    @click="onLocaleChange(option.value)">
+                    <v-list-item-title>{{ option.title }}</v-list-item-title>
+                </v-list-item>
+            </v-list>
+        </v-menu>
     </v-card-text>
 
     <v-card-text class="pt-2 pb-2 text-body-small text-grey-lighten-1 text-center">
@@ -867,6 +882,14 @@ export default {
   },
 
   computed: {
+    localeTitle() {
+      const option = this.localeOptions.find(
+        (item) => item.value === this.locale,
+      );
+
+      return option ? option.title : this.locale;
+    },
+
     replOutputText() {
       return this.replOutputEntries.join("\n");
     },

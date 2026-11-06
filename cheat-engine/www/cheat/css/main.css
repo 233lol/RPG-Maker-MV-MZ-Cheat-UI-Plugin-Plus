@@ -88,6 +88,22 @@ body::-webkit-scrollbar {
   --indent-padding: 24px !important;
 }
 
+/* 常用面板的语言菜单：跟触发按钮保持同一档尺寸，避免弹出一大块列表 */
+.cheat-locale-menu {
+  min-width: 104px !important;
+  max-width: 160px;
+}
+
+.cheat-locale-menu-item {
+  min-height: 26px !important;
+  padding-inline: 10px !important;
+}
+
+.cheat-locale-menu-item .v-list-item-title {
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+}
+
 .v-data-table-footer {
   flex-wrap: nowrap !important;
 }
