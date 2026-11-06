@@ -624,10 +624,7 @@ class GlobalShortcut {
             fs.readFileSync(this.shortcutSettingsFile, "utf-8"),
           );
         } catch (fileWriteErr) {
-          Alert.warn(
-            "Can't initialize shortcut settings file. Use internal data instead.\n(You can use cheat plugin anyway)",
-            err,
-          );
+          Alert.warn(t("shortcut.settingsInitFailed"), err);
           return defaultShortcutSettings;
         }
       }
@@ -648,18 +645,12 @@ class GlobalShortcut {
     try {
       this.shortcutSettings = parseStringToKeyObject(rawSettings);
     } catch (err) {
-      Alert.warn(
-        "Can't parse shortcut settings. Use default settings instead.\n(You can use cheat plugin anyway)",
-        err,
-      );
+      Alert.warn(t("shortcut.settingsParseFailed"), err);
 
       try {
         this.shortcutSettings = parseStringToKeyObject(defaultShortcutSettings);
       } catch (err) {
-        Alert.error(
-          "Can't parse shortcut settings. Cheat plugin will not work properly",
-          err,
-        );
+        Alert.error(t("shortcut.settingsBroken"), err);
       }
     }
   }

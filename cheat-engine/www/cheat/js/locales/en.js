@@ -111,12 +111,16 @@ export default {
     mp: "MP",
     recover: "Recover",
     fillTp: "Fill TP",
+    hpZero: "HP 0",
+    hpOne: "HP 1",
     memberName: "Name",
   },
 
   stats: {
     godMode: "God Mode",
     levelExp: "Level / EXP",
+    level: "Level",
+    exp: "EXP",
     params: "Stats",
     modifyLevel: "change actor level",
     modifyExp: "change actor EXP",
@@ -447,6 +451,12 @@ export default {
     multipleMainKeys: "Multiple regular keys cannot be combined.",
     unknownKey: "Unknown key: {key}",
     necessary: "Required",
+    settingsInitFailed:
+      "Could not initialize the shortcut settings file. Using internal defaults instead.\n(The cheat plugin still works)",
+    settingsParseFailed:
+      "Could not parse the shortcut settings. Using defaults instead.\n(The cheat plugin still works)",
+    settingsBroken:
+      "Could not parse the shortcut settings. The cheat plugin may not work properly",
   },
 
   shortcutAction: {

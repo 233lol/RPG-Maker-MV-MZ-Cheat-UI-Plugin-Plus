@@ -111,12 +111,16 @@ export default {
     mp: "MP",
     recover: "回復",
     fillTp: "TP を全回復",
+    hpZero: "HP 0",
+    hpOne: "HP 1",
     memberName: "名前",
   },
 
   stats: {
     godMode: "無敵モード",
     levelExp: "レベル / 経験値",
+    level: "レベル",
+    exp: "経験値",
     params: "能力値",
     modifyLevel: "アクターのレベルを変更",
     modifyExp: "アクターの経験値を変更",
@@ -454,6 +458,12 @@ export default {
     multipleMainKeys: "複数の通常キーは組み合わせられません。",
     unknownKey: "不明なキーです：{key}",
     necessary: "必須",
+    settingsInitFailed:
+      "ショートカット設定ファイルを初期化できませんでした。内蔵の既定値を使用します。\n（チートプラグインは引き続き使用できます）",
+    settingsParseFailed:
+      "ショートカット設定を解析できませんでした。既定値を使用します。\n（チートプラグインは引き続き使用できます）",
+    settingsBroken:
+      "ショートカット設定を解析できませんでした。チートプラグインが正しく動作しない可能性があります",
   },
 
   shortcutAction: {

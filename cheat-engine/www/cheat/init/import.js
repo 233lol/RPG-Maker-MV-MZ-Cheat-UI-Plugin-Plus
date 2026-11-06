@@ -72,16 +72,42 @@ function validateNwjsVersion() {
     }) < 0;
 
   if (lowVersion) {
-    const msg = `Node Webkit version of game is too low to using cheat
-  - version=${nwjsVersion}, minimum required version=${minRequiredNwjsVersion}
-Cheat may not work properly.
+    // import.js 是 classic script，不能 import strings.js，这里用内联文案；
+    // 语言按浏览器语言探测（与界面默认检测一致）。
+    const lang = (() => {
+      try {
+        return String(navigator.language || "").toLowerCase();
+      } catch (error) {
+        return "";
+      }
+    })();
 
-Click "OK" button to see the solution.
-`;
+    const warningLocale = lang.startsWith("zh")
+      ? "zh-CN"
+      : lang.startsWith("ja")
+        ? "ja"
+        : "en";
+
+    const warningMessages = {
+      "zh-CN": `游戏使用的 Node Webkit 版本过低，作弊插件可能无法正常工作。
+  - 当前版本=${nwjsVersion}，最低要求=${minRequiredNwjsVersion}
+
+点击「确定」查看解决方案。`,
+      en: `The game's Node Webkit version is too low for the cheat plugin.
+  - current=${nwjsVersion}, minimum required=${minRequiredNwjsVersion}
+The cheat may not work properly.
+
+Click "OK" to see the solution.`,
+      ja: `ゲームの Node Webkit バージョンが低すぎるため、チートプラグインが正しく動作しない可能性があります。
+  - 現在=${nwjsVersion}、最低要件=${minRequiredNwjsVersion}
+
+「OK」を押すと解決方法を表示します。`,
+    };
+
     const docsUrl =
       "https://github.com/233lol/RPG-Maker-MV-MZ-Cheat-UI-Plugin-Plus#readme";
 
-    if (window.confirm(msg)) {
+    if (window.confirm(warningMessages[warningLocale])) {
       window.open(docsUrl, "_blank");
     }
     return false;

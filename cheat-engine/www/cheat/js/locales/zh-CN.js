@@ -110,12 +110,16 @@ export default {
     mp: "MP",
     recover: "恢复",
     fillTp: "补满 TP",
+    hpZero: "HP 0",
+    hpOne: "HP 1",
     memberName: "名字",
   },
 
   stats: {
     godMode: "无敌模式",
     levelExp: "等级 / 经验",
+    level: "等级",
+    exp: "经验",
     params: "属性",
     modifyLevel: "修改角色等级",
     modifyExp: "修改角色经验",
@@ -431,6 +435,11 @@ export default {
     multipleMainKeys: "不能组合多个普通按键。",
     unknownKey: "这是未知的按键：{key}",
     necessary: "必须项",
+    settingsInitFailed:
+      "无法初始化快捷键设置文件，将使用内置默认值。\n（作弊插件仍可使用）",
+    settingsParseFailed:
+      "无法解析快捷键设置，将使用默认值。\n（作弊插件仍可使用）",
+    settingsBroken: "无法解析快捷键设置，作弊插件可能无法正常工作",
   },
 
   shortcutAction: {

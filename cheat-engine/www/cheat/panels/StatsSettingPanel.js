@@ -54,7 +54,7 @@ export default {
                 <v-row class="mt-0 pt-3">
                     <v-col>
                         <v-text-field
-                            label="Lv"
+                            :label="t('stats.level')"
                             v-model="actor.level"
                             variant="outlined"
                             density="compact"
@@ -65,7 +65,7 @@ export default {
                     </v-col>
                     <v-col>
                         <v-text-field
-                            label="EXP"
+                            :label="t('stats.exp')"
                             v-model="actor.exp"
                             variant="outlined"
                             density="compact"

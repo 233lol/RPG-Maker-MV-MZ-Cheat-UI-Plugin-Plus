@@ -41,16 +41,16 @@ export default {
     
     <v-card-subtitle class="text-body-small pb-1">{{ t("battle.enemy") }}</v-card-subtitle>
     <v-card-text class="pt-0 pb-2">
-        <v-btn size="small" @click.prevent="changeAllEnemyHealth(0)">HP 0</v-btn>
-        <v-btn size="small" @click.prevent="changeAllEnemyHealth(1)">HP 1</v-btn>
+        <v-btn size="small" @click.prevent="changeAllEnemyHealth(0)">{{ t("battle.hpZero") }}</v-btn>
+        <v-btn size="small" @click.prevent="changeAllEnemyHealth(1)">{{ t("battle.hpOne") }}</v-btn>
         <v-btn size="small" @click.prevent="recoverAllEnemy">{{ t("battle.recover") }}</v-btn>
         <v-btn size="small" @click.prevent="fillTpAllEnemy">{{ t("battle.fillTp") }}</v-btn>
     </v-card-text>
     
     <v-card-subtitle class="text-body-small pb-1">{{ t("battle.party") }}</v-card-subtitle>
     <v-card-text class="pt-0 pb-2">
-        <v-btn size="small" @click.prevent="changeAllPartyHealth(0)">HP 0</v-btn>
-        <v-btn size="small" @click.prevent="changeAllPartyHealth(1)">HP 1</v-btn>
+        <v-btn size="small" @click.prevent="changeAllPartyHealth(0)">{{ t("battle.hpZero") }}</v-btn>
+        <v-btn size="small" @click.prevent="changeAllPartyHealth(1)">{{ t("battle.hpOne") }}</v-btn>
         <v-btn size="small" @click.prevent="recoverAllParty">{{ t("battle.recover") }}</v-btn>
         <v-btn size="small" @click.prevent="fillTpAllParty">{{ t("battle.fillTp") }}</v-btn>
     </v-card-text>
