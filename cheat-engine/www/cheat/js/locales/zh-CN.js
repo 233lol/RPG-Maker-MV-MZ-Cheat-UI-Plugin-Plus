@@ -41,6 +41,7 @@ export default {
 
   nav: {
     general: "常用",
+    gameSystem: "游戏统计",
     battle: "战斗",
     stats: "等级/属性",
     party: "队伍",
@@ -95,6 +96,32 @@ export default {
       noEvent: "当前没有正在执行的地图事件",
       error: "出错: {message}",
     },
+  },
+
+  gameSystem: {
+    title: "游戏统计",
+    unavailable: "游戏尚未加载完成，统计暂不可用。",
+    playtime: "游玩时长（秒）",
+    playtimeHint: "当前显示 {time}",
+    steps: "步数",
+    gold: "金钱",
+    saveCount: "存档次数",
+    battleCount: "战斗次数",
+    winCount: "胜利次数",
+    escapeCount: "逃跑次数",
+    currentMap: "当前地图",
+    position: "当前位置",
+    partySize: "队伍人数",
+    engine: "引擎",
+    noMap: "不在地图中",
+    mapValue: "#{id} · {name}",
+    resetCounters: "重置统计",
+    resetConfirm:
+      "确定把存档 / 战斗 / 胜利 / 逃跑次数归零？\n\n只会修改当前游戏内存，不会改动存档文件。",
+    reset: "归零",
+    invalidValue: "「{label}」必须是 0 或正整数",
+    writeFailed: "修改「{label}」失败: {message}",
+    updated: "已更新：{label}",
   },
 
   battle: {

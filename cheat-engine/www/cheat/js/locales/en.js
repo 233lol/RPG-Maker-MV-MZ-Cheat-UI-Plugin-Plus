@@ -42,6 +42,7 @@ export default {
 
   nav: {
     general: "General",
+    gameSystem: "Game Stats",
     battle: "Battle",
     stats: "Level / Stats",
     party: "Party",
@@ -96,6 +97,32 @@ export default {
       noEvent: "No map event is currently running",
       error: "Error: {message}",
     },
+  },
+
+  gameSystem: {
+    title: "Game Stats",
+    unavailable: "The game is not ready yet; stats are unavailable.",
+    playtime: "Playtime (seconds)",
+    playtimeHint: "Currently {time}",
+    steps: "Steps",
+    gold: "Gold",
+    saveCount: "Save count",
+    battleCount: "Battle count",
+    winCount: "Win count",
+    escapeCount: "Escape count",
+    currentMap: "Current map",
+    position: "Position",
+    partySize: "Party size",
+    engine: "Engine",
+    noMap: "Not on a map",
+    mapValue: "#{id} · {name}",
+    resetCounters: "Reset stats",
+    resetConfirm:
+      "Reset save / battle / win / escape counts to zero?\n\nThis only changes the current game state, not the save file.",
+    reset: "Reset",
+    invalidValue: '"{label}" must be 0 or a positive integer',
+    writeFailed: 'Failed to update "{label}": {message}',
+    updated: "Updated: {label}",
   },
 
   battle: {

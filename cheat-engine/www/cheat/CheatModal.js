@@ -7,6 +7,7 @@ import {
 import { panelStateMixin } from "./js/PanelState.js";
 import PanelErrorBoundary from "./components/PanelErrorBoundary.js";
 import GeneralPanel from "./panels/GeneralPanel.js";
+import GameSystemPanel from "./panels/GameSystemPanel.js";
 import HealthSettingPanel from "./panels/HealthSettingPanel.js";
 import StatsSettingPanel from "./panels/StatsSettingPanel.js";
 import PartyPanel from "./panels/PartyPanel.js";
@@ -29,6 +30,7 @@ export default {
   components: {
     PanelErrorBoundary,
     GeneralPanel,
+    GameSystemPanel,
     HealthSettingPanel,
     StatsSettingPanel,
     PartyPanel,
@@ -145,6 +147,11 @@ export default {
           name: t("nav.general"),
           icon: "mdi-hammer-screwdriver",
           component: "general-panel",
+        },
+        {
+          name: t("nav.gameSystem"),
+          icon: "mdi-chart-box-outline",
+          component: "game-system-panel",
         },
         {
           name: t("nav.battle"),

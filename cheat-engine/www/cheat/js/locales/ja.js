@@ -42,6 +42,7 @@ export default {
 
   nav: {
     general: "一般",
+    gameSystem: "ゲーム統計",
     battle: "戦闘",
     stats: "レベル / 能力値",
     party: "パーティー",
@@ -96,6 +97,32 @@ export default {
       noEvent: "現在実行中のマップイベントはありません",
       error: "エラー: {message}",
     },
+  },
+
+  gameSystem: {
+    title: "ゲーム統計",
+    unavailable: "ゲームがまだ読み込まれていないため、統計を表示できません。",
+    playtime: "プレイ時間（秒）",
+    playtimeHint: "現在 {time}",
+    steps: "歩数",
+    gold: "所持金",
+    saveCount: "セーブ回数",
+    battleCount: "戦闘回数",
+    winCount: "勝利回数",
+    escapeCount: "逃亡回数",
+    currentMap: "現在のマップ",
+    position: "現在位置",
+    partySize: "パーティー人数",
+    engine: "エンジン",
+    noMap: "マップ上にいません",
+    mapValue: "#{id} · {name}",
+    resetCounters: "統計をリセット",
+    resetConfirm:
+      "セーブ / 戦闘 / 勝利 / 逃亡回数を 0 にしますか？\n\n現在のゲーム状態のみ変更し、セーブファイルは変更しません。",
+    reset: "リセット",
+    invalidValue: "「{label}」は 0 以上の整数である必要があります",
+    writeFailed: "「{label}」の変更に失敗しました: {message}",
+    updated: "更新しました: {label}",
   },
 
   battle: {
