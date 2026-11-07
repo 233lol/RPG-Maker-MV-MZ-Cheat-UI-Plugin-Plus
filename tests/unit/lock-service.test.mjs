@@ -23,8 +23,13 @@ const { LockService } =
 function resetLocks() {
   LockService.setSwitchLocks({});
   LockService.setVariableLocks({});
+  LockService.setItemLocks({});
   delete globalThis.$gameSwitches;
   delete globalThis.$gameVariables;
+  delete globalThis.$gameParty;
+  delete globalThis.$dataItems;
+  delete globalThis.$dataWeapons;
+  delete globalThis.$dataArmors;
 }
 
 afterEach(() => {
@@ -389,4 +394,153 @@ test("LockService 跳过非法 / 未启用的手动锁记录", () => {
   // 手动注入的记录不经过 sanitize，会直接按下标查找
   assert.equal(LockService.applyVariableLock(0), true);
   assert.deepEqual(writes, ["v0"]);
+});
+
+function installItemEnvironment(amounts, max = 99) {
+  const gained = [];
+  const item1 = { id: 1, name: "Potion", kind: "item" };
+  const item2 = { id: 1, name: "Sword", kind: "weapon" };
+  const item3 = { id: 1, name: "Shield", kind: "armor" };
+
+  globalThis.$dataItems = [null, item1];
+  globalThis.$dataWeapons = [null, item2];
+  globalThis.$dataArmors = [null, item3];
+  globalThis.$gameParty = {
+    numItems(item) {
+      return amounts[item.kind] || 0;
+    },
+    gainItem(item, diff) {
+      gained.push([item.kind, diff]);
+      amounts[item.kind] = (amounts[item.kind] || 0) + diff;
+    },
+    maxItems() {
+      return max;
+    },
+  };
+
+  return { gained, items: { item1, item2, item3 } };
+}
+
+test("LockService：物品锁按 kind:id 写回持有数量", () => {
+  const amounts = { item: 0, weapon: 2, armor: 5 };
+  const { gained } = installItemEnvironment(amounts);
+
+  const locks = LockService.setItemLocks({
+    "item:1": { lockEnabled: true, lockValue: 9 },
+    "weapon:1": { lockEnabled: true, lockValue: 1 },
+    "armor:1": { lockEnabled: true, lockValue: 5 },
+  });
+
+  assert.deepEqual(locks, {
+    "item:1": { lockEnabled: true, lockValue: 9 },
+    "weapon:1": { lockEnabled: true, lockValue: 1 },
+    "armor:1": { lockEnabled: true, lockValue: 5 },
+  });
+
+  assert.deepEqual(gained, [
+    ["item", 9],
+    ["weapon", -1],
+  ]);
+  assert.equal(LockService.applyItemLocks(), false);
+});
+
+test("LockService：物品锁超过背包上限时按上限收敛", () => {
+  const amounts = { item: 0 };
+  const { gained } = installItemEnvironment(amounts, 99);
+
+  LockService.setItemLocks({
+    "item:1": { lockEnabled: true, lockValue: 500 },
+  });
+
+  assert.deepEqual(gained, [["item", 99]]);
+  assert.equal(amounts.item, 99);
+  assert.equal(LockService.applyItemLocks(), false, "不会每秒重复写 500");
+});
+
+test("LockService：按单个物品应用锁 / 游戏数据缺失时安全返回", () => {
+  const amounts = { item: 0, weapon: 0 };
+  const { gained } = installItemEnvironment(amounts);
+
+  LockService.setItemLocks({
+    "item:1": { lockEnabled: true, lockValue: 3 },
+    "weapon:1": { lockEnabled: true, lockValue: 4 },
+  });
+
+  // setItemLocks 已经应用过一次，先把数量改回 0 再验证单条应用
+  amounts.item = 0;
+  gained.length = 0;
+  assert.equal(LockService.applyItemLock("item", 1), true);
+  assert.deepEqual(gained, [["item", 3]]);
+
+  gained.length = 0;
+  assert.equal(LockService.applyItemLock("armor", 99), false);
+  assert.deepEqual(gained, []);
+
+  delete globalThis.$gameParty;
+  assert.equal(LockService.applyItemLocks(), false);
+  assert.equal(LockService.applyItemLock("item", 1), false);
+});
+
+test("LockService：物品数据库缺失 / 损坏时跳过", () => {
+  const amounts = { item: 0 };
+  installItemEnvironment(amounts);
+  globalThis.$dataItems = [null, null];
+
+  LockService.setItemLocks({
+    "item:1": { lockEnabled: true, lockValue: 3 },
+    "item:2": { lockEnabled: true, lockValue: 4 },
+  });
+
+  assert.equal(amounts.item, 0);
+
+  globalThis.$dataItems = null;
+  assert.equal(LockService.applyItemLocks(), false);
+});
+
+test("LockService：物品锁也计入 hasAnyLock / 定时器", () => {
+  timers.clear();
+  cleared.length = 0;
+
+  LockService.setSwitchLocks({});
+  LockService.setVariableLocks({});
+  LockService.setItemLocks({
+    "item:1": { lockEnabled: true, lockValue: 1 },
+  });
+
+  assert.equal(LockService.hasAnyLock(), true);
+  assert.equal(timers.size, 1);
+
+  LockService.setItemLocks({});
+  assert.equal(LockService.hasAnyLock(), false);
+  assert.equal(timers.size, 0);
+});
+
+test("LockService：applyAllLocks 同时应用开关 / 变量 / 物品", () => {
+  const calls = [];
+  globalThis.$gameSwitches = {
+    value: () => false,
+    setValue: (id) => calls.push(`s${id}`),
+  };
+  globalThis.$gameVariables = {
+    value: () => 0,
+    setValue: (id) => calls.push(`v${id}`),
+  };
+  const amounts = { item: 0 };
+  installItemEnvironment(amounts);
+
+  LockService.setSwitchLocks({
+    1: { lockEnabled: true, lockValue: true },
+  });
+  LockService.setVariableLocks({
+    2: { lockEnabled: true, lockValue: 5 },
+  });
+  LockService.setItemLocks({
+    "item:1": { lockEnabled: true, lockValue: 2 },
+  });
+
+  calls.length = 0;
+  LockService.applyAllLocks();
+
+  assert.deepEqual(calls, ["s1", "v2"]);
+  assert.equal(amounts.item, 2);
 });

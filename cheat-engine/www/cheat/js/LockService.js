@@ -1,6 +1,13 @@
 // @ts-check
 import { KeyValueStorage } from "./KeyValueStorage.js";
 import { getCheatSettingsPath } from "./SettingsPath.js";
+import {
+  itemLockKey,
+  normalizeItemAmount,
+  parseItemLockKey,
+  resolveItemData,
+  sanitizeItemLocks,
+} from "./ItemLockHelper.js";
 
 // 开关 / 变量锁定的全局服务。
 //
@@ -148,6 +155,50 @@ function sanitizeLocks(raw) {
   return ret;
 }
 
+function getItemTables() {
+  return {
+    items: typeof $dataItems !== "undefined" ? $dataItems : null,
+    weapons: typeof $dataWeapons !== "undefined" ? $dataWeapons : null,
+    armors: typeof $dataArmors !== "undefined" ? $dataArmors : null,
+  };
+}
+
+function getPartyItemCount(item) {
+  if (
+    typeof $gameParty === "undefined" ||
+    !$gameParty ||
+    typeof $gameParty.numItems !== "function"
+  ) {
+    return null;
+  }
+
+  try {
+    const count = Number($gameParty.numItems(item));
+    return Number.isInteger(count) && count >= 0 ? count : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function getPartyItemMax(item) {
+  if (
+    typeof $gameParty !== "undefined" &&
+    $gameParty &&
+    typeof $gameParty.maxItems === "function"
+  ) {
+    try {
+      const max = Math.floor(Number($gameParty.maxItems(item)));
+      if (Number.isInteger(max) && max >= 0) {
+        return max;
+      }
+    } catch (error) {
+      // 落到默认值
+    }
+  }
+
+  return 99;
+}
+
 export class LockService {
   static ensureLoaded() {
     if (this.loaded) {
@@ -161,8 +212,12 @@ export class LockService {
     this.variableStorage = new KeyValueStorage(
       getCheatSettingsPath("variable-locks.json"),
     );
+    this.itemStorage = new KeyValueStorage(
+      getCheatSettingsPath("item-locks.json"),
+    );
     this.switchLocks = sanitizeLocks(this.readStorage(this.switchStorage));
     this.variableLocks = sanitizeLocks(this.readStorage(this.variableStorage));
+    this.itemLocks = sanitizeItemLocks(this.readStorage(this.itemStorage));
     this.schedule();
 
     return this;
@@ -201,6 +256,11 @@ export class LockService {
     return this.variableLocks;
   }
 
+  static getItemLocks() {
+    this.ensureLoaded();
+    return this.itemLocks;
+  }
+
   // 面板用完整表数据重建锁定表，一次写入磁盘。
   static setSwitchLocks(locks) {
     this.ensureLoaded();
@@ -220,12 +280,22 @@ export class LockService {
     return this.variableLocks;
   }
 
+  static setItemLocks(locks) {
+    this.ensureLoaded();
+    this.itemLocks = sanitizeItemLocks(locks);
+    this.writeStorage(this.itemStorage, this.itemLocks);
+    this.schedule();
+    this.applyItemLocks();
+    return this.itemLocks;
+  }
+
   static hasAnyLock() {
     this.ensureLoaded();
 
     return (
       Object.values(this.switchLocks).some((lock) => lock.lockEnabled) ||
-      Object.values(this.variableLocks).some((lock) => lock.lockEnabled)
+      Object.values(this.variableLocks).some((lock) => lock.lockEnabled) ||
+      Object.values(this.itemLocks).some((lock) => lock.lockEnabled)
     );
   }
 
@@ -242,6 +312,15 @@ export class LockService {
       return;
     }
 
+    // 单元测试 / 非浏览器沙箱没有 window，锁仍然会在 setXxxLocks 时立即应用一次；
+    // 这里直接跳过定时器，避免 ReferenceError。
+    if (
+      typeof window === "undefined" ||
+      typeof window.setInterval !== "function"
+    ) {
+      return;
+    }
+
     this.timer = window.setInterval(() => {
       this.applyAllLocks();
     }, LOCK_INTERVAL_MS);
@@ -252,7 +331,13 @@ export class LockService {
       return;
     }
 
-    window.clearInterval(this.timer);
+    if (
+      typeof window !== "undefined" &&
+      typeof window.clearInterval === "function"
+    ) {
+      window.clearInterval(this.timer);
+    }
+
     this.timer = null;
   }
 
@@ -264,6 +349,7 @@ export class LockService {
 
     this.applySwitchLocks();
     this.applyVariableLocks();
+    this.applyItemLocks();
   }
 
   static applySwitchLocks() {
@@ -310,6 +396,74 @@ export class LockService {
       if (!valuesEqual(current, lock.lockValue)) {
         $gameVariables.setValue(id, cloneValue(lock.lockValue));
         changed = true;
+      }
+    }
+
+    return changed;
+  }
+
+  static applyItemLocks() {
+    this.ensureLoaded();
+    return this.applyItemLocksFor(Object.keys(this.itemLocks || {}));
+  }
+
+  static applyItemLock(kind, id) {
+    this.ensureLoaded();
+    const key = itemLockKey(kind, id);
+    return key ? this.applyItemLocksFor([key]) : false;
+  }
+
+  static applyItemLocksFor(keys) {
+    if (
+      typeof $gameParty === "undefined" ||
+      !$gameParty ||
+      typeof $gameParty.gainItem !== "function"
+    ) {
+      return false;
+    }
+
+    const tables = getItemTables();
+    let changed = false;
+
+    for (const rawKey of keys) {
+      const parsed = parseItemLockKey(rawKey);
+
+      if (!parsed) {
+        continue;
+      }
+
+      const lock = this.itemLocks[rawKey];
+
+      if (!lock || !lock.lockEnabled) {
+        continue;
+      }
+
+      const item = resolveItemData(tables, parsed.kind, parsed.id);
+
+      if (!item) {
+        continue;
+      }
+
+      const current = getPartyItemCount(item);
+
+      if (current === null) {
+        continue;
+      }
+
+      // 引擎的背包上限（MV / MZ 默认 99）会截断 gainItem。
+      // 不在这里按上限收敛的话，锁 999 会每秒写一次、永远不相等。
+      const max = getPartyItemMax(item);
+      const target = Math.min(normalizeItemAmount(lock.lockValue, 0), max);
+
+      if (current === target) {
+        continue;
+      }
+
+      try {
+        $gameParty.gainItem(item, target - current);
+        changed = true;
+      } catch (error) {
+        console.warn("[cheat plugin] 应用物品锁定失败", error);
       }
     }
 

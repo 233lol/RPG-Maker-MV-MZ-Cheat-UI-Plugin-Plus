@@ -4,12 +4,17 @@ import assert from "node:assert/strict";
 import HealthSettingTab from "../../cheat-engine/www/cheat/panels/HealthSettingTab.js";
 import ItemTableTab from "../../cheat-engine/www/cheat/panels/ItemTableTab.js";
 import { Alert } from "../../cheat-engine/www/cheat/js/AlertHelper.js";
+import { LockService } from "../../cheat-engine/www/cheat/js/LockService.js";
 
 const originalAlertHandler = Alert.handler;
 
 afterEach(() => {
+  LockService.setItemLocks({});
   delete globalThis.$gameParty;
   delete globalThis.$gamePlayer;
+  delete globalThis.$dataItems;
+  delete globalThis.$dataWeapons;
+  delete globalThis.$dataArmors;
   Alert.handler = originalAlertHandler;
   Alert.pending = [];
 });
@@ -101,6 +106,8 @@ function makeItemPanel(overrides = {}) {
     ...ItemTableTab.data(),
     ...ItemTableTab.methods,
 
+    stateKey: "item",
+    itemKind: "item",
     items: [],
     headers: [{ title: "Name", key: "name" }],
     asTableData: (item) => ({ name: item.name, description: item.description }),
@@ -145,7 +152,7 @@ test("ItemTableTab.initializeVariables：队伍未就绪时只准备表头", () 
 
   assert.deepEqual(
     panel.tableHeaders.map((header) => header.key),
-    ["name", "amount"],
+    ["name", "amount", "lock"],
   );
   assert.deepEqual(panel.tableItems, []);
 });
@@ -179,7 +186,7 @@ test("ItemTableTab.initializeVariables：过滤空条目并同步持有数量", 
   // 每次刷新都追加 amount 表头，不应该重复
   assert.deepEqual(
     panel.tableHeaders.map((header) => header.key),
-    ["name", "amount"],
+    ["name", "amount", "lock"],
   );
 });
 
@@ -265,4 +272,172 @@ test("ItemTableTab.onItemChange：按差值增减物品，非法输入回滚", (
     [1, 4],
     [1, -5],
   ]);
+});
+
+test("ItemTableTab.itemKind / allFilteredLocked：类型与全锁判断", () => {
+  const panel = makeItemPanel({ stateKey: "weapon" });
+  assert.equal(ItemTableTab.computed.itemKind.call(panel), "weapon");
+  panel.itemKind = "weapon";
+
+  panel.stateKey = "unknown";
+  assert.equal(ItemTableTab.computed.itemKind.call(panel), "item");
+  panel.itemKind = "item";
+
+  const items = [
+    { id: 1, lockEnabled: true },
+    { id: 2, lockEnabled: true },
+    { id: 0, lockEnabled: false },
+    { id: undefined, lockEnabled: false },
+  ];
+
+  panel.filteredTableItems = items;
+  assert.equal(
+    ItemTableTab.computed.allFilteredLocked.call(panel),
+    true,
+    "占位项 / 无效 ID 不参与判断",
+  );
+
+  items[1].lockEnabled = false;
+  assert.equal(ItemTableTab.computed.allFilteredLocked.call(panel), false);
+
+  panel.filteredTableItems = [];
+  assert.equal(ItemTableTab.computed.allFilteredLocked.call(panel), false);
+});
+
+test("ItemTableTab.initializeVariables：读取已保存的物品锁", () => {
+  const potion = { id: 1, name: "Potion", description: "Heals" };
+  const amounts = { 1: 3 };
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = partyWithItems(amounts);
+  globalThis.$dataItems = [null, potion];
+
+  LockService.setItemLocks({
+    "item:1": { lockEnabled: true, lockValue: 5 },
+  });
+
+  const panel = makeItemPanel({ items: [potion], stateKey: "item" });
+  panel.initializeVariables();
+
+  const row = panel.tableItems[0];
+  assert.equal(row.kind, "item");
+  assert.equal(row.id, 1);
+  assert.equal(row.lockEnabled, true);
+  assert.equal(row.lockValue, 5);
+  assert.equal(row.amount, 5, "锁定会立即把数量写到游戏里");
+});
+
+test("ItemTableTab.toggleItemLock：锁定当前数量 / 再次点击解除", () => {
+  const potion = { id: 1, name: "Potion" };
+  const amounts = { 1: 3 };
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = partyWithItems(amounts);
+  globalThis.$dataItems = [null, potion];
+
+  const panel = makeItemPanel({ items: [potion] });
+  panel.initializeVariables();
+
+  const row = panel.tableItems[0];
+  assert.equal(row.lockEnabled, false);
+
+  panel.toggleItemLock(row);
+  assert.equal(row.lockEnabled, true);
+  assert.deepEqual(LockService.getItemLocks(), {
+    "item:1": { lockEnabled: true, lockValue: 3 },
+  });
+
+  panel.toggleItemLock(row);
+  assert.equal(row.lockEnabled, false);
+  assert.deepEqual(LockService.getItemLocks(), {});
+});
+
+test("ItemTableTab.toggleItemLock：非法 ID / 队伍未就绪时忽略", () => {
+  const messages = [];
+  Alert.setHandler((level, msg) => messages.push({ level, msg }));
+
+  const panel = makeItemPanel();
+  panel.toggleItemLock({ id: 0, lockEnabled: false });
+  assert.equal(messages.length, 1, "队伍未就绪先提示");
+  assert.equal(messages[0].level, "warn");
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = partyWithItems({});
+
+  panel.toggleItemLock({ id: 0, lockEnabled: false });
+  assert.deepEqual(LockService.getItemLocks(), {});
+});
+
+test("ItemTableTab.toggleAllFilteredLocks：按当前状态批量锁定 / 解锁", () => {
+  const potion = { id: 1, name: "Potion" };
+  const ether = { id: 2, name: "Ether" };
+  const amounts = { 1: 2, 2: 7 };
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = partyWithItems(amounts);
+  globalThis.$dataItems = [null, potion, ether];
+
+  const panel = makeItemPanel({ items: [potion, ether] });
+  panel.initializeVariables();
+  panel.filteredTableItems = panel.tableItems;
+
+  panel.toggleAllFilteredLocks();
+  assert.deepEqual(LockService.getItemLocks(), {
+    "item:1": { lockEnabled: true, lockValue: 2 },
+    "item:2": { lockEnabled: true, lockValue: 7 },
+  });
+  assert.equal(
+    panel.tableItems.every((row) => row.lockEnabled),
+    true,
+  );
+
+  panel.toggleAllFilteredLocks();
+  assert.deepEqual(LockService.getItemLocks(), {});
+  assert.equal(
+    panel.tableItems.every((row) => !row.lockEnabled),
+    true,
+  );
+});
+
+test("ItemTableTab.syncLockedRows：只同步锁定行", () => {
+  const potion = { id: 1, name: "Potion" };
+  const ether = { id: 2, name: "Ether" };
+  const amounts = { 1: 2, 2: 7 };
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = partyWithItems(amounts);
+  globalThis.$dataItems = [null, potion, ether];
+
+  const panel = makeItemPanel({ items: [potion, ether] });
+  panel.initializeVariables();
+  panel.tableItems[0].lockEnabled = true;
+
+  amounts[1] = 8;
+  amounts[2] = 9;
+  panel.syncLockedRows();
+
+  assert.equal(panel.tableItems[0].amount, 8, "锁定行跟随游戏值");
+  assert.equal(panel.tableItems[1].amount, 7, "未锁定行保留显示值");
+});
+
+test("ItemTableTab.onItemChange：锁定中的物品会更新锁定数量", () => {
+  const potion = { id: 1, name: "Potion" };
+  const amounts = { 1: 3 };
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = partyWithItems(amounts);
+  globalThis.$dataItems = [null, potion];
+
+  const panel = makeItemPanel({ items: [potion] });
+  panel.initializeVariables();
+
+  const row = panel.tableItems[0];
+  panel.toggleItemLock(row);
+  row.amount = "10";
+  panel.onItemChange(row);
+
+  assert.equal(row.amount, 10);
+  assert.deepEqual(LockService.getItemLocks(), {
+    "item:1": { lockEnabled: true, lockValue: 10 },
+  });
 });
