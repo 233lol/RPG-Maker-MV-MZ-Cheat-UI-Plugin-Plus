@@ -21,6 +21,7 @@ import { registerActorEditor } from "./specs/actor-editor.mjs";
 import { registerSettingsLocale } from "./specs/settings-locale.mjs";
 import { registerInputGuard } from "./specs/input-guard.mjs";
 import { registerMapEvent } from "./specs/map-event.mjs";
+import { registerFeatureTools } from "./specs/feature-tools.mjs";
 import { registerPackaging } from "./specs/packaging.mjs";
 
 const repoRoot = path.resolve(
@@ -136,6 +137,7 @@ async function main() {
       registerSettingsLocale({ test: runner.test, page: game, type, state });
       registerInputGuard({ test: runner.test, page: game, type, state });
       registerMapEvent({ test: runner.test, page: game, type, state });
+      registerFeatureTools({ test: runner.test, page: game, type, state });
 
       const result = await runner.run();
       totalPassed += result.passed;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 const PANELS = [
   { nav: "general-panel", component: "GeneralPanel" },
+  { nav: "game-system-panel", component: "GameSystemPanel" },
   { nav: "health-setting-panel", component: "HealthSettingPanel" },
   { nav: "stats-setting-panel", component: "StatsSettingPanel" },
   { nav: "party-panel", component: "PartyPanel" },
@@ -176,7 +177,7 @@ export function registerCore({ test, page, type, state }) {
     assert.equal(closed, true);
   });
 
-  test("16 个面板全部能挂载并读取游戏数据", async () => {
+  test("17 个面板全部能挂载并读取游戏数据", async () => {
     const result = await page.evaluate(async (panels) => {
       const api = window.__cheatTest;
       const output = {};
@@ -193,6 +194,7 @@ export function registerCore({ test, page, type, state }) {
           switches: proxy.switchNames?.length,
           maps: proxy.maps?.length,
           shortcuts: proxy.shortcuts?.length,
+          ready: proxy.ready,
           backups: Array.isArray(proxy.backups)
             ? proxy.backups.length
             : undefined,
@@ -251,6 +253,11 @@ export function registerCore({ test, page, type, state }) {
 
     const metrics = (name) => result.panels[name].metrics;
 
+    assert.equal(
+      metrics("GameSystemPanel").ready,
+      true,
+      "游戏统计面板没有就绪",
+    );
     assert.ok(metrics("StatsSettingPanel").actors >= 1, "属性面板没有角色");
     assert.ok(metrics("PartyPanel").partyMembers >= 1, "队伍面板没有队伍成员");
     assert.ok(metrics("ItemSettingPanel").items > 1, "道具列表为空");
