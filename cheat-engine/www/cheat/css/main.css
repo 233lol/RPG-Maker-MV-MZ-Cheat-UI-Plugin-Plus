@@ -25,6 +25,14 @@ body::-webkit-scrollbar {
   min-height: min(240px, 100vh);
   max-width: calc(100vw - 8px);
   max-height: calc(100vh - 8px);
+  /* 只在打开时淡入；关闭直接移除元素，不再等 0.3s 淡出 */
+  animation: cheat-window-fade-in 0.12s ease-out;
+}
+
+@keyframes cheat-window-fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .cheat-window-content {

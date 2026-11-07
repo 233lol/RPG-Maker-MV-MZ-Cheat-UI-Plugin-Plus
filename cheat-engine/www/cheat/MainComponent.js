@@ -42,18 +42,18 @@ export default {
 <div 
     class="pa-2"
     ref="rootDiv">
-    <v-fade-transition leave-absolute>
-        <cheat-modal
-            id="cheat-modal"
-            ref="cheatModal"
-            class="opaque-on-mouseover"
-            :key="localeKey"
-            v-model="currentComponentName"
-            v-if="show"
-            @close="closeCheatModal"
-            >
-        </cheat-modal>
-    </v-fade-transition>
+    <!-- 打开时由 .cheat-window 的 CSS 动画淡入；关闭立即移除，
+         不走 leave 过渡，避免窗口在淡出期间继续遮挡界面显得“关不掉”。 -->
+    <cheat-modal
+        id="cheat-modal"
+        ref="cheatModal"
+        class="opaque-on-mouseover"
+        :key="localeKey"
+        v-model="currentComponentName"
+        v-if="show"
+        @close="closeCheatModal"
+        >
+    </cheat-modal>
     <alert-snackbar></alert-snackbar>
     <confirm-dialog></confirm-dialog>
 </div>`,
