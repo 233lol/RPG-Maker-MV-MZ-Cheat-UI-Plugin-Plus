@@ -35,6 +35,8 @@ declare var $gameMap: any;
 declare var $gameSystem: any;
 declare var $gameSwitches: any;
 declare var $gameVariables: any;
+declare var $gameSelfSwitches: any;
+declare var $gameTemp: any;
 declare var $gameScreen: any;
 declare var $dataSystem: any;
 declare var $dataMap: any;

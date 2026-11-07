@@ -1,9 +1,20 @@
 // @ts-check
 import { MapEventClassifier } from "../js/map-event/classifier.js";
+import {
+  SELF_SWITCH_KEYS,
+  buildCommonEventOptions,
+  buildEventOptions,
+  readSelfSwitchState,
+  resolveCommonEvent,
+  writeSelfSwitchValue,
+} from "../js/map-event/tools.js";
 import { markRaw } from "../libs/vue.js";
 import { t } from "../js/strings.js";
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
 import { getCheatSettingsPath } from "../js/SettingsPath.js";
+import { requireGameReady } from "../js/GameState.js";
+import { Alert } from "../js/AlertHelper.js";
+import { ConfirmDialog } from "../js/DialogHelper.js";
 
 const SETTINGS_FILE = "map-event.json";
 
@@ -81,6 +92,122 @@ export default {
             </v-text-field>
         </v-col>
     </v-row>
+
+    <v-row class="mb-0 pa-0">
+        <v-col cols="12">
+            <v-btn
+                size="small"
+                color="indigo"
+                prepend-icon="mdi-wrench"
+                @click="openEventTools">
+                {{ t("mapEvent.eventTools") }}
+            </v-btn>
+            <span class="text-body-small text-grey-lighten-1 ml-3">
+                {{ t("mapEvent.eventToolsHint") }}
+            </span>
+        </v-col>
+    </v-row>
+
+    <v-dialog v-model="eventTools.show" max-width="640">
+        <v-card
+            @keydown.stop
+            @keyup.stop
+            @keypress.stop>
+            <v-card-title class="d-flex align-center">
+                <v-icon class="mr-2">mdi-wrench</v-icon>
+                <span class="text-title-large">{{ t("mapEvent.eventToolsTitle") }}</span>
+                <v-spacer></v-spacer>
+                <v-btn icon size="small" @click="eventTools.show = false">
+                    <v-icon>mdi-close</v-icon>
+                </v-btn>
+            </v-card-title>
+            <v-card-text>
+                <v-select
+                    v-model="eventTools.selectedEventId"
+                    :items="eventOptions"
+                    item-title="title"
+                    item-value="id"
+                    :label="t('mapEvent.selectEvent')"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    @update:model-value="onEventSelectionChange"
+                    @keydown.stop>
+                </v-select>
+
+                <div
+                    v-if="selectedEventOption"
+                    class="text-body-small text-grey-lighten-1 mt-1">
+                    {{ t("mapEvent.eventInfo", { id: selectedEventOption.id, name: selectedEventOption.name, x: selectedEventOption.x, y: selectedEventOption.y }) }}
+                </div>
+                <div
+                    v-else
+                    class="text-body-small text-grey-lighten-1 mt-1">
+                    {{ t("mapEvent.eventListEmpty") }}
+                </div>
+
+                <div class="font-weight-bold mt-4">{{ t("mapEvent.selfSwitches") }}</div>
+                <div class="d-flex flex-wrap ga-4 mt-1">
+                    <v-switch
+                        v-for="key in selfSwitchKeys"
+                        :key="key"
+                        v-model="eventTools.selfSwitches[key]"
+                        :label="key"
+                        :disabled="!eventTools.selectedEventId"
+                        color="primary"
+                        density="compact"
+                        hide-details
+                        @update:model-value="(value) => onSelfSwitchChange(key, value)">
+                    </v-switch>
+                </div>
+
+                <v-divider class="my-4"></v-divider>
+
+                <div class="font-weight-bold">{{ t("mapEvent.commonEvents") }}</div>
+                <v-autocomplete
+                    v-model="eventTools.commonEventId"
+                    :items="commonEventOptions"
+                    item-title="title"
+                    item-value="id"
+                    :label="t('mapEvent.selectCommonEvent')"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    clearable
+                    class="mt-2"
+                    @keydown.stop>
+                </v-autocomplete>
+                <div class="d-flex align-center mt-2">
+                    <v-btn
+                        size="small"
+                        color="teal"
+                        prepend-icon="mdi-play"
+                        :disabled="!eventTools.commonEventId"
+                        @click="runCommonEvent">
+                        {{ t("mapEvent.runCommonEvent") }}
+                    </v-btn>
+                    <span class="text-body-small text-grey-lighten-1 ml-3">
+                        {{ t("mapEvent.commonEventHint") }}
+                    </span>
+                </div>
+            </v-card-text>
+            <v-card-actions>
+                <v-btn variant="text" :disabled="!eventTools.selectedEventId" @click="reloadEventTools">
+                    {{ t("mapEvent.refresh") }}
+                </v-btn>
+                <v-spacer></v-spacer>
+                <v-btn variant="text" @click="eventTools.show = false">
+                    {{ t("common.close") }}
+                </v-btn>
+                <v-btn
+                    color="deep-purple"
+                    :disabled="!eventTools.selectedEventId"
+                    @click="confirmTriggerSelectedEvent">
+                    {{ t("mapEvent.triggerEvent") }}
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 </v-card>
     `,
 
@@ -120,6 +247,15 @@ export default {
       readInterval: this.normalizeReadInterval(
         this.loadSetting("mapEventPanel_readInterval", 500),
       ),
+
+      // 事件工具：独立开关、公共事件、手动触发当前事件
+      selfSwitchKeys: SELF_SWITCH_KEYS,
+      eventTools: {
+        show: false,
+        selectedEventId: 0,
+        selfSwitches: { A: false, B: false, C: false, D: false },
+        commonEventId: null,
+      },
     };
   },
 
@@ -146,6 +282,12 @@ export default {
 
     clickToTeleportEnabled(newValue) {
       this.saveSetting("mapEventPanel_clickToTeleport", newValue);
+    },
+
+    "eventTools.show"(visible) {
+      if (visible) {
+        this.initializeEventTools();
+      }
     },
   },
 
@@ -194,6 +336,26 @@ export default {
         cursor: this.clickToTeleportEnabled ? "pointer" : "default",
       };
     },
+
+    eventOptions() {
+      return buildEventOptions(this.mapEvents);
+    },
+
+    selectedEventOption() {
+      const id = Number(this.eventTools && this.eventTools.selectedEventId);
+
+      return (
+        buildEventOptions(this.mapEvents).find((option) => option.id === id) ||
+        null
+      );
+    },
+
+    commonEventOptions() {
+      const data =
+        typeof $dataCommonEvents !== "undefined" ? $dataCommonEvents : [];
+
+      return buildCommonEventOptions(data);
+    },
   },
 
   methods: {
@@ -228,6 +390,286 @@ export default {
       } catch (error) {
         console.warn("Failed to save setting:", key, error);
       }
+    },
+
+    // ---------- 事件工具：独立开关 / 公共事件 / 触发事件 ----------
+
+    openEventTools() {
+      this.eventTools.show = true;
+      this.initializeEventTools();
+    },
+
+    initializeEventTools() {
+      const options = this.eventOptions;
+
+      if (options.length === 0) {
+        this.eventTools.selectedEventId = 0;
+        this.resetSelfSwitches();
+        return;
+      }
+
+      const preferred = this.getDefaultEventId();
+      const selected = options.some((option) => option.id === preferred)
+        ? preferred
+        : options[0].id;
+
+      this.eventTools.selectedEventId = selected;
+      this.loadSelfSwitches(selected);
+    },
+
+    getDefaultEventId() {
+      try {
+        if (typeof $gameMap !== "undefined" && $gameMap) {
+          const interpreter = $gameMap._interpreter;
+
+          if (interpreter && typeof interpreter.eventId === "function") {
+            const runningId = Number(interpreter.eventId());
+
+            if (Number.isInteger(runningId) && runningId > 0) {
+              return runningId;
+            }
+          }
+        }
+      } catch (error) {
+        // 解释器不可用时继续尝试面向的事件
+      }
+
+      const facingId = this.getFacingEventId();
+
+      if (facingId > 0) {
+        return facingId;
+      }
+
+      return 0;
+    },
+
+    getFacingEventId() {
+      try {
+        if (
+          typeof $gamePlayer === "undefined" ||
+          !$gamePlayer ||
+          typeof $gameMap === "undefined" ||
+          !$gameMap ||
+          typeof $gameMap.eventIdXy !== "function"
+        ) {
+          return 0;
+        }
+
+        const direction = Number(
+          typeof $gamePlayer.direction === "function"
+            ? $gamePlayer.direction()
+            : $gamePlayer._direction,
+        );
+
+        const dx = direction === 6 ? 1 : direction === 4 ? -1 : 0;
+        const dy = direction === 2 ? 1 : direction === 8 ? -1 : 0;
+        const x = Number($gamePlayer.x ?? $gamePlayer._x) + dx;
+        const y = Number($gamePlayer.y ?? $gamePlayer._y) + dy;
+        const id = Number($gameMap.eventIdXy(x, y));
+
+        return Number.isInteger(id) && id > 0 ? id : 0;
+      } catch (error) {
+        return 0;
+      }
+    },
+
+    onEventSelectionChange(value) {
+      const id = Number(value);
+
+      this.eventTools.selectedEventId = Number.isInteger(id) && id > 0 ? id : 0;
+      this.loadSelfSwitches(this.eventTools.selectedEventId);
+    },
+
+    resetSelfSwitches() {
+      this.eventTools.selfSwitches = { A: false, B: false, C: false, D: false };
+    },
+
+    loadSelfSwitches(eventId) {
+      const id = Number(eventId);
+      const mapId = Number(this.currentMapId);
+
+      if (
+        !Number.isInteger(id) ||
+        id <= 0 ||
+        !Number.isInteger(mapId) ||
+        mapId <= 0 ||
+        typeof $gameSelfSwitches === "undefined" ||
+        !$gameSelfSwitches
+      ) {
+        this.resetSelfSwitches();
+        return;
+      }
+
+      this.eventTools.selfSwitches = readSelfSwitchState(
+        $gameSelfSwitches,
+        mapId,
+        id,
+      );
+    },
+
+    onSelfSwitchChange(key, value) {
+      const eventId = Number(this.eventTools.selectedEventId);
+      const mapId = Number(this.currentMapId);
+
+      if (!requireGameReady(t("mapEvent.toolsFeature"))) {
+        this.loadSelfSwitches(eventId);
+        return false;
+      }
+
+      const ok = writeSelfSwitchValue(
+        $gameSelfSwitches,
+        mapId,
+        eventId,
+        key,
+        value,
+      );
+
+      if (!ok) {
+        Alert.error(t("mapEvent.selfSwitchFailed"));
+        this.loadSelfSwitches(eventId);
+        return false;
+      }
+
+      this.loadSelfSwitches(eventId);
+      return true;
+    },
+
+    getGameEvent(eventId) {
+      const id = Number(eventId);
+
+      if (!Number.isInteger(id) || id <= 0) {
+        return null;
+      }
+
+      try {
+        if (typeof $gameMap === "undefined" || !$gameMap) {
+          return null;
+        }
+
+        if (typeof $gameMap.event === "function") {
+          return $gameMap.event(id) || null;
+        }
+
+        return ($gameMap._events && $gameMap._events[id]) || null;
+      } catch (error) {
+        return null;
+      }
+    },
+
+    runSelectedEvent() {
+      if (!requireGameReady(t("mapEvent.triggerEventFeature"))) {
+        return false;
+      }
+
+      const eventId = Number(this.eventTools.selectedEventId);
+      const event = this.getGameEvent(eventId);
+      const page =
+        event && typeof event.page === "function" ? event.page() : null;
+      const list = page && Array.isArray(page.list) ? page.list : null;
+
+      if (!list || list.length === 0) {
+        Alert.warn(t("mapEvent.eventNoPage"));
+        return false;
+      }
+
+      const interpreter = $gameMap && $gameMap._interpreter;
+
+      if (!interpreter || typeof interpreter.setup !== "function") {
+        Alert.error(t("mapEvent.eventInterpreterMissing"));
+        return false;
+      }
+
+      if (
+        typeof interpreter.isRunning === "function" &&
+        interpreter.isRunning()
+      ) {
+        Alert.warn(t("mapEvent.eventBusy"));
+        return false;
+      }
+
+      try {
+        interpreter.setup(list, eventId);
+        Alert.success(t("mapEvent.eventTriggered", { id: eventId }));
+        return true;
+      } catch (error) {
+        Alert.error(
+          t("mapEvent.eventTriggerFailed", { message: String(error) }),
+        );
+        return false;
+      }
+    },
+
+    confirmTriggerSelectedEvent() {
+      const eventId = Number(this.eventTools.selectedEventId);
+
+      if (!Number.isInteger(eventId) || eventId <= 0) {
+        return;
+      }
+
+      const self = this;
+
+      ConfirmDialog.show({
+        width: 480,
+        message: t("mapEvent.triggerConfirm", { id: eventId }),
+        actions: [
+          {
+            icon: "mdi-close",
+            label: t("common.cancel"),
+            color: "white",
+            action: ConfirmDialog.close,
+          },
+          {
+            icon: "mdi-play",
+            color: "deep-purple",
+            label: t("mapEvent.triggerEvent"),
+            action() {
+              self.runSelectedEvent();
+              ConfirmDialog.close();
+            },
+          },
+        ],
+      });
+    },
+
+    runCommonEvent() {
+      if (!requireGameReady(t("mapEvent.runCommonEventFeature"))) {
+        return false;
+      }
+
+      const id = Number(this.eventTools.commonEventId);
+      const data =
+        typeof $dataCommonEvents !== "undefined" ? $dataCommonEvents : [];
+      const commonEvent = resolveCommonEvent(data, id);
+
+      if (!commonEvent) {
+        Alert.warn(t("mapEvent.commonEventInvalid"));
+        return false;
+      }
+
+      if (
+        typeof $gameTemp === "undefined" ||
+        !$gameTemp ||
+        typeof $gameTemp.reserveCommonEvent !== "function"
+      ) {
+        Alert.error(t("mapEvent.commonEventUnavailable"));
+        return false;
+      }
+
+      try {
+        $gameTemp.reserveCommonEvent(commonEvent.id);
+        Alert.success(t("mapEvent.commonEventQueued", { id: commonEvent.id }));
+        return true;
+      } catch (error) {
+        Alert.error(
+          t("mapEvent.commonEventFailed", { message: String(error) }),
+        );
+        return false;
+      }
+    },
+
+    reloadEventTools() {
+      this.updateMapEvents();
+      this.initializeEventTools();
     },
 
     initializeMapDisplay() {

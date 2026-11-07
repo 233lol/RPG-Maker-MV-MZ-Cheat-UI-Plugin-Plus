@@ -2,8 +2,21 @@ import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 
 import MapEventPanel from "../../cheat-engine/www/cheat/panels/MapEventPanel.js";
+import { Alert } from "../../cheat-engine/www/cheat/js/AlertHelper.js";
+import { ConfirmDialog } from "../../cheat-engine/www/cheat/js/DialogHelper.js";
+import { SELF_SWITCH_KEYS } from "../../cheat-engine/www/cheat/js/map-event/tools.js";
 
-const GAME_GLOBALS = ["$gameMap", "$gamePlayer", "$dataMap", "$dataMapInfos"];
+const GAME_GLOBALS = [
+  "$gameMap",
+  "$gamePlayer",
+  "$gameParty",
+  "$gameSystem",
+  "$gameSelfSwitches",
+  "$gameTemp",
+  "$dataMap",
+  "$dataMapInfos",
+  "$dataCommonEvents",
+];
 
 function makePanel(overrides = {}) {
   const panel = {
@@ -32,6 +45,14 @@ function makePanel(overrides = {}) {
     needsRedraw: true,
     renderIntervalId: null,
     readInterval: 500,
+
+    selfSwitchKeys: SELF_SWITCH_KEYS,
+    eventTools: {
+      show: false,
+      selectedEventId: 0,
+      selfSwitches: { A: false, B: false, C: false, D: false },
+      commonEventId: null,
+    },
 
     $refs: {},
     $nextTick(callback) {
@@ -108,6 +129,8 @@ afterEach(() => {
   delete globalThis.window;
   delete globalThis.document;
   delete globalThis.IntersectionObserver;
+  Alert.handler = null;
+  Alert.pending = [];
 });
 
 test("MapEventPanel.saveSetting：存储抛错时只警告，不打断面板", () => {
@@ -1380,4 +1403,328 @@ test("MapEventPanel.drawWalkableBoundaries draws right border", () => {
   assert.ok(
     ctx.calls.some(([name, x, y]) => name === "moveTo" && x === 10 && y === 0),
   );
+});
+
+/* ------------------------------------------------------------ 事件工具 */
+
+function captureAlerts() {
+  const messages = [];
+  Alert.setHandler((level, msg, err) => messages.push({ level, msg, err }));
+  return messages;
+}
+
+function installReadyGame() {
+  globalThis.$gamePlayer = { x: 1, y: 1 };
+  globalThis.$gameParty = {};
+  globalThis.$gameSystem = {};
+  globalThis.$gameMap = { event: () => null, _interpreter: null };
+}
+
+function makeSelfSwitchStore(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  const writes = [];
+
+  return {
+    values,
+    writes,
+    value(target) {
+      return values.get(target.join(":")) || false;
+    },
+    setValue(target, value) {
+      writes.push([target, value]);
+      values.set(target.join(":"), value);
+    },
+  };
+}
+
+test("MapEventPanel：事件 / 公共事件下拉选项", () => {
+  const panel = makePanel({
+    mapEvents: [
+      { id: 1, name: "Door", x: 2, y: 3 },
+      { id: 2, name: "Chest", x: 4, y: 5 },
+    ],
+    eventTools: {
+      show: false,
+      selectedEventId: 1,
+      selfSwitches: { A: false, B: false, C: false, D: false },
+      commonEventId: null,
+    },
+  });
+
+  globalThis.$dataCommonEvents = [
+    null,
+    { name: "Teleport" },
+    { name: "" },
+    { name: "Ending" },
+  ];
+
+  assert.deepEqual(
+    panel.eventOptions.map((option) => option.id),
+    [1, 2],
+  );
+  assert.equal(panel.selectedEventOption.title, "1: Door");
+  assert.deepEqual(
+    panel.commonEventOptions.map((option) => option.id),
+    [1, 3],
+  );
+
+  panel.eventTools.selectedEventId = 99;
+  assert.equal(panel.selectedEventOption, null);
+});
+
+test("MapEventPanel.initializeEventTools：优先当前解释器事件并读取独立开关", () => {
+  const selfSwitches = makeSelfSwitchStore({ "5:2:A": true });
+
+  globalThis.$gameMap = {
+    _interpreter: { eventId: () => 2 },
+    eventIdXy: () => 0,
+  };
+  globalThis.$gamePlayer = { x: 1, y: 1, direction: () => 2 };
+  globalThis.$gameSelfSwitches = selfSwitches;
+
+  const panel = makePanel({
+    currentMapId: 5,
+    mapEvents: [
+      { id: 1, name: "Door", x: 2, y: 3 },
+      { id: 2, name: "Chest", x: 4, y: 5 },
+    ],
+  });
+
+  panel.initializeEventTools();
+
+  assert.equal(panel.eventTools.selectedEventId, 2);
+  assert.deepEqual(panel.eventTools.selfSwitches, {
+    A: true,
+    B: false,
+    C: false,
+    D: false,
+  });
+});
+
+test("MapEventPanel.initializeEventTools：没有解释器时回退到面向事件 / 第一个事件", () => {
+  globalThis.$gameMap = {
+    _interpreter: null,
+    eventIdXy: (x, y) => (x === 2 && y === 1 ? 7 : 0),
+  };
+  globalThis.$gamePlayer = { x: 1, y: 1, direction: () => 6 };
+
+  const panel = makePanel({
+    currentMapId: 3,
+    mapEvents: [
+      { id: 1, name: "A", x: 1, y: 1 },
+      { id: 7, name: "B", x: 2, y: 1 },
+    ],
+  });
+
+  panel.initializeEventTools();
+  assert.equal(panel.eventTools.selectedEventId, 7);
+
+  globalThis.$gameMap.eventIdXy = () => 0;
+  panel.initializeEventTools();
+  assert.equal(panel.eventTools.selectedEventId, 1);
+
+  panel.mapEvents = [];
+  panel.initializeEventTools();
+  assert.equal(panel.eventTools.selectedEventId, 0);
+  assert.deepEqual(panel.eventTools.selfSwitches, {
+    A: false,
+    B: false,
+    C: false,
+    D: false,
+  });
+});
+
+test("MapEventPanel.getFacingEventId：按方向找前方事件，异常时返回 0", () => {
+  const panel = makePanel();
+
+  globalThis.$gamePlayer = { x: 5, y: 5, direction: () => 6 };
+  globalThis.$gameMap = {
+    eventIdXy(x, y) {
+      return x === 6 && y === 5 ? 9 : 0;
+    },
+  };
+  assert.equal(panel.getFacingEventId(), 9);
+
+  globalThis.$gamePlayer.direction = () => 2;
+  globalThis.$gameMap.eventIdXy = (x, y) => (y === 6 ? 10 : 0);
+  assert.equal(panel.getFacingEventId(), 10);
+
+  globalThis.$gamePlayer.direction = () => 4;
+  globalThis.$gameMap.eventIdXy = () => 0;
+  assert.equal(panel.getFacingEventId(), 0);
+
+  globalThis.$gameMap.eventIdXy = () => {
+    throw new Error("broken map");
+  };
+  assert.equal(panel.getFacingEventId(), 0);
+
+  delete globalThis.$gameMap;
+  assert.equal(panel.getFacingEventId(), 0);
+});
+
+test("MapEventPanel.onEventSelectionChange / onSelfSwitchChange：写入并刷新", () => {
+  const alerts = captureAlerts();
+  const selfSwitches = makeSelfSwitchStore();
+  const panel = makePanel({ currentMapId: 4 });
+
+  installReadyGame();
+  globalThis.$gameSelfSwitches = selfSwitches;
+
+  panel.onEventSelectionChange("7");
+  assert.equal(panel.eventTools.selectedEventId, 7);
+
+  panel.onEventSelectionChange("bad");
+  assert.equal(panel.eventTools.selectedEventId, 0);
+
+  panel.eventTools.selectedEventId = 7;
+  assert.equal(panel.onSelfSwitchChange("B", true), true);
+  assert.deepEqual(selfSwitches.writes, [[[4, 7, "B"], true]]);
+  assert.equal(panel.eventTools.selfSwitches.B, true);
+
+  assert.equal(panel.onSelfSwitchChange("C", 1), true);
+  assert.equal(panel.eventTools.selfSwitches.C, false, "非 true 归一化为关闭");
+  assert.equal(alerts.length, 0);
+});
+
+test("MapEventPanel.onSelfSwitchChange：游戏未就绪 / 写入失败时回滚显示", () => {
+  const alerts = captureAlerts();
+  const panel = makePanel({ currentMapId: 4 });
+  panel.eventTools.selectedEventId = 7;
+  panel.eventTools.selfSwitches.B = true;
+
+  // 未就绪：提示并恢复成读取值（此时没有 $gameSelfSwitches，全部 false）
+  assert.equal(panel.onSelfSwitchChange("B", true), false);
+  assert.equal(panel.eventTools.selfSwitches.B, false);
+  assert.equal(alerts.at(-1).level, "warn");
+
+  installReadyGame();
+  globalThis.$gameSelfSwitches = {
+    value: () => false,
+    setValue() {
+      throw new Error("write failed");
+    },
+  };
+
+  assert.equal(panel.onSelfSwitchChange("A", true), false);
+  assert.equal(alerts.at(-1).level, "error");
+  assert.equal(panel.eventTools.selfSwitches.A, false);
+});
+
+test("MapEventPanel.runSelectedEvent：执行当前页并处理无页面 / 忙 / 缺解释器", () => {
+  const alerts = captureAlerts();
+  const setupCalls = [];
+  const list = [{ code: 101, parameters: ["Hello"] }];
+
+  installReadyGame();
+  globalThis.$gameMap = {
+    event(id) {
+      return id === 5
+        ? {
+            page() {
+              return { list };
+            },
+          }
+        : null;
+    },
+    _interpreter: {
+      setup(commands, eventId) {
+        setupCalls.push([commands, eventId]);
+      },
+      isRunning: () => false,
+    },
+  };
+
+  const panel = makePanel();
+  panel.eventTools.selectedEventId = 5;
+
+  assert.equal(panel.runSelectedEvent(), true);
+  assert.deepEqual(setupCalls, [[list, 5]]);
+  assert.equal(alerts.at(-1).level, "success");
+
+  panel.eventTools.selectedEventId = 99;
+  assert.equal(panel.runSelectedEvent(), false);
+  assert.equal(alerts.at(-1).level, "warn");
+
+  globalThis.$gameMap = {
+    event: () => ({ page: () => ({ list }) }),
+    _interpreter: { setup() {}, isRunning: () => true },
+  };
+  panel.eventTools.selectedEventId = 5;
+  assert.equal(panel.runSelectedEvent(), false);
+  assert.match(alerts.at(-1).msg, /执行|busy|running/i);
+
+  globalThis.$gameMap._interpreter = {};
+  assert.equal(panel.runSelectedEvent(), false);
+  assert.equal(alerts.at(-1).level, "error");
+});
+
+test("MapEventPanel.runCommonEvent：校验并排队公共事件", () => {
+  const alerts = captureAlerts();
+  const queued = [];
+
+  installReadyGame();
+  globalThis.$dataCommonEvents = [null, { name: "Teleport" }, { name: "" }];
+  globalThis.$gameTemp = {
+    reserveCommonEvent(id) {
+      queued.push(id);
+    },
+  };
+
+  const panel = makePanel();
+  panel.eventTools.commonEventId = 1;
+
+  assert.equal(panel.runCommonEvent(), true);
+  assert.deepEqual(queued, [1]);
+  assert.equal(alerts.at(-1).level, "success");
+
+  panel.eventTools.commonEventId = 2;
+  assert.equal(panel.runCommonEvent(), false);
+  assert.equal(alerts.at(-1).level, "warn");
+  assert.deepEqual(queued, [1]);
+
+  panel.eventTools.commonEventId = 1;
+  globalThis.$gameTemp = null;
+  assert.equal(panel.runCommonEvent(), false);
+  assert.equal(alerts.at(-1).level, "error");
+});
+
+test("MapEventPanel.confirmTriggerSelectedEvent / reloadEventTools", () => {
+  const originalShow = ConfirmDialog.show;
+  const calls = [];
+
+  try {
+    ConfirmDialog.show = (options) => {
+      calls.push(options);
+    };
+
+    const panel = makePanel();
+    panel.eventTools.selectedEventId = 0;
+    panel.confirmTriggerSelectedEvent();
+    assert.equal(calls.length, 0, "未选择事件时不弹确认框");
+
+    panel.eventTools.selectedEventId = 3;
+    panel.runSelectedEvent = () => calls.push("run");
+
+    panel.confirmTriggerSelectedEvent();
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].message, /#3/);
+
+    calls[0].actions.at(-1).action();
+    assert.equal(calls.at(-1), "run");
+  } finally {
+    ConfirmDialog.show = originalShow;
+  }
+
+  const events = [];
+  const panel = makePanel({
+    updateMapEvents() {
+      events.push("update");
+    },
+    initializeEventTools() {
+      events.push("init");
+    },
+  });
+
+  panel.reloadEventTools();
+  assert.deepEqual(events, ["update", "init"]);
 });
