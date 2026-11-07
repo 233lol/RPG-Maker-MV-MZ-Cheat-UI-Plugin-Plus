@@ -1112,3 +1112,217 @@ test("GlobalVariablePanel.buildEntries / goUp / buildSearchRoot", () => {
   panel.container = { nested: true };
   assert.equal(panel.buildSearchRoot(), panel.container);
 });
+
+test("GlobalVariablePanel：收藏切换、收藏视图与分页", () => {
+  globalThis.window = { root: { a: 1, text: "hello" } };
+
+  const panel = makePanel({
+    path: ["root"],
+    container: globalThis.window.root,
+    deepSearch: false,
+    search: "",
+    entries: [{ key: "text", name: "text", preview: "hello" }],
+    pagination: { page: 1, itemsPerPage: 5 },
+  });
+
+  assert.equal(panel.isEntryFavorite({ key: "a" }), false);
+
+  panel.toggleEntryFavorite({ key: "a" });
+  assert.deepEqual(panel.favoritePaths, [["root", "a"]]);
+  assert.equal(panel.isEntryFavorite({ key: "a" }), true);
+
+  panel.toggleEntryFavorite({ key: "a" });
+  assert.deepEqual(panel.favoritePaths, []);
+  panel.toggleEntryFavorite({ key: "a" });
+  panel.toggleEntryFavorite({ key: "text" });
+  assert.deepEqual(panel.favoritePaths, [
+    ["root", "a"],
+    ["root", "text"],
+  ]);
+
+  panel.showFavoritesOnly = true;
+  panel.favoritesActive =
+    GlobalVariablePanel.computed.favoritesActive.call(panel);
+  assert.equal(panel.favoritesActive, true);
+
+  panel.favoriteRows = GlobalVariablePanel.computed.favoriteRows.call(panel);
+  assert.deepEqual(
+    panel.favoriteRows.map((row) => row.pathText),
+    ["root.a", "root.text"],
+  );
+
+  panel.filteredFavoriteRows =
+    GlobalVariablePanel.computed.filteredFavoriteRows.call(panel);
+  assert.equal(GlobalVariablePanel.computed.totalCount.call(panel), 2);
+
+  panel.pagination.itemsPerPage = 1;
+  assert.deepEqual(
+    GlobalVariablePanel.computed.pagedEntries
+      .call(panel)
+      .map((row) => row.pathText),
+    ["root.a"],
+  );
+
+  panel.search = "text";
+  panel.filteredFavoriteRows =
+    GlobalVariablePanel.computed.filteredFavoriteRows.call(panel);
+  assert.deepEqual(
+    GlobalVariablePanel.computed.pagedEntries
+      .call(panel)
+      .map((row) => row.pathText),
+    ["root.text"],
+  );
+
+  // 深度搜索生效时收藏视图让位给搜索结果
+  panel.deepSearch = true;
+  panel.searchActive = GlobalVariablePanel.computed.searchActive.call(panel);
+  assert.equal(panel.searchActive, true);
+  assert.equal(GlobalVariablePanel.computed.favoritesActive.call(panel), false);
+
+  panel.showFavoritesOnly = false;
+  panel.toggleFavoritesOnly();
+  assert.equal(panel.showFavoritesOnly, true);
+});
+
+test("GlobalVariablePanel：收藏行跳转 / 删除收藏", () => {
+  const navigations = [];
+  const panel = makePanel({
+    path: ["other"],
+    navigateTo(path, options) {
+      navigations.push([path, options]);
+    },
+  });
+
+  panel.jumpToFavorite({ fullPath: ["root", "nested", "value"] });
+  assert.deepEqual(navigations.at(-1), [
+    ["root", "nested"],
+    { highlightKey: "value" },
+  ]);
+
+  panel.jumpToFavorite({ fullPath: [] });
+  assert.equal(navigations.length, 1);
+
+  panel.favoritePaths = [["root", "a"]];
+  panel.toggleEntryFavorite({ key: "a", fullPath: ["root", "a"] });
+  assert.deepEqual(panel.favoritePaths, []);
+
+  panel.onEntryNameClick({ key: "a", fullPath: ["root", "a"] });
+  assert.deepEqual(navigations.at(-1), [["root"], { highlightKey: "a" }]);
+});
+
+test("GlobalVariablePanel：修改 / 删除都可撤销", () => {
+  const alerts = captureAlerts();
+  const navigations = [];
+  const root = {
+    a: 1,
+    arr: [1, 2, 3],
+  };
+
+  globalThis.window = { root };
+
+  const panel = makePanel({
+    path: ["root"],
+    container: root,
+    rebuildEntries() {},
+    refresh() {},
+    navigateTo(path, options) {
+      navigations.push([path, options]);
+    },
+  });
+
+  panel.applyValue({ key: "a" }, 2);
+  assert.equal(root.a, 2);
+  assert.equal(panel.undoStack.length, 1);
+
+  panel.undoLastChange();
+  assert.equal(root.a, 1);
+  assert.equal(panel.undoStack.length, 0);
+  assert.deepEqual(navigations.at(-1), [["root"], { highlightKey: "a" }]);
+  assert.equal(alerts.at(-1).level, "success");
+
+  panel.path = ["root", "arr"];
+  panel.container = root.arr;
+  panel.deleteEntry({ key: "1", name: "1" });
+  assert.deepEqual(root.arr, [1, 3]);
+  assert.equal(panel.undoStack.length, 1);
+
+  panel.undoLastChange();
+  assert.deepEqual(root.arr, [1, 2, 3]);
+  assert.equal(panel.undoStack.length, 0);
+});
+
+test("GlobalVariablePanel：JSON 新增 / 编辑也可撤销", () => {
+  const alerts = captureAlerts();
+  const root = {
+    obj: { a: 1 },
+  };
+
+  globalThis.window = { root };
+
+  const panel = makePanel({
+    path: ["root"],
+    container: root,
+    rebuildEntries() {},
+    refresh() {},
+    navigateTo() {},
+  });
+
+  panel.jsonDialog = {
+    show: true,
+    mode: "add",
+    targetKey: null,
+    text: "2",
+    error: "",
+    keyText: " added ",
+    requireKey: true,
+  };
+  panel.submitJsonDialog();
+  assert.equal(root.added, 2);
+  assert.equal(panel.undoStack.length, 1);
+
+  panel.undoLastChange();
+  assert.equal(Object.hasOwn(root, "added"), false);
+
+  panel.jsonDialog = {
+    show: true,
+    mode: "edit",
+    targetKey: "obj",
+    text: '{"a":9}',
+    error: "",
+    keyText: "",
+    requireKey: false,
+  };
+  panel.submitJsonDialog();
+  assert.deepEqual(root.obj, { a: 9 });
+
+  panel.undoLastChange();
+  assert.deepEqual(root.obj, { a: 1 });
+  assert.equal(alerts.at(-1).level, "success");
+});
+
+test("GlobalVariablePanel：撤销空栈 / 路径失效时给出提示", () => {
+  const alerts = captureAlerts();
+  const panel = makePanel({
+    undoStack: [],
+    navigateTo() {},
+    rebuildEntries() {},
+  });
+
+  panel.undoLastChange();
+  assert.equal(alerts.at(-1).level, "warn");
+
+  globalThis.window = {};
+  panel.undoStack = [
+    {
+      action: "set",
+      path: ["missing"],
+      key: "value",
+      hadOwn: true,
+      oldValue: 1,
+    },
+  ];
+
+  panel.undoLastChange();
+  assert.equal(alerts.at(-1).level, "error");
+  assert.equal(panel.undoStack.length, 1, "失败的撤销不应弹出历史");
+});

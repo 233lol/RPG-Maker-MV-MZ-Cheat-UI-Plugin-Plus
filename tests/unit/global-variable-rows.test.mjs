@@ -4,10 +4,16 @@ import assert from "node:assert/strict";
 import {
   buildBreadcrumbItems,
   buildEntries,
+  buildFavoriteRows,
   entriesShallowEqual,
   entryMatches,
+  favoritePathKey,
   filterEntries,
+  filterFavoriteRows,
   findPageOfKey,
+  isFavoritePath,
+  normalizeFavoritePaths,
+  toggleFavoritePath,
 } from "../../cheat-engine/www/cheat/js/GlobalVariableRows.js";
 
 test("buildBreadcrumbItems：根节点 + 每层路径切片", () => {
@@ -146,4 +152,104 @@ test("entriesShallowEqual：长度 / 显示字段 / 引用比较", () => {
 
   const plugin = { ...second, isPlugin: true };
   assert.equal(entriesShallowEqual([first], [plugin]), false);
+});
+
+test("normalizeFavoritePaths：过滤非法项并去重", () => {
+  assert.deepEqual(normalizeFavoritePaths(null), []);
+  assert.deepEqual(normalizeFavoritePaths("bad"), []);
+  assert.deepEqual(
+    normalizeFavoritePaths([
+      ["$gameParty", "_gold"],
+      ["$gameParty", "_gold"],
+      [],
+      [1, 2],
+      [true],
+      "nope",
+      ["$gameVariables", 3],
+    ]),
+    [
+      ["$gameParty", "_gold"],
+      ["1", "2"],
+      ["$gameVariables", "3"],
+    ],
+  );
+});
+
+test("isFavoritePath / toggleFavoritePath：添加、取消与空路径", () => {
+  let favorites = [];
+
+  assert.equal(isFavoritePath(favorites, []), false);
+  assert.equal(isFavoritePath(favorites, ["a"]), false);
+
+  favorites = toggleFavoritePath(favorites, ["a"]);
+  assert.deepEqual(favorites, [["a"]]);
+  assert.equal(isFavoritePath(favorites, ["a"]), true);
+  assert.equal(isFavoritePath(favorites, ["b"]), false);
+
+  favorites = toggleFavoritePath(favorites, ["a"]);
+  assert.deepEqual(favorites, []);
+
+  favorites = toggleFavoritePath(favorites, ["a"]);
+  favorites = toggleFavoritePath(favorites, ["b"]);
+  favorites = toggleFavoritePath(favorites, ["a"]);
+  assert.deepEqual(favorites, [["b"]]);
+
+  assert.deepEqual(toggleFavoritePath(favorites, []), [["b"]]);
+  assert.equal(favoritePathKey(["a", "b"]), "a\u0000b");
+  assert.equal(favoritePathKey(null), "");
+});
+
+test("buildFavoriteRows：解析路径、标记路径文本并跳过失效项", () => {
+  const root = {
+    $gameParty: { _gold: 120, _actors: [1, 2] },
+    $gameVariables: { value: () => 1 },
+  };
+
+  const rows = buildFavoriteRows(
+    [
+      ["$gameParty", "_gold"],
+      ["$gameParty", "_actors", "1"],
+      ["$gameParty", "missing", "x"],
+      ["$gameVariables", "value"],
+    ],
+    root,
+  );
+
+  assert.deepEqual(
+    rows.map((row) => ({
+      key: row.key,
+      pathText: row.pathText,
+      preview: row.preview,
+      isFavorite: row.isFavorite,
+    })),
+    [
+      {
+        key: "_gold",
+        pathText: "$gameParty._gold",
+        preview: "120",
+        isFavorite: true,
+      },
+      {
+        key: "1",
+        pathText: "$gameParty._actors[1]",
+        preview: "2",
+        isFavorite: true,
+      },
+    ],
+  );
+
+  // 函数是隐藏类型，不应出现在收藏行里
+  assert.equal(rows.length, 2);
+});
+
+test("filterFavoriteRows：按名称 / 路径过滤", () => {
+  const rows = [
+    { name: "_gold", pathText: "$gameParty._gold", preview: "120" },
+    { name: "speed", pathText: "MyPlugin.speed", preview: "3" },
+  ];
+
+  assert.equal(filterFavoriteRows(rows, ""), rows);
+  assert.deepEqual(filterFavoriteRows(rows, "party"), [rows[0]]);
+  assert.deepEqual(filterFavoriteRows(rows, "speed"), [rows[1]]);
+  assert.deepEqual(filterFavoriteRows(rows, "missing"), []);
 });

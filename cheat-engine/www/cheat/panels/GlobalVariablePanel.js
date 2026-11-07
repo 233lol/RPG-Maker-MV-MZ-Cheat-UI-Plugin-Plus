@@ -29,10 +29,22 @@ import {
 import {
   buildBreadcrumbItems,
   buildEntries as buildEntryRows,
+  buildFavoriteRows,
   entriesShallowEqual,
   filterEntries,
+  filterFavoriteRows,
   findPageOfKey as findEntryPage,
+  isFavoritePath,
+  normalizeFavoritePaths,
+  toggleFavoritePath,
 } from "../js/GlobalVariableRows.js";
+import {
+  buildAddHistoryEntry,
+  buildDeleteHistoryEntry,
+  buildSetHistoryEntry,
+  pushHistoryEntry,
+  revertHistoryEntry,
+} from "../js/GlobalVariableHistory.js";
 
 // 搜索上限的模块级缓存：设置文件只在第一次真正需要时同步读一次，
 // 之后重复打开面板都复用内存里的值，不再走 fs.readFileSync。
@@ -99,6 +111,39 @@ export default {
             btn-class="ml-2"
             @click="reloadAll">
         </refresh-button>
+        <v-tooltip location="bottom">
+            <template #activator="{ props }">
+                <v-badge
+                    :content="favoritePaths.length"
+                    :model-value="favoritePaths.length > 0"
+                    color="amber">
+                    <v-btn
+                        v-bind="props"
+                        :color="showFavoritesOnly ? 'amber' : 'grey-lighten-1'"
+                        size="small"
+                        icon
+                        class="ml-2"
+                        @click="toggleFavoritesOnly">
+                        <v-icon>{{ showFavoritesOnly ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+                    </v-btn>
+                </v-badge>
+            </template>
+            <span>{{ showFavoritesOnly ? t("globalVariable.favoritesShowAll") : t("globalVariable.favoritesOnly") }}</span>
+        </v-tooltip>
+        <v-tooltip location="bottom">
+            <template #activator="{ props }">
+                <v-btn
+                    v-bind="props"
+                    size="small"
+                    icon
+                    class="ml-2"
+                    :disabled="undoStack.length === 0"
+                    @click="undoLastChange">
+                    <v-icon>mdi-undo</v-icon>
+                </v-btn>
+            </template>
+            <span>{{ undoStack.length > 0 ? t("globalVariable.undoCount", { count: undoStack.length }) : t("globalVariable.undoEmpty") }}</span>
+        </v-tooltip>
         <v-tooltip location="bottom">
             <template #activator="{ props }">
                 <v-btn
@@ -181,10 +226,10 @@ export default {
     <div
         class="d-flex px-1 py-1 text-body-small text-grey-lighten-1 font-weight-bold"
         v-if="!searchActive">
-        <div style="width: 40%;">{{ t("globalVariable.nameHeader") }}</div>
+        <div style="width: 40%;">{{ favoritesActive ? t("globalVariable.pathHeader") : t("globalVariable.nameHeader") }}</div>
         <div style="width: 14%;">{{ t("globalVariable.typeHeader") }}</div>
         <div class="flex-grow-1">{{ t("globalVariable.valueHeader") }}</div>
-        <div style="width: 96px; text-align: right;">{{ t("globalVariable.actionsHeader") }}</div>
+        <div style="width: 122px; text-align: right;">{{ t("globalVariable.actionsHeader") }}</div>
     </div>
 
     <div v-if="!searchActive" class="hide-scrollbar" style="max-height: 290px; overflow-y: auto;">
@@ -203,10 +248,10 @@ export default {
                 </v-icon>
                 <span
                     class="text-body-medium text-truncate"
-                    :class="{ 'global-var-name-link': item.isContainer }"
-                    :title="item.name"
-                    @click="enterEntry(item)">
-                    {{ item.name }}
+                    :class="{ 'global-var-name-link': item.isContainer || item.fullPath }"
+                    :title="item.pathText || item.name"
+                    @click="onEntryNameClick(item)">
+                    {{ item.pathText || item.name }}
                 </span>
                 <v-chip
                     v-if="item.isPlugin"
@@ -221,7 +266,7 @@ export default {
                 <span class="text-body-small text-grey-lighten-1">{{ item.typeText }}</span>
             </div>
             <div class="flex-grow-1 d-flex align-center" style="min-width: 0;">
-                <template v-if="item.kind === 'boolean'">
+                <template v-if="item.kind === 'boolean' && !item.fullPath">
                     <v-checkbox
                         :model-value="item.boolValue"
                         density="compact"
@@ -231,7 +276,7 @@ export default {
                     </v-checkbox>
                     <span class="text-body-small text-grey-lighten-1">{{ item.preview }}</span>
                 </template>
-                <template v-else-if="item.isEditable">
+                <template v-else-if="item.isEditable && !item.fullPath">
                     <v-text-field
                         :model-value="item.valueText"
                         density="compact"
@@ -249,9 +294,18 @@ export default {
                     <span class="text-body-small text-grey-lighten-1 text-truncate">{{ item.preview }}</span>
                 </template>
             </div>
-            <div class="d-flex align-center justify-end" style="width: 96px;">
+            <div class="d-flex align-center justify-end" style="width: 122px;">
                 <v-btn
-                    v-if="item.isContainer"
+                    v-if="item.fullPath"
+                    :title="t('globalVariable.jumpToEntry')"
+                    icon
+                    size="x-small"
+                    color="amber"
+                    @click.stop="jumpToFavorite(item)">
+                    <v-icon size="small">mdi-target</v-icon>
+                </v-btn>
+                <v-btn
+                    v-if="item.isContainer && !item.fullPath"
                     :title="t('globalVariable.enter', { name: item.name })"
                     icon
                     size="x-small"
@@ -260,7 +314,7 @@ export default {
                     <v-icon size="small">mdi-arrow-right-bold</v-icon>
                 </v-btn>
                 <v-btn
-                    v-if="item.isContainer"
+                    v-if="item.isContainer && !item.fullPath"
                     :title="t('globalVariable.editJson')"
                     icon
                     size="x-small"
@@ -269,7 +323,7 @@ export default {
                     <v-icon size="small">mdi-code-json</v-icon>
                 </v-btn>
                 <v-btn
-                    v-if="item.isContainer"
+                    v-if="item.isContainer && !item.fullPath"
                     :title="t('globalVariable.addChild', { name: item.name })"
                     icon
                     size="x-small"
@@ -278,7 +332,7 @@ export default {
                     <v-icon size="small">mdi-plus</v-icon>
                 </v-btn>
                 <v-btn
-                    v-if="!item.isRoot"
+                    v-if="!item.isRoot && !item.fullPath"
                     :title="t('globalVariable.delete')"
                     icon
                     size="x-small"
@@ -286,11 +340,25 @@ export default {
                     @click.stop="confirmDeleteEntry(item)">
                     <v-icon size="small">mdi-delete</v-icon>
                 </v-btn>
+                <v-btn
+                    :title="isEntryFavorite(item) ? t('globalVariable.favoriteRemove') : t('globalVariable.favoriteAdd')"
+                    icon
+                    size="x-small"
+                    :color="isEntryFavorite(item) ? 'amber' : 'grey-lighten-1'"
+                    @click.stop="toggleEntryFavorite(item)">
+                    <v-icon size="small">{{ isEntryFavorite(item) ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+                </v-btn>
             </div>
         </div>
 
         <div v-if="pagedEntries.length === 0" class="pa-3 text-body-small text-grey-lighten-1">
-            <div v-if="entriesLoading">{{ t("globalVariable.loadingEntries") }}</div>
+            <div v-if="favoritesActive">
+                <template v-if="search">
+                    {{ t("globalVariable.noMatchHere", { search: search }) }}
+                </template>
+                <template v-else>{{ t("globalVariable.noFavorites") }}</template>
+            </div>
+            <div v-else-if="entriesLoading">{{ t("globalVariable.loadingEntries") }}</div>
             <div v-else-if="containerError">{{ containerError }}</div>
             <div v-else-if="search">
                 {{ t("globalVariable.noMatchHere", { search: search }) }}
@@ -515,6 +583,15 @@ export default {
       entries: [],
       highlightKey: null,
 
+      // 收藏（完整路径）与「只看收藏」视图
+      favoritePaths: [],
+      showFavoritesOnly: false,
+      // 收藏视图里的值直接读 window，不在 entries 里；自动刷新时靠它触发重算
+      favoritesTick: 0,
+
+      // 编辑历史（仅内存，不落盘）
+      undoStack: [],
+
       // 初始加载（设置文件读取 / window 扫描 / 构建列表）推迟到首帧之后，
       // 点击「全局变量」时只做状态初始化与骨架渲染
       entriesLoading: true,
@@ -542,7 +619,13 @@ export default {
         100,
         { title: t("common.all"), value: -1 },
       ],
-      panelStateExtraKeys: ["rootFilter", "autoRefresh", "refreshIntervalMs"],
+      panelStateExtraKeys: [
+        "rootFilter",
+        "autoRefresh",
+        "refreshIntervalMs",
+        "favoritePaths",
+        "showFavoritesOnly",
+      ],
 
       // JSON 编辑对话框
       jsonDialog: {
@@ -568,6 +651,9 @@ export default {
   },
 
   mounted() {
+    // panel-state.json 可能被旧版本 / 手工改成任意结构，先收敛收藏路径。
+    this.favoritePaths = normalizeFavoritePaths(this.favoritePaths);
+
     // 兜底：即使没有被 keep-alive 缓存（activated 不触发）也能完成初始加载
     this.scheduleInitialLoad();
   },
@@ -617,6 +703,12 @@ export default {
       }
     },
 
+    showFavoritesOnly() {
+      if (!this.__restoringPanelState) {
+        this.pagination.page = 1;
+      }
+    },
+
     autoRefresh() {
       this.restartAutoRefresh();
     },
@@ -658,6 +750,28 @@ export default {
       return filterEntries(this.entries, this.search);
     },
 
+    // 收藏视图与深度搜索结果互斥：搜索生效时优先显示搜索结果。
+    favoritesActive() {
+      const self = /** @type {any} */ (this);
+      return self.showFavoritesOnly && !self.searchActive;
+    },
+
+    favoriteRows() {
+      // 显式依赖 favoritesTick，让自动刷新后的当前值进入重算。
+      void this.favoritesTick;
+      return buildFavoriteRows(
+        this.favoritePaths,
+        typeof window !== "undefined" ? window : {},
+      );
+    },
+
+    filteredFavoriteRows() {
+      const rows = /** @type {Array<Record<string, any>>} */ (
+        /** @type {any} */ (this).favoriteRows
+      );
+      return filterFavoriteRows(rows, this.search);
+    },
+
     // 0 表示「全部」
     effectiveItemsPerPage() {
       const perPage = Number(this.pagination.itemsPerPage);
@@ -665,12 +779,20 @@ export default {
     },
 
     totalCount() {
-      return this.filteredEntries.length;
+      const self = /** @type {any} */ (this);
+      return self.favoritesActive
+        ? self.filteredFavoriteRows.length
+        : self.filteredEntries.length;
     },
 
     pagedEntries() {
+      const self = /** @type {any} */ (this);
+      const source = self.favoritesActive
+        ? self.filteredFavoriteRows
+        : self.filteredEntries;
+
       return paginate(
-        this.filteredEntries,
+        source,
         this.pagination.page,
         this.pagination.itemsPerPage,
       );
@@ -812,6 +934,9 @@ export default {
     },
 
     rebuildEntries() {
+      // 收藏视图不经过 entries，也要在每次刷新时重新读取当前值。
+      this.favoritesTick += 1;
+
       if (!this.resolveContainer()) {
         if (this.entries.length > 0) {
           this.entries = [];
@@ -894,6 +1019,92 @@ export default {
       this.navigateTo([...this.path, entry.key]);
     },
 
+    // ---------- 收藏 ----------
+
+    toggleFavoritesOnly() {
+      this.showFavoritesOnly = !this.showFavoritesOnly;
+    },
+
+    isEntryFavorite(item) {
+      if (!item || item.key === undefined) {
+        return false;
+      }
+
+      const path = item.fullPath || [...this.path, item.key];
+      return isFavoritePath(this.favoritePaths, path);
+    },
+
+    toggleEntryFavorite(item) {
+      if (!item || item.key === undefined) {
+        return;
+      }
+
+      const path = item.fullPath || [...this.path, item.key];
+      this.favoritePaths = toggleFavoritePath(this.favoritePaths, path);
+    },
+
+    jumpToFavorite(item) {
+      if (
+        !item ||
+        !Array.isArray(item.fullPath) ||
+        item.fullPath.length === 0
+      ) {
+        return;
+      }
+
+      this.navigateTo(item.fullPath.slice(0, -1), {
+        highlightKey: item.fullPath[item.fullPath.length - 1],
+      });
+    },
+
+    onEntryNameClick(item) {
+      if (item && item.fullPath) {
+        this.jumpToFavorite(item);
+        return;
+      }
+
+      this.enterEntry(item);
+    },
+
+    // ---------- 编辑历史 / 撤销 ----------
+
+    historyRoot() {
+      return typeof window !== "undefined" ? window : {};
+    },
+
+    recordUndo(entry) {
+      if (!entry) {
+        return;
+      }
+
+      this.undoStack = pushHistoryEntry(this.undoStack, entry);
+    },
+
+    undoLastChange() {
+      if (!Array.isArray(this.undoStack) || this.undoStack.length === 0) {
+        Alert.warn(t("globalVariable.undoEmpty"));
+        return;
+      }
+
+      const entry = this.undoStack[this.undoStack.length - 1];
+      const result = revertHistoryEntry(this.historyRoot(), entry);
+
+      if (!result.ok) {
+        Alert.error(
+          t("globalVariable.undoFailed", { message: result.message }),
+        );
+        return;
+      }
+
+      this.undoStack = this.undoStack.slice(0, -1);
+
+      const path = Array.isArray(entry.path) ? entry.path : [];
+      const label = formatPathText([...path, entry.key]);
+
+      this.navigateTo(path, { highlightKey: entry.key });
+      Alert.success(t("globalVariable.undone", { path: label }));
+    },
+
     // 重新读取当前层的值（force=true 时忽略输入框焦点保护）
     refresh(force = false) {
       if (!force && this.isEditingInput()) {
@@ -962,6 +1173,21 @@ export default {
         return;
       }
 
+      const previous = getChildValue(this.container, entry.key);
+
+      if (!previous.ok) {
+        Alert.error(
+          t("globalVariable.readFailed", { message: previous.message }),
+        );
+        this.refresh(true);
+        return;
+      }
+
+      const hadOwn = Object.prototype.hasOwnProperty.call(
+        this.container,
+        entry.key,
+      );
+      const oldValue = previous.value;
       const result = setChildValue(this.container, entry.key, value);
 
       if (!result.ok) {
@@ -970,6 +1196,12 @@ export default {
         );
         this.refresh(true);
         return;
+      }
+
+      if (!hadOwn || !Object.is(oldValue, value)) {
+        this.recordUndo(
+          buildSetHistoryEntry(this.path, entry.key, oldValue, hadOwn),
+        );
       }
 
       this.refresh(true);
@@ -1118,6 +1350,20 @@ export default {
         }
       }
 
+      const previous = getChildValue(targetContainer, key);
+
+      if (!previous.ok) {
+        dialog.error = t("globalVariable.readFailed", {
+          message: previous.message,
+        });
+        return;
+      }
+
+      const hadOwn = Object.prototype.hasOwnProperty.call(targetContainer, key);
+      const targetPath =
+        dialog.mode === "add" && dialog.targetKey !== null
+          ? [...this.path, dialog.targetKey]
+          : this.path.slice();
       const result = setChildValue(targetContainer, key, parsed);
 
       if (!result.ok) {
@@ -1125,6 +1371,14 @@ export default {
           message: result.message,
         });
         return;
+      }
+
+      if (dialog.mode === "add" && !hadOwn) {
+        this.recordUndo(buildAddHistoryEntry(targetPath, key));
+      } else {
+        this.recordUndo(
+          buildSetHistoryEntry(targetPath, key, previous.value, hadOwn),
+        );
       }
 
       dialog.show = false;
@@ -1170,6 +1424,16 @@ export default {
         return;
       }
 
+      const previous = getChildValue(this.container, entry.key);
+
+      if (!previous.ok) {
+        Alert.error(
+          t("globalVariable.readFailed", { message: previous.message }),
+        );
+        return;
+      }
+
+      const isArray = Array.isArray(this.container);
       const result = deleteChildValue(this.container, entry.key);
 
       if (!result.ok) {
@@ -1179,6 +1443,9 @@ export default {
         return;
       }
 
+      this.recordUndo(
+        buildDeleteHistoryEntry(this.path, entry.key, previous.value, isArray),
+      );
       this.rebuildEntries();
       Alert.success(t("globalVariable.deleted", { name: entry.name }));
     },
