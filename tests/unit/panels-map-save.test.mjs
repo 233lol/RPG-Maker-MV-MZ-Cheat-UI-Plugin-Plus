@@ -783,6 +783,190 @@ test.afterEach(() => {
   Object.assign(SaveBackupCheat, originalBackupMethods);
 });
 
+test("SaveBackupPanel.data / created / panelStateId", () => {
+  const data = SaveBackupPanel.data.call({});
+
+  assert.equal(data.available, false);
+  assert.deepEqual(data.settings, {
+    autoOnSave: false,
+    autoSaveInterval: 1,
+    autoKeep: 5,
+  });
+  assert.equal(data.intervalText, "1");
+  assert.equal(data.keepText, "5");
+  assert.equal(data.loadedSlot, -1);
+  assert.deepEqual(data.selectedBackupIds, []);
+  assert.deepEqual(data.panelStateExtraKeys, ["slotFilter"]);
+  assert.deepEqual(
+    data.tableHeaders.map((header) => header.key),
+    ["slot", "progress", "createdText", "actions"],
+  );
+  assert.equal(SaveBackupPanel.computed.panelStateId.call({}), "save-backup");
+
+  let reloads = 0;
+  SaveBackupPanel.created.call({
+    reload() {
+      reloads++;
+    },
+  });
+  assert.equal(reloads, 1);
+});
+
+test("SaveBackupPanel.reload 回填失败只告警，不影响刷新", () => {
+  SaveBackupCheat.isLocalMode = () => true;
+  SaveBackupCheat.getSettings = () => ({
+    autoOnSave: false,
+    autoSaveInterval: 1,
+    autoKeep: 5,
+  });
+  SaveBackupCheat.getLoadedSlot = () => -1;
+  SaveBackupCheat.getPlaytimeText = () => "";
+  SaveBackupCheat.readSavefileInfo = () => null;
+  SaveBackupCheat.backfillFromSavefileInfo = () => {
+    throw new Error("backfill failed");
+  };
+  SaveBackupCheat.listBackups = () => [];
+  SaveBackupCheat.getStats = () => ({ count: 0, missingCount: 0, bytes: 0 });
+
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    const panel = makeSavePanel();
+    panel.reload();
+    assert.equal(panel.available, true);
+    assert.equal(warnings.length, 1);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test("SaveBackupPanel.getCurrentMapName 地图接口异常时返回空串", () => {
+  globalThis.$gameMap = {
+    mapId() {
+      throw new Error("map not ready");
+    },
+  };
+
+  const panel = makeSavePanel();
+  assert.equal(panel.getCurrentMapName(), "");
+});
+
+test("SaveBackupPanel.getLivePlaytimeText 优先使用快照时长", () => {
+  const panel = makeSavePanel({
+    getSavefileInfo() {
+      return { playtimeText: "live" };
+    },
+  });
+
+  assert.equal(
+    panel.getLivePlaytimeText({ playtimeText: "snapshot" }),
+    "snapshot",
+  );
+  assert.equal(panel.getLivePlaytimeText({ slot: 1 }), "live");
+  assert.equal(panel.getLivePlaytimeText({ slot: 0 }), "live");
+});
+
+test("SaveBackupPanel.restoreBackupSameSlot 使用数值槽位确认", () => {
+  const calls = [];
+  const panel = makeSavePanel({
+    confirmRestore(item, target) {
+      calls.push([item.id, target]);
+    },
+  });
+
+  panel.restoreBackupSameSlot({ id: "a", slot: "2" });
+  assert.deepEqual(calls, [["a", 2]]);
+});
+
+test("SaveBackupPanel.getSuggestedTargetSlot 只有单个槽位时回退自身", () => {
+  const panel = makeSavePanel();
+  SaveBackupCheat.maxSavefiles = () => 1;
+  SaveBackupCheat.hasSave = () => true;
+
+  assert.equal(panel.getSuggestedTargetSlot(1), 1);
+});
+
+test("SaveBackupPanel.confirmRestore 覆盖同槽空 / 异槽有存档 / 异槽空", () => {
+  const dialogs = [];
+  ConfirmDialog.show = (options) => dialogs.push(options);
+  ConfirmDialog.close = () => {};
+  SaveBackupCheat.hasSave = (slot) => slot === 2;
+
+  const panel = makeSavePanel({
+    loadedSlot: -1,
+    progressPrimary: () => "地图",
+    progressSecondary: () => "进度",
+    doRestore() {},
+  });
+
+  const item = { id: "a", slot: 1, createdText: "", relativeText: "" };
+
+  panel.confirmRestore(item, 1);
+  panel.confirmRestore(item, 2);
+  panel.confirmRestore(item, 3);
+
+  assert.equal(dialogs.length, 3);
+  assert.equal(new Set(dialogs.map((dialog) => dialog.message)).size, 3);
+});
+
+test("SaveBackupPanel 删除 / 清空 / 导出选中失败时提示错误", () => {
+  const alerts = captureAlerts();
+  const dialogs = [];
+  ConfirmDialog.show = (options) => dialogs.push(options);
+  ConfirmDialog.close = () => {};
+
+  SaveBackupCheat.deleteBackup = () => {
+    throw new Error("delete failed");
+  };
+  SaveBackupCheat.clearBackups = () => {
+    throw new Error("clear failed");
+  };
+  SaveBackupCheat.exportSelected = () => {
+    throw new Error("export failed");
+  };
+
+  const panel = makeSavePanel({
+    selectedBackupIds: ["a"],
+    backups: [{ id: "a" }],
+    reload() {},
+  });
+
+  panel.deleteBackup({ id: "a", slot: 1, createdText: "x" });
+  dialogs[0].actions[1].action();
+  assert.equal(alerts.at(-1).level, "error");
+
+  panel.clearAllBackups();
+  dialogs[1].actions[1].action();
+  assert.equal(alerts.at(-1).level, "error");
+
+  panel.exportSelectedBackups();
+  assert.equal(alerts.at(-1).level, "error");
+});
+
+test("SaveBackupPanel.onImportFileChange 读取失败时提示", () => {
+  const alerts = captureAlerts();
+
+  class FailingFileReader {
+    readAsText() {
+      this.onerror(new Error("read failed"));
+    }
+  }
+
+  globalThis.FileReader = FailingFileReader;
+
+  const panel = makeSavePanel({
+    reload() {},
+  });
+
+  panel.onImportFileChange({
+    target: { files: [{ size: 5 }] },
+  });
+
+  assert.equal(alerts.at(-1).level, "error");
+});
+
 test("SaveBackupPanel.reload：读取设置 / 当前槽位 / 快照并剔除失效选择", () => {
   SaveBackupCheat.isLocalMode = () => true;
   SaveBackupCheat.getSettings = () => ({
@@ -1314,4 +1498,256 @@ test("SaveBackupPanel.importBackups / onImportFileChange：文件选择、大小
     target: { files: [{ size: 5, content: "{}" }] },
   });
   assert.equal(alerts.at(-1).level, "error");
+});
+
+/* --------------------------------------------------- SaveRecallPanel (补充) */
+
+test("TeleportPanel.data / created / beforeUnmount ��ʱ��", () => {
+  const data = TeleportPanel.data.call({});
+
+  assert.equal(data.inputX, "0");
+  assert.equal(data.inputY, "0");
+  assert.deepEqual(data.panelStateExtraKeys, ["excludeFullPath"]);
+  assert.equal(TeleportPanel.computed.panelStateId.call({}), "teleport");
+
+  const headers = data.tableHeaders;
+  const fullPanel = {
+    tableHeaders: headers,
+    excludeFullPath: false,
+  };
+
+  assert.equal(
+    TeleportPanel.computed.filteredTableHeaders.call(fullPanel),
+    headers,
+  );
+
+  fullPanel.excludeFullPath = true;
+  assert.deepEqual(
+    TeleportPanel.computed.filteredTableHeaders
+      .call(fullPanel)
+      .map((header) => header.key),
+    ["id", "name", "actions"],
+  );
+
+  let initialized = 0;
+  let positionUpdates = 0;
+  const panel = {
+    ...TeleportPanel.methods,
+    initializeVariables() {
+      initialized++;
+    },
+    updateCurrentPosition() {
+      positionUpdates++;
+    },
+  };
+
+  TeleportPanel.created.call(panel);
+  assert.equal(initialized, 1);
+  assert.equal(positionUpdates, 1);
+  assert.notEqual(panel.updateTimer, null);
+
+  TeleportPanel.beforeUnmount.call(panel);
+  // 没有定时器时重复调用也不应报错
+  assert.doesNotThrow(() => TeleportPanel.beforeUnmount.call(panel));
+});
+
+test("SaveRecallPanel.data / computed չ��Ĭ��ֵ", () => {
+  const data = SaveRecallPanel.data.call({});
+
+  assert.equal(data.locationAliasInput, "");
+  assert.deepEqual(data.locations, []);
+  assert.equal(data.currentMapName, "");
+  assert.deepEqual(
+    data.tableHeaders.map((header) => header.key),
+    ["name", "mapName", "coord", "actions"],
+  );
+  assert.equal(SaveRecallPanel.computed.panelStateId.call({}), "save-recall");
+});
+
+test("SaveRecallPanel.mounted���ȡ��λ���ݲ��۽��������", () => {
+  let initialized = 0;
+  let focused = 0;
+
+  const panel = makePanel(SaveRecallPanel, {
+    initializeVariables() {
+      initialized++;
+    },
+    $refs: {
+      locationAliasField: {
+        focus() {
+          focused++;
+        },
+      },
+    },
+  });
+
+  SaveRecallPanel.mounted.call(panel);
+
+  assert.equal(initialized, 1);
+  assert.equal(focused, 1);
+});
+
+test("SaveRecallPanel.tableItems���ֵ�ͼ�� / ȱʧ / ���������", () => {
+  globalThis.$dataMapInfos = [
+    null,
+    { id: 1, name: "World" },
+    { id: 2, name: "" },
+  ];
+
+  const panel = makePanel(SaveRecallPanel, {
+    locations: [
+      { name: "Inn", mapId: 1, x: 2, y: 3 },
+      { name: null, mapId: 2, x: 4, y: 5 },
+      { name: "Void", mapId: 99, x: 6, y: 7 },
+    ],
+  });
+
+  const rows = SaveRecallPanel.computed.tableItems.call(panel);
+
+  assert.equal(rows.length, 3);
+  assert.deepEqual(rows[0], {
+    locationIndex: 0,
+    name: "Inn",
+    mapName: "World",
+    mapId: 1,
+    coord: { x: 2, y: 3 },
+  });
+  assert.equal(rows[1].name, "");
+  assert.equal(rows[1].mapName, "");
+  assert.equal(rows[2].mapName, "NULL");
+
+  delete globalThis.$dataMapInfos;
+  const rowsWithoutData = SaveRecallPanel.computed.tableItems.call(panel);
+  assert.equal(rowsWithoutData[0].mapName, "NULL");
+});
+
+test("SaveRecallPanel.filteredTableItems�������ֶι���", () => {
+  globalThis.$dataMapInfos = [null, { id: 1, name: "World" }];
+
+  const panel = makePanel(SaveRecallPanel, {
+    search: "wor",
+    locations: [
+      { name: "Inn", mapId: 1, x: 1, y: 1 },
+      { name: "Shop", mapId: 99, x: 2, y: 2 },
+    ],
+  });
+
+  panel.tableItems = SaveRecallPanel.computed.tableItems.call(panel);
+
+  const filtered = SaveRecallPanel.computed.filteredTableItems.call(panel);
+  assert.deepEqual(
+    filtered.map((row) => row.name),
+    ["Inn"],
+  );
+
+  panel.search = "shop";
+  assert.deepEqual(
+    SaveRecallPanel.computed.filteredTableItems
+      .call(panel)
+      .map((row) => row.name),
+    ["Shop"],
+  );
+
+  panel.search = "no-such-location";
+  assert.equal(
+    SaveRecallPanel.computed.filteredTableItems.call(panel).length,
+    0,
+  );
+});
+
+test("SaveRecallPanel.initializeVariables������Ϸ�� / δ������֧", async () => {
+  const stored = new Map();
+  KEY_VALUE_STORAGE.getItem = (key) => stored.get(key) ?? null;
+  KEY_VALUE_STORAGE.setItem = (key, value) => stored.set(key, value);
+
+  const panel = makePanel(SaveRecallPanel, {
+    loadLocations() {
+      this.locations = [{ name: "Inn", mapId: 1, x: 1, y: 1 }];
+    },
+    currentMapName: "stale",
+  });
+
+  await panel.initializeVariables();
+  assert.equal(panel.currentMapName, "");
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = {};
+  globalThis.$gameSystem = {};
+  globalThis.$gameMap = { mapId: () => 2 };
+  globalThis.$dataMapInfos = [
+    null,
+    { id: 1, name: "World", parentId: 0 },
+    { id: 2, name: "Town", parentId: 1 },
+  ];
+
+  await panel.initializeVariables();
+  assert.equal(panel.currentMapName, "World / Town");
+});
+
+test("SaveRecallPanel.saveLocations / loadLocations�߽�", () => {
+  const stored = new Map();
+  KEY_VALUE_STORAGE.getItem = (key) => stored.get(key) ?? null;
+  KEY_VALUE_STORAGE.setItem = (key, value) => stored.set(key, value);
+
+  const panel = makePanel(SaveRecallPanel, {
+    locations: [{ name: "Inn", mapId: 1, x: 2, y: 3 }],
+  });
+
+  panel.saveLocations();
+  assert.equal(
+    stored.get("cheat.locations"),
+    JSON.stringify([{ name: "Inn", mapId: 1, x: 2, y: 3 }]),
+  );
+
+  stored.delete("cheat.locations");
+  panel.locations = [{ name: "stale", mapId: 1, x: 1, y: 1 }];
+  panel.loadLocations();
+  assert.deepEqual(panel.locations, []);
+});
+
+test("SaveRecallPanel.backupCorruptLocations��д��ʧ��ʱ���׳�", () => {
+  KEY_VALUE_STORAGE.setItem = () => {
+    throw new Error("disk full");
+  };
+
+  const panel = makePanel(SaveRecallPanel);
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    assert.doesNotThrow(() => panel.backupCorruptLocations("raw"));
+    assert.doesNotThrow(() => panel.backupCorruptLocations({ a: 1 }));
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 2);
+});
+
+test("SaveRecallPanel.onLocationAliasKeyDown / onAddLocation", () => {
+  const added = [];
+  let blurred = 0;
+
+  const panel = makePanel(SaveRecallPanel, {
+    locationAliasInput: "Inn",
+    addLocation(name) {
+      added.push(name);
+    },
+    $refs: {
+      locationAliasField: {
+        blur() {
+          blurred++;
+        },
+      },
+    },
+  });
+
+  panel.onLocationAliasKeyDown({ code: "Space" });
+  assert.deepEqual(added, []);
+
+  panel.onLocationAliasKeyDown({ code: "Enter" });
+  assert.deepEqual(added, ["Inn"]);
+  assert.equal(panel.locationAliasInput, "");
+  assert.equal(blurred, 1);
 });

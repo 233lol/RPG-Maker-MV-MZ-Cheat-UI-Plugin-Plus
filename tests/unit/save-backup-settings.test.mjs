@@ -374,3 +374,77 @@ test("installSaveHook：MZ Promise 完成后才留档，失败则跳过", async 
     SaveBackupCheat.saveHookOriginal = originalSaveHookOriginal;
   }
 });
+
+test("getSettings / writeSettings non-local mode fallback and reject", () => {
+  const originalIsLocalMode = SaveBackupCheat.isLocalMode;
+  SaveBackupCheat.isLocalMode = () => false;
+
+  try {
+    assert.deepEqual(SaveBackupCheat.getSettings(), {
+      autoOnSave: false,
+      autoSaveInterval: 1,
+      autoKeep: 5,
+    });
+    assert.throws(
+      () => SaveBackupCheat.writeSettings({ autoKeep: 3 }),
+      /nw\.js/i,
+    );
+  } finally {
+    SaveBackupCheat.isLocalMode = originalIsLocalMode;
+  }
+});
+
+test("installSaveHook skips when DataManager has no saveGame", () => {
+  const originalSaveHookInstalled = SaveBackupCheat.saveHookInstalled;
+  const originalSaveHookOriginal = SaveBackupCheat.saveHookOriginal;
+  SaveBackupCheat.saveHookInstalled = false;
+
+  try {
+    assert.equal(SaveBackupCheat.installSaveHook(), false);
+
+    globalThis.DataManager = {};
+    assert.equal(SaveBackupCheat.installSaveHook(), false);
+    assert.equal(SaveBackupCheat.saveHookInstalled, false);
+
+    globalThis.DataManager = { saveGame: null };
+    assert.equal(SaveBackupCheat.installSaveHook(), false);
+  } finally {
+    SaveBackupCheat.saveHookInstalled = originalSaveHookInstalled;
+    SaveBackupCheat.saveHookOriginal = originalSaveHookOriginal;
+  }
+});
+
+test("installSaveHook warns when then getter throws", () => {
+  const originalOnGameSave = SaveBackupCheat.onGameSave;
+  const originalSaveHookInstalled = SaveBackupCheat.saveHookInstalled;
+  const originalSaveHookOriginal = SaveBackupCheat.saveHookOriginal;
+
+  SaveBackupCheat.onGameSave = () => {};
+  SaveBackupCheat.saveHookInstalled = false;
+  delete SaveBackupCheat.saveHookOriginal;
+
+  globalThis.DataManager = {
+    saveGame() {
+      return Object.defineProperty({}, "then", {
+        get() {
+          throw new Error("then getter broken");
+        },
+      });
+    },
+  };
+
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    assert.equal(SaveBackupCheat.installSaveHook(), true);
+    assert.doesNotThrow(() => globalThis.DataManager.saveGame(1));
+    assert.equal(warnings.length, 1);
+  } finally {
+    SaveBackupCheat.onGameSave = originalOnGameSave;
+    SaveBackupCheat.saveHookInstalled = originalSaveHookInstalled;
+    SaveBackupCheat.saveHookOriginal = originalSaveHookOriginal;
+    console.warn = originalWarn;
+  }
+});

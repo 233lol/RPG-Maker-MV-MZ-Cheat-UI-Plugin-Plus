@@ -435,6 +435,41 @@ test("ConfirmDialog：默认设置、嵌套合并与关闭", () => {
   assert.deepEqual(ConfirmDialog.computed.messageArray.call(panel), []);
 });
 
+test("组件 data 工厂返回可用的初始状态", () => {
+  assert.deepEqual(KeyInputField.data.call({}), {});
+
+  assert.deepEqual(PanelErrorBoundary.data.call({}), {
+    errorMessage: "",
+    errorStack: "",
+    errorInfo: "",
+  });
+
+  assert.deepEqual(ConfirmDialog.data(), {
+    showDialog: false,
+    options: undefined,
+  });
+
+  assert.deepEqual(AlertSnackbar.data(), {
+    showSnackbar: false,
+    snackbarKey: 0,
+    text: "",
+    timeout: 1000,
+    color: "black",
+  });
+});
+
+test("ConfirmDialog.close 清空对话框状态", () => {
+  const panel = {
+    showDialog: true,
+    options: { message: "hi" },
+  };
+
+  ConfirmDialog.methods.close.call(panel);
+
+  assert.equal(panel.showDialog, false);
+  assert.equal(panel.options, undefined);
+});
+
 test("ConfirmDialog.copyObjectProps：递归合并对象、数组整体替换", () => {
   const panel = { ...ConfirmDialog.methods };
 

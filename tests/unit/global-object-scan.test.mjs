@@ -8,6 +8,7 @@ import {
   getRootNamesByFilter,
   invalidateBuiltinGlobalNamesCache,
   invalidateRootScanCache,
+  prewarmGlobalObjectHelper,
   resolvePathValue,
   scanRootGlobals,
   scanRootGlobalsCached,
@@ -279,6 +280,40 @@ test("searchGlobalTree：跳过函数、危险全局名和循环引用", () => {
   );
 });
 
+test("GlobalObjectHelper 在浏览器环境自动预热全局名缓存", async () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  let idleCalls = 0;
+
+  globalThis.window = {
+    requestIdleCallback(callback) {
+      idleCalls++;
+    },
+  };
+  globalThis.document = {};
+  invalidateBuiltinGlobalNamesCache();
+
+  try {
+    await import("../../cheat-engine/www/cheat/js/GlobalObjectHelper.js?prewarm-test=1");
+  } finally {
+    if (originalWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = originalWindow;
+    }
+
+    if (originalDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = originalDocument;
+    }
+
+    invalidateBuiltinGlobalNamesCache();
+  }
+
+  assert.equal(idleCalls, 1);
+});
+
 test("searchGlobalTree：支持 basePath 前缀", () => {
   const result = searchGlobalTree({ child: { needle: "hit" } }, "needle", {
     basePath: ["$gameParty"],
@@ -287,4 +322,96 @@ test("searchGlobalTree：支持 basePath 前缀", () => {
   assert.equal(result.results.length, 1);
   assert.deepEqual(result.results[0].path, ["$gameParty", "child", "needle"]);
   assert.equal(result.results[0].pathText, "$gameParty.child.needle");
+});
+
+test("getBuiltinGlobalNames tolerates failing iframe removal", () => {
+  invalidateBuiltinGlobalNamesCache();
+
+  const iframe = {
+    style: {},
+    contentWindow: { FakeBuiltinTwo: 1 },
+    remove() {
+      throw new Error("already detached");
+    },
+  };
+
+  const names = withDocument(
+    {
+      createElement: () => iframe,
+      body: { appendChild() {} },
+    },
+    () => getBuiltinGlobalNames(),
+  );
+
+  assert.ok(names.has("FakeBuiltinTwo"));
+});
+
+test("scanRootGlobals tolerates unreadable roots", () => {
+  const root = new Proxy(
+    {},
+    {
+      has() {
+        throw new Error("cannot check");
+      },
+      getOwnPropertyNames() {
+        throw new Error("cannot enumerate");
+      },
+    },
+  );
+
+  const result = scanRootGlobals(root);
+  assert.deepEqual(result.rpg, []);
+  assert.deepEqual(result.plugin, []);
+});
+
+test("prewarmGlobalObjectHelper uses timeout and skips when cached", () => {
+  const originalWindow = globalThis.window;
+  const scheduled = [];
+
+  globalThis.window = {
+    setTimeout(callback) {
+      scheduled.push(callback);
+      return 1;
+    },
+  };
+
+  invalidateBuiltinGlobalNamesCache();
+  prewarmGlobalObjectHelper();
+  assert.equal(scheduled.length, 1);
+
+  scheduled[0]();
+  prewarmGlobalObjectHelper();
+  assert.equal(scheduled.length, 1, "cached names skip scheduling");
+
+  globalThis.window = originalWindow;
+});
+
+test("searchGlobalTree skips primitives / unreadable children and time limit", () => {
+  const root = { primitive: 1, nested: { needle: "hit" } };
+  Object.defineProperty(root, "broken", {
+    enumerable: true,
+    get() {
+      throw new Error("cannot read");
+    },
+  });
+
+  const result = searchGlobalTree(root, "needle");
+  assert.equal(result.results.length, 1);
+
+  const originalNow = Date.now;
+  let call = 0;
+  Date.now = () => {
+    call++;
+    return call === 1 ? 0 : 10_000;
+  };
+
+  try {
+    const limited = searchGlobalTree({ a: { needle: "hit" } }, "needle", {
+      maxTimeMs: 1,
+    });
+    assert.equal(limited.truncated, true);
+    assert.equal(limited.reason, "time");
+  } finally {
+    Date.now = originalNow;
+  }
 });

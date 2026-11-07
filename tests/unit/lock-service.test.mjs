@@ -198,3 +198,195 @@ test("LockService：有锁时启动定时器，清空后停止", () => {
   LockService.setVariableLocks({});
   assert.equal(timers.size, 0);
 });
+
+test("LockService.readStorage / writeStorage 损坏与写失败时降级", () => {
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    assert.deepEqual(
+      LockService.readStorage({
+        getItem() {
+          return "{bad";
+        },
+      }),
+      {},
+    );
+    assert.deepEqual(
+      LockService.readStorage({
+        getItem() {
+          return JSON.stringify([1, 2]);
+        },
+      }),
+      [1, 2],
+    );
+    assert.deepEqual(
+      LockService.readStorage({
+        getItem() {
+          throw new Error("read failed");
+        },
+      }),
+      {},
+    );
+
+    assert.doesNotThrow(() =>
+      LockService.writeStorage(
+        {
+          setItem() {
+            throw new Error("write failed");
+          },
+        },
+        {},
+      ),
+    );
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 3);
+});
+
+test("LockService.applyAllLocks 无锁时停止，有锁时应用两类", () => {
+  timers.clear();
+  cleared.length = 0;
+
+  const switched = [];
+  globalThis.$gameSwitches = {
+    value: () => false,
+    setValue: (id, value) => switched.push(["s", id, value]),
+  };
+  const variables = [];
+  globalThis.$gameVariables = {
+    value: () => 0,
+    setValue: (id, value) => variables.push(["v", id, value]),
+  };
+
+  LockService.setSwitchLocks({});
+  LockService.setVariableLocks({});
+  LockService.start();
+
+  LockService.applyAllLocks();
+  assert.equal(LockService.timer, null);
+  assert.equal(timers.size, 0);
+
+  LockService.setSwitchLocks({
+    1: { lockEnabled: true, lockValue: true },
+  });
+  LockService.setVariableLocks({
+    2: { lockEnabled: true, lockValue: 5 },
+  });
+
+  switched.length = 0;
+  variables.length = 0;
+  LockService.applyAllLocks();
+  assert.deepEqual(switched, [["s", 1, true]]);
+  assert.deepEqual(variables, [["v", 2, 5]]);
+});
+
+test("LockService.start 幂等，stop 无定时器时安全", () => {
+  timers.clear();
+  LockService.stop();
+
+  LockService.start();
+  assert.equal(timers.size, 1);
+  const first = LockService.timer;
+
+  LockService.start();
+  assert.equal(timers.size, 1);
+  assert.equal(LockService.timer, first);
+
+  LockService.stop();
+  assert.equal(timers.size, 0);
+  assert.equal(LockService.timer, null);
+  assert.doesNotThrow(() => LockService.stop());
+});
+
+test("LockService 复杂值不相等时重新写入", () => {
+  const values = new Map([
+    [1, { a: 1 }],
+    [2, new Map([["a", 1]])],
+    [3, new Set([1, 2])],
+    [4, [1, 2]],
+    [5, { a: 1 }],
+  ]);
+  const writes = [];
+
+  globalThis.$gameVariables = {
+    value(id) {
+      return values.get(id);
+    },
+    setValue(id, value) {
+      values.set(id, value);
+      writes.push(id);
+    },
+  };
+
+  LockService.setVariableLocks({
+    1: { lockEnabled: true, lockValue: { a: 1, b: 2 } },
+    2: { lockEnabled: true, lockValue: new Map([["b", 2]]) },
+    3: { lockEnabled: true, lockValue: new Set([3]) },
+    4: { lockEnabled: true, lockValue: [1, 2, 3] },
+    5: { lockEnabled: true, lockValue: { a: 1, b: undefined } },
+  });
+
+  assert.deepEqual(writes.sort(), [1, 2, 3, 4, 5]);
+});
+
+test("LockService 克隆失败时回退并保留原值", () => {
+  const originalClone = globalThis.structuredClone;
+  globalThis.structuredClone = () => {
+    throw new Error("cannot clone");
+  };
+
+  const circular = {};
+  circular.self = circular;
+
+  try {
+    const locks = LockService.setVariableLocks({
+      1: { lockEnabled: true, lockValue: circular },
+    });
+
+    assert.equal(locks[1].lockValue, circular);
+  } finally {
+    globalThis.structuredClone = originalClone;
+  }
+});
+
+test("LockService 跳过非法 / 未启用的手动锁记录", () => {
+  const writes = [];
+  globalThis.$gameSwitches = {
+    value: () => false,
+    setValue: (id) => writes.push(`s${id}`),
+  };
+  globalThis.$gameVariables = {
+    value: () => 0,
+    setValue: (id) => writes.push(`v${id}`),
+  };
+
+  LockService.switchLocks = {
+    0: { lockEnabled: true, lockValue: true },
+    abc: { lockEnabled: true, lockValue: true },
+    2: { lockEnabled: false, lockValue: true },
+    3: { lockEnabled: true, lockValue: true },
+  };
+  LockService.variableLocks = {
+    0: { lockEnabled: true, lockValue: 1 },
+    abc: { lockEnabled: true, lockValue: 1 },
+    2: { lockEnabled: false, lockValue: 1 },
+    3: { lockEnabled: true, lockValue: 1 },
+  };
+
+  LockService.applySwitchLocks();
+  LockService.applyVariableLocks();
+  assert.deepEqual(writes, ["s3", "v3"]);
+
+  writes.length = 0;
+  assert.equal(LockService.applyVariableLock(2), false, "未启用的锁跳过");
+  assert.equal(LockService.applyVariableLock(999), false, "不存在的锁跳过");
+  assert.deepEqual(writes, []);
+
+  // 手动注入的记录不经过 sanitize，会直接按下标查找
+  assert.equal(LockService.applyVariableLock(0), true);
+  assert.deepEqual(writes, ["v0"]);
+});

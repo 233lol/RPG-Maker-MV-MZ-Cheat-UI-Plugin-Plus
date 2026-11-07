@@ -82,3 +82,50 @@ test("Alert.clearHandler：只清除匹配的 handler", () => {
 
   resetAlert();
 });
+
+test("Alert handler failures are logged and pending continues", () => {
+  resetAlert();
+  Alert.info("one");
+  Alert.info("two");
+
+  const received = [];
+  const originalError = console.error;
+  const errors = [];
+  console.error = (...args) => errors.push(args);
+
+  try {
+    Alert.setHandler((level, msg) => {
+      received.push(msg);
+      if (msg === "one") {
+        throw new Error("handler failed");
+      }
+    });
+  } finally {
+    console.error = originalError;
+  }
+
+  assert.deepEqual(received, ["one", "two"]);
+  assert.equal(errors.length, 1);
+  assert.equal(Alert.pending.length, 0);
+
+  resetAlert();
+});
+
+test("Alert without handler logs errors with cause", () => {
+  resetAlert();
+  const originalError = console.error;
+  const errors = [];
+  console.error = (...args) => errors.push(args);
+
+  try {
+    Alert.error("bad", new Error("cause"));
+  } finally {
+    console.error = originalError;
+  }
+
+  assert.equal(errors.length, 1);
+  assert.match(String(errors[0][0]), /bad/);
+  assert.equal(Alert.pending.length, 1);
+
+  resetAlert();
+});

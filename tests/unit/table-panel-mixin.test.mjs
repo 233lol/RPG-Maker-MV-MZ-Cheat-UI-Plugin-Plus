@@ -31,6 +31,16 @@ function makeLockPanel(extra = {}) {
   };
 }
 
+test("tablePanelMixin.data 提供搜索 / 分页默认值", () => {
+  const data = tablePanelMixin.data.call({});
+
+  assert.equal(data.search, "");
+  assert.deepEqual(data.pagination, { page: 1, itemsPerPage: 5 });
+  assert.deepEqual(data.panelStateExtraKeys, []);
+  assert.ok(Array.isArray(data.itemsPerPageOptions));
+  assert.ok(data.itemsPerPageOptions.length > 0);
+});
+
 test("tablePanelMixin：快照包含搜索、分页与声明的额外字段", () => {
   const panel = makePanel({
     search: "abc",

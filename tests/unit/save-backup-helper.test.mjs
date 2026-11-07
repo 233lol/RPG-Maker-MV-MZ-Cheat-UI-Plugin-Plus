@@ -27,6 +27,14 @@ const originalMethods = {
   getLoadedSlot: SaveBackupCheat.getLoadedSlot,
   getSaveCount: SaveBackupCheat.getSaveCount,
   backupCurrentSave: SaveBackupCheat.backupCurrentSave,
+  isLocalMode: SaveBackupCheat.isLocalMode,
+  getSaveFilePath: SaveBackupCheat.getSaveFilePath,
+  requireFs: SaveBackupCheat.requireFs,
+  findPayloadPath: SaveBackupCheat.findPayloadPath,
+  readSaveText: SaveBackupCheat.readSaveText,
+  readIndex: SaveBackupCheat.readIndex,
+  writeMeta: SaveBackupCheat.writeMeta,
+  writeIndex: SaveBackupCheat.writeIndex,
 };
 
 function resetGlobals() {
@@ -908,4 +916,654 @@ test("SaveBackupCheat.backfillMapFromIndex：载荷无法解析时只警告不�
     assert.equal(findIndexEntry(snapshot.id).payloadBackfillChecked, undefined);
     assert.ok(warnings.length > 0);
   });
+});
+
+test("SaveBackupCheat.getLoadedSlot / getPlaytimeText 防御异常", () => {
+  globalThis.$gameSystem = { _savefileId: 0 };
+  globalThis.DataManager = {
+    get _lastAccessedId() {
+      throw new Error("broken");
+    },
+  };
+
+  assert.equal(SaveBackupCheat.getLoadedSlot(), -1);
+
+  globalThis.$gameSystem = null;
+  assert.equal(SaveBackupCheat.getPlaytimeText(), "");
+});
+
+test("SaveBackupCheat.hasSave 支持 web storage 与异常回退", () => {
+  const originalRequire = globalThis.require;
+  globalThis.require = undefined;
+
+  try {
+    globalThis.StorageManager = {
+      webStorageExists: (slot) => slot === 3,
+    };
+    assert.equal(SaveBackupCheat.hasSave(3), true);
+    assert.equal(SaveBackupCheat.hasSave(4), false);
+
+    globalThis.StorageManager = {
+      webStorageExists() {
+        throw new Error("storage broken");
+      },
+    };
+    const { result, warnings } = silenceWarn(() => SaveBackupCheat.hasSave(1));
+    assert.equal(result, false);
+    assert.equal(warnings.length, 1);
+  } finally {
+    globalThis.require = originalRequire;
+  }
+});
+
+test("SaveBackupCheat.getSaveFilePath 路径接口抛错时回退或返回 null", () => {
+  withTempCwd((dir) => {
+    globalThis.StorageManager = {
+      localFilePath() {
+        throw new Error("localFilePath broken");
+      },
+      filePath() {
+        throw new Error("filePath broken");
+      },
+    };
+
+    const { result, warnings } = silenceWarn(() =>
+      SaveBackupCheat.getSaveFilePath(2),
+    );
+    assert.equal(result, path.join(dir, "www", "save", "file2.rpgsave"));
+    assert.equal(warnings.length, 2);
+
+    const originalRequire = globalThis.require;
+    globalThis.require = undefined;
+
+    try {
+      assert.equal(SaveBackupCheat.getSaveFilePath(1), null);
+    } finally {
+      globalThis.require = originalRequire;
+    }
+  });
+});
+
+test("SaveBackupCheat.readSaveText 浏览器 / MZ / 异常分支", () => {
+  SaveBackupCheat.isLocalMode = () => false;
+
+  globalThis.Utils.RPGMAKER_NAME = "MZ";
+  assert.equal(SaveBackupCheat.readSaveText(1), null);
+
+  globalThis.Utils.RPGMAKER_NAME = "MV";
+  globalThis.StorageManager = {
+    loadFromWebStorage: (slot) => `web-${slot}`,
+  };
+  assert.equal(SaveBackupCheat.readSaveText(2), "web-2");
+
+  globalThis.StorageManager = {
+    loadFromWebStorage() {
+      throw new Error("web storage broken");
+    },
+  };
+  const { result, warnings } = silenceWarn(() =>
+    SaveBackupCheat.readSaveText(3),
+  );
+  assert.equal(result, null);
+  assert.equal(warnings.length, 1);
+});
+
+test("SaveBackupCheat.writeSaveText 缺失 pako / 未知路径 / 浏览器分支", () => {
+  SaveBackupCheat.isLocalMode = () => true;
+  globalThis.Utils.RPGMAKER_NAME = "MZ";
+
+  const originalPako = globalThis.pako;
+  delete globalThis.pako;
+
+  try {
+    assert.throws(() => SaveBackupCheat.writeSaveText(1, "{}"), /pako|压缩/i);
+  } finally {
+    if (originalPako !== undefined) {
+      globalThis.pako = originalPako;
+    }
+  }
+
+  SaveBackupCheat.getSaveFilePath = () => null;
+  SaveBackupCheat.pakoCache = undefined;
+  globalThis.pako = { deflate: (text) => text };
+
+  try {
+    assert.throws(
+      () => SaveBackupCheat.writeSaveText(1, "{}"),
+      /路径|path|unknown/i,
+    );
+  } finally {
+    delete globalThis.pako;
+  }
+
+  SaveBackupCheat.isLocalMode = () => false;
+  assert.throws(
+    () => SaveBackupCheat.writeSaveText(1, "{}"),
+    /浏览器|browser|不支持/i,
+  );
+
+  globalThis.Utils.RPGMAKER_NAME = "MV";
+  const calls = [];
+  globalThis.StorageManager = {
+    saveToWebStorage: (slot, text) => calls.push([slot, text]),
+  };
+  SaveBackupCheat.writeSaveText(4, '{"ok":1}');
+  assert.deepEqual(calls, [[4, '{"ok":1}']]);
+});
+
+test("SaveBackupCheat.isSnapshotPresent / listBackups 异常时降级", () => {
+  SaveBackupCheat.requireFs = () => {
+    throw new Error("fs unavailable");
+  };
+
+  assert.equal(SaveBackupCheat.isSnapshotPresent({ id: "a" }), false);
+  SaveBackupCheat.requireFs = originalMethods.requireFs;
+
+  withTempCwd(() => {
+    writeSaveFile(1);
+    SaveBackupCheat.createSnapshot(1, "manual");
+
+    SaveBackupCheat.findPayloadPath = () => {
+      throw new Error("payload lookup failed");
+    };
+
+    const { result, warnings } = silenceWarn(() =>
+      SaveBackupCheat.listBackups(),
+    );
+    assert.deepEqual(result, []);
+    assert.equal(warnings.length, 1);
+  });
+});
+
+test("SaveBackupCheat.getStats 非本地模式返回零统计", () => {
+  SaveBackupCheat.isLocalMode = () => false;
+
+  assert.deepEqual(SaveBackupCheat.getStats(), {
+    count: 0,
+    autoCount: 0,
+    manualCount: 0,
+    missingCount: 0,
+    bytes: 0,
+  });
+  assert.deepEqual(SaveBackupCheat.listBackups(), []);
+  assert.equal(SaveBackupCheat.backfillFromSavefileInfo(), 0);
+});
+
+test("SaveBackupCheat.rename / delete / clear 非本地模式拒绝", () => {
+  withTempCwd(() => {
+    writeSaveFile(1);
+    const meta = SaveBackupCheat.createSnapshot(1, "manual");
+
+    SaveBackupCheat.isLocalMode = () => false;
+
+    assert.throws(() => SaveBackupCheat.renameBackup(meta.id, "x"), /nw\.js/i);
+    assert.throws(() => SaveBackupCheat.deleteBackup(meta.id), /nw\.js/i);
+    assert.throws(() => SaveBackupCheat.clearBackups(), /nw\.js/i);
+  });
+});
+
+test("SaveBackupCheat.updateGlobalInfoAfterRestore 全局信息缺失时安全返回", () => {
+  globalThis.Utils.RPGMAKER_NAME = "MZ";
+  globalThis.DataManager = { _globalInfo: null };
+  assert.doesNotThrow(() =>
+    SaveBackupCheat.updateGlobalInfoAfterRestore(1, 1, saveText()),
+  );
+
+  globalThis.Utils.RPGMAKER_NAME = "MV";
+  globalThis.DataManager = {};
+  assert.doesNotThrow(() =>
+    SaveBackupCheat.updateGlobalInfoAfterRestore(1, 1, saveText()),
+  );
+
+  globalThis.DataManager = {
+    loadGlobalInfo() {
+      throw new Error("global broken");
+    },
+  };
+
+  const { warnings } = silenceWarn(() =>
+    SaveBackupCheat.updateGlobalInfoAfterRestore(1, 1, saveText()),
+  );
+  assert.equal(warnings.length, 1);
+});
+
+test("SaveBackupCheat.touchBackup 快照不存在时安全返回", () => {
+  assert.doesNotThrow(() => SaveBackupCheat.touchBackup("missing"));
+});
+
+test("SaveBackupCheat.isLocalMode returns false when requireFs throws", () => {
+  const originalRequireFs = SaveBackupCheat.requireFs;
+  SaveBackupCheat.requireFs = () => {
+    throw new Error("fs unavailable");
+  };
+
+  try {
+    assert.equal(SaveBackupCheat.isLocalMode(), false);
+  } finally {
+    SaveBackupCheat.requireFs = originalRequireFs;
+  }
+});
+
+test("SaveBackupCheat.writeSaveText MZ rename failure cleans temp file", () => {
+  withTempCwd(() => {
+    globalThis.Utils.RPGMAKER_NAME = "MZ";
+    globalThis.pako = { deflate: (text) => `PAKO:${text}` };
+
+    const target = path.join(process.cwd(), "target.rmmzsave");
+    fs.mkdirSync(target);
+    globalThis.StorageManager = { filePath: () => target };
+
+    assert.throws(() => SaveBackupCheat.writeSaveText(1, '{"ok":1}'));
+    assert.equal(
+      fs
+        .readdirSync(process.cwd())
+        .some((name) => name.includes(".cheat-") && name.endsWith(".tmp")),
+      false,
+    );
+  });
+});
+
+test("SaveBackupCheat.getSaveFilePath returns null when require path fails", () => {
+  const originalRequire = globalThis.require;
+  const originalIsLocalMode = SaveBackupCheat.isLocalMode;
+
+  globalThis.require = () => {
+    throw new Error("require broken");
+  };
+  SaveBackupCheat.isLocalMode = () => true;
+  globalThis.StorageManager = {};
+
+  try {
+    assert.equal(SaveBackupCheat.getSaveFilePath(1), null);
+  } finally {
+    globalThis.require = originalRequire;
+    SaveBackupCheat.isLocalMode = originalIsLocalMode;
+  }
+});
+
+test("SaveBackupCheat.listBackups sorts equal timestamps by id", () => {
+  withTempCwd(() => {
+    SaveBackupCheat.ensureBackupDir();
+
+    const make = (id) => ({
+      id,
+      slot: 1,
+      kind: "manual",
+      label: id,
+      createdAt: 5,
+      mapId: 1,
+      mapName: "Start",
+      sizeBytes: 10,
+    });
+
+    SaveBackupCheat.writeIndex([make("a"), make("b")]);
+
+    assert.deepEqual(
+      SaveBackupCheat.listBackups().map((entry) => entry.id),
+      ["b", "a"],
+    );
+  });
+});
+
+test("SaveBackupCheat.removeSnapshotFiles reports unlink failures", () => {
+  const originalRequireFs = SaveBackupCheat.requireFs;
+  const dir = path.join(process.cwd(), "www", "cheat-settings", "save-backups");
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+
+  SaveBackupCheat.requireFs = () => ({
+    existsSync: () => true,
+    unlinkSync() {
+      throw new Error("locked file");
+    },
+  });
+
+  try {
+    assert.doesNotThrow(() =>
+      SaveBackupCheat.removeSnapshotFiles({
+        id: "manual-s1-a",
+        payloadFile: path.join(dir, "manual-s1-a.rpgsave"),
+      }),
+    );
+  } finally {
+    SaveBackupCheat.requireFs = originalRequireFs;
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 2);
+});
+
+test("SaveBackupCheat.backupCurrentSave reports snapshot failures", () => {
+  const originalCreateSnapshot = SaveBackupCheat.createSnapshot;
+  SaveBackupCheat.hasSave = () => true;
+  SaveBackupCheat.createSnapshot = () => {
+    throw new Error("no space");
+  };
+
+  try {
+    const { result, warnings } = silenceWarn(() =>
+      SaveBackupCheat.backupCurrentSave(1),
+    );
+
+    assert.equal(result.status, "failed");
+    assert.match(String(result.error), /no space/);
+    assert.equal(warnings.length, 1);
+  } finally {
+    SaveBackupCheat.createSnapshot = originalCreateSnapshot;
+  }
+});
+
+test("SaveBackupCheat.restoreBackup shows loaded-slot dialog", async () => {
+  const { ConfirmDialog } =
+    await import("../../cheat-engine/www/cheat/js/DialogHelper.js");
+  const originalShow = ConfirmDialog.show;
+  const originalClose = ConfirmDialog.close;
+  const dialogs = [];
+
+  ConfirmDialog.show = (options) => dialogs.push(options);
+  ConfirmDialog.close = () => {};
+
+  try {
+    withTempCwd(() => {
+      writeSaveFile(1, saveText(1, 600));
+      const meta = SaveBackupCheat.createSnapshot(1, "manual");
+
+      SaveBackupCheat.writeSaveText = () => {};
+      SaveBackupCheat.updateGlobalInfoAfterRestore = () => {};
+      SaveBackupCheat.hasSave = () => true;
+      SaveBackupCheat.backupCurrentSave = () => ({ status: "created" });
+      SaveBackupCheat.getLoadedSlot = () => 1;
+      SaveBackupCheat.maxSavefiles = () => 10;
+
+      SaveBackupCheat.restoreBackup(meta.id);
+
+      assert.equal(dialogs.length, 1);
+      assert.equal(dialogs[0].width, 480);
+      assert.equal(dialogs[0].actions.length, 1);
+    });
+  } finally {
+    ConfirmDialog.show = originalShow;
+    ConfirmDialog.close = originalClose;
+  }
+});
+
+test("SaveBackupCheat.restoreBackup to other slot reports success", async () => {
+  const { Alert } =
+    await import("../../cheat-engine/www/cheat/js/AlertHelper.js");
+  const messages = [];
+  Alert.setHandler((level, msg) => messages.push({ level, msg }));
+
+  try {
+    withTempCwd(() => {
+      writeSaveFile(1, saveText(1, 600));
+      const meta = SaveBackupCheat.createSnapshot(1, "manual");
+
+      SaveBackupCheat.writeSaveText = () => {};
+      SaveBackupCheat.updateGlobalInfoAfterRestore = () => {};
+      SaveBackupCheat.hasSave = () => false;
+      SaveBackupCheat.getLoadedSlot = () => -1;
+      SaveBackupCheat.maxSavefiles = () => 10;
+
+      const result = SaveBackupCheat.restoreBackup(meta.id, 2);
+      assert.equal(result.slot, 2);
+      assert.equal(result.sourceSlot, 1);
+      assert.equal(result.isSameSlot, false);
+      assert.equal(messages.at(-1).level, "success");
+    });
+  } finally {
+    Alert.handler = null;
+  }
+});
+
+test("SaveBackupCheat.restoreBackup rejects invalid source slot metadata", () => {
+  withTempCwd(() => {
+    SaveBackupCheat.ensureBackupDir();
+    SaveBackupCheat.writeMeta({
+      id: "manual-s0-a",
+      slot: 0,
+      kind: "manual",
+      label: "",
+      createdAt: 1,
+      mapId: 0,
+      mapName: "",
+    });
+
+    assert.throws(
+      () => SaveBackupCheat.restoreBackup("manual-s0-a"),
+      /槽|slot/i,
+    );
+  });
+});
+
+test("SaveBackupCheat.updateGlobalInfoAfterRestore uses _playtime", () => {
+  globalThis.Utils.RPGMAKER_NAME = "MZ";
+  globalThis.DataManager = {
+    _globalInfo: [],
+    saveGlobalInfo() {},
+  };
+
+  globalThis.$dataSystem = { gameTitle: "Test Game" };
+  assert.equal(SaveBackupCheat.isMZ(), true);
+  SaveBackupCheat.updateGlobalInfoAfterRestore(
+    1,
+    1,
+    JSON.stringify({ system: { _playtime: 600 } }),
+  );
+
+  assert.equal(globalThis.DataManager._globalInfo[1].playtime, "00:00:10");
+});
+
+test("SaveBackupCheat.writeSaveText ignores temp cleanup failures", () => {
+  withTempCwd(() => {
+    globalThis.Utils.RPGMAKER_NAME = "MZ";
+    globalThis.pako = { deflate: (text) => `PAKO:${text}` };
+
+    const target = path.join(process.cwd(), "target.rmmzsave");
+    fs.mkdirSync(target);
+    globalThis.StorageManager = { filePath: () => target };
+
+    const originalRequireFs = SaveBackupCheat.requireFs;
+    SaveBackupCheat.requireFs = () => ({
+      ...fs,
+      existsSync: () => true,
+      writeFileSync: (...args) => fs.writeFileSync(...args),
+      renameSync: () => {
+        throw new Error("rename failed");
+      },
+      unlinkSync: () => {
+        throw new Error("cleanup failed");
+      },
+    });
+
+    try {
+      assert.throws(
+        () => SaveBackupCheat.writeSaveText(1, '{"ok":1}'),
+        /rename failed/,
+      );
+    } finally {
+      SaveBackupCheat.requireFs = originalRequireFs;
+    }
+  });
+});
+
+test("SaveBackupCheat.backfillFromSavefileInfo caches same-save checks", () => {
+  withTempCwd(() => {
+    writeSaveFile(1, saveText(1, 600));
+    const now = Date.now();
+
+    SaveBackupCheat.writeIndex([
+      { id: "auto-s1-a", slot: 1, kind: "auto", createdAt: now },
+      { id: "auto-s1-b", slot: 1, kind: "auto", createdAt: now },
+    ]);
+
+    globalThis.DataManager = {
+      loadSavefileInfo: () => ({ playtime: 3600, timestamp: 1700000000000 }),
+    };
+
+    assert.ok(SaveBackupCheat.backfillFromSavefileInfo() >= 2);
+    const entries = SaveBackupCheat.readIndex();
+    assert.equal(
+      entries.every((entry) => entry.backfillChecked),
+      true,
+    );
+    assert.equal(entries[0].playtimeFrames, 3600);
+  });
+});
+
+test("SaveBackupCheat.backfillFromSavefileInfo ignores stat failures", () => {
+  withTempCwd(() => {
+    writeSaveFile(1, saveText(1, 600));
+    const now = Date.now();
+    SaveBackupCheat.writeIndex([
+      { id: "auto-s1-a", slot: 1, kind: "auto", createdAt: now },
+    ]);
+
+    globalThis.DataManager = {
+      loadSavefileInfo: () => ({ playtime: 3600, timestamp: 1 }),
+    };
+
+    const originalRequireFs = SaveBackupCheat.requireFs;
+    SaveBackupCheat.requireFs = () => ({
+      ...fs,
+      statSync: () => {
+        throw new Error("stat failed");
+      },
+    });
+
+    try {
+      SaveBackupCheat.backfillFromSavefileInfo();
+    } finally {
+      SaveBackupCheat.requireFs = originalRequireFs;
+    }
+
+    assert.equal(SaveBackupCheat.readIndex()[0].backfillChecked, undefined);
+  });
+});
+
+test("SaveBackupCheat.backfillFromSavefileInfo skips invalid slots", () => {
+  SaveBackupCheat.isLocalMode = () => true;
+  SaveBackupCheat.readIndex = () => [
+    { id: "bad-slot", slot: 0, createdAt: Date.now() },
+  ];
+  globalThis.DataManager = {
+    loadSavefileInfo: () => ({ playtime: 1, timestamp: 1 }),
+  };
+
+  assert.equal(SaveBackupCheat.backfillFromSavefileInfo(), 0);
+});
+
+test("SaveBackupCheat.backfillFromSavefileInfo warns on meta / index write failures", () => {
+  withTempCwd(() => {
+    writeSaveFile(1, saveText(1, 600));
+    const now = Date.now();
+    const entries = [
+      { id: "auto-s1-a", slot: 1, kind: "auto", createdAt: now },
+    ];
+    SaveBackupCheat.writeIndex(entries);
+
+    globalThis.DataManager = {
+      loadSavefileInfo: () => ({ playtime: 3600, timestamp: 1 }),
+    };
+
+    const originalWriteMeta = SaveBackupCheat.writeMeta;
+    const originalWriteIndex = SaveBackupCheat.writeIndex;
+    const originalReadIndex = SaveBackupCheat.readIndex;
+    const originalWarn = console.warn;
+    const warnings = [];
+    console.warn = (...args) => warnings.push(args);
+
+    SaveBackupCheat.writeMeta = () => {
+      throw new Error("meta write failed");
+    };
+
+    try {
+      const patched = SaveBackupCheat.backfillFromSavefileInfo();
+      assert.ok(patched >= 1);
+    } finally {
+      SaveBackupCheat.writeMeta = originalWriteMeta;
+    }
+
+    assert.equal(warnings.length, 1);
+
+    SaveBackupCheat.writeIndex(entries);
+    SaveBackupCheat.writeIndex = () => {
+      throw new Error("index write failed");
+    };
+    SaveBackupCheat.readIndex = () => [
+      { id: "auto-s1-b", slot: 1, kind: "auto", createdAt: now },
+    ];
+
+    try {
+      assert.doesNotThrow(() => SaveBackupCheat.backfillFromSavefileInfo());
+    } finally {
+      SaveBackupCheat.writeIndex = originalWriteIndex;
+      SaveBackupCheat.readIndex = originalReadIndex;
+      console.warn = originalWarn;
+    }
+  });
+});
+
+test("SaveBackupCheat.backfillMapFromIndex skips missing payloads and non-object saves", () => {
+  withTempCwd(() => {
+    assert.equal(
+      SaveBackupCheat.backfillMapFromIndex([
+        { id: "missing", slot: 1, mapId: 0 },
+        { id: "bad-slot", slot: 0, mapId: 0 },
+      ]),
+      false,
+    );
+
+    writeSaveFile(1, saveText(1, 60));
+    const meta = SaveBackupCheat.createSnapshot(1, "manual");
+    SaveBackupCheat.writePayload(meta, "123");
+
+    const index = SaveBackupCheat.readIndex();
+    const entry = index.find((item) => item.id === meta.id);
+    entry.mapId = 0;
+    entry.mapName = "";
+    entry.playtimeFrames = 0;
+    entry.playtime = "";
+
+    assert.equal(SaveBackupCheat.backfillMapFromIndex([entry]), false);
+  });
+});
+
+test("SaveBackupCheat.removeSnapshotFiles skips paths outside backup dir", () => {
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    assert.doesNotThrow(() =>
+      SaveBackupCheat.removeSnapshotFiles({
+        id: "manual-s1-a",
+        payloadFile: path.join(process.cwd(), "outside.rpgsave"),
+      }),
+    );
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.ok(warnings.length >= 1);
+});
+
+test("SaveBackupCheat.touchBackup warns on index failures", () => {
+  const originalReadIndex = SaveBackupCheat.readIndex;
+  SaveBackupCheat.readIndex = () => {
+    throw new Error("index broken");
+  };
+
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    assert.doesNotThrow(() => SaveBackupCheat.touchBackup("x"));
+  } finally {
+    SaveBackupCheat.readIndex = originalReadIndex;
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
 });

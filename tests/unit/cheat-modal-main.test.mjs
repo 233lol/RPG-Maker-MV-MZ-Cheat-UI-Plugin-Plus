@@ -13,6 +13,8 @@ const originalClearInterval = globalThis.clearInterval;
 globalThis.setInterval = () => 0;
 globalThis.clearInterval = () => {};
 
+const { GeneralCheat, MessageCheat } =
+  await import("../../cheat-engine/www/cheat/js/CheatHelper.js");
 const { default: CheatModal } =
   await import("../../cheat-engine/www/cheat/CheatModal.js");
 const { default: MainComponent } =
@@ -32,11 +34,19 @@ const originalShortcutMethods = {
   runKeyLeaveEvent: GLOBAL_SHORTCUT.runKeyLeaveEvent,
 };
 
+const originalCheatMethods = {
+  toggleCheatModal: GeneralCheat.toggleCheatModal,
+  openCheatModal: GeneralCheat.openCheatModal,
+};
+
 function resetGlobals() {
   delete globalThis.window;
   delete globalThis.document;
   delete globalThis.ResizeObserver;
+  delete globalThis.TouchInput;
+  delete globalThis.Input;
   Object.assign(GLOBAL_SHORTCUT, originalShortcutMethods);
+  Object.assign(GeneralCheat, originalCheatMethods);
   setGameInputBlocked(false);
 }
 
@@ -1064,4 +1074,77 @@ test("CheatModal.scheduleSizeSync：尺寸没变 / 请求已清空时不写回",
   timers[1]();
 
   assert.equal(modal.__pendingSize, null);
+});
+
+test("MainComponent.created 安装补丁 / 接管 CheatHelper / 注册监听", () => {
+  const listeners = [];
+  globalThis.window = {
+    addEventListener(type, handler, capture) {
+      listeners.push([type, handler, capture]);
+    },
+    removeEventListener() {},
+  };
+  globalThis.TouchInput = {
+    _newState: { wheelX: 0, wheelY: 0 },
+    _events: { wheelX: 0, wheelY: 0 },
+  };
+
+  const originalInitialized = MessageCheat.__initialized;
+  MessageCheat.__initialized = true;
+
+  const calls = [];
+  const panel = {
+    localeKey: 0,
+    toggleCheatModal(name) {
+      calls.push(["toggle", name]);
+    },
+    openCheatModal(name) {
+      calls.push(["open", name]);
+    },
+  };
+
+  try {
+    MainComponent.created.call(panel);
+  } finally {
+    MessageCheat.__initialized = originalInitialized;
+  }
+
+  assert.deepEqual(
+    listeners.map(([type]) => type),
+    ["keydown", "keyup", "keypress", "blur"],
+  );
+  assert.equal(typeof GeneralCheat.toggleCheatModal, "function");
+  assert.equal(typeof GeneralCheat.openCheatModal, "function");
+  assert.equal(typeof panel.__unsubscribeLocaleChange, "function");
+
+  // 静态方法通过实例转发
+  GeneralCheat.toggleCheatModal("x");
+  GeneralCheat.openCheatModal("y");
+  assert.deepEqual(calls, [
+    ["toggle", "x"],
+    ["open", "y"],
+  ]);
+});
+
+test("MainComponent.mounted 设置输入守卫并监听 focusin", () => {
+  const listeners = [];
+  globalThis.document = {
+    addEventListener(type, handler, capture) {
+      listeners.push([type, handler, capture]);
+    },
+    removeEventListener() {},
+  };
+
+  const panel = {
+    setupInputGuard() {
+      this.guardSetup = true;
+    },
+  };
+
+  MainComponent.mounted.call(panel);
+
+  assert.equal(panel.guardSetup, true);
+  assert.equal(listeners.length, 1);
+  assert.equal(listeners[0][0], "focusin");
+  assert.equal(listeners[0][2], true);
 });

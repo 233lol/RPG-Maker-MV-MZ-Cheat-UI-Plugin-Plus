@@ -220,6 +220,145 @@ test("findPayloadPath：忽略越界 payloadFile，按候选扩展名回退", ()
   });
 });
 
+test("readIndex 结构异常 / JSON 损坏时回退重建", () => {
+  withTempCwd(() => {
+    SaveBackupCheat.ensureBackupDir();
+    const indexFile = path.join(backupDir(), "index.json");
+
+    const originalWarn = console.warn;
+    console.warn = () => {};
+
+    try {
+      fs.writeFileSync(indexFile, JSON.stringify({ not: "array" }), "utf8");
+      assert.deepEqual(SaveBackupCheat.readIndex(), []);
+
+      fs.writeFileSync(indexFile, "{bad json", "utf8");
+      assert.deepEqual(SaveBackupCheat.readIndex(), []);
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+});
+
+test("rebuildIndexFromMetas 扫描目录失败时返回空", () => {
+  const originalRequireFs = SaveBackupCheat.requireFs;
+  const originalWarn = console.warn;
+  console.warn = () => {};
+
+  SaveBackupCheat.requireFs = () => ({
+    existsSync: () => true,
+    readFileSync: () => "{bad",
+    readdirSync() {
+      throw new Error("permission denied");
+    },
+  });
+
+  try {
+    assert.deepEqual(SaveBackupCheat.readIndex(), []);
+  } finally {
+    SaveBackupCheat.requireFs = originalRequireFs;
+    console.warn = originalWarn;
+  }
+});
+
+test("rebuildIndexFromMetas 跳过非法 id / 损坏 / 不匹配 / 非法槽位", () => {
+  withTempCwd(() => {
+    SaveBackupCheat.ensureBackupDir();
+    const dir = backupDir();
+
+    fs.writeFileSync(
+      path.join(dir, "valid.json"),
+      JSON.stringify(meta("valid")),
+      "utf8",
+    );
+    fs.writeFileSync(path.join(dir, "broken.json"), "{bad", "utf8");
+    fs.writeFileSync(
+      path.join(dir, "wrong.json"),
+      JSON.stringify(meta("other")),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(dir, "slot0.json"),
+      JSON.stringify(meta("slot0", 0)),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(dir, "bad id.json"),
+      JSON.stringify(meta("bad id")),
+      "utf8",
+    );
+    fs.writeFileSync(path.join(dir, "notes.txt"), "ignored", "utf8");
+
+    const originalWarn = console.warn;
+    console.warn = () => {};
+
+    try {
+      const entries = SaveBackupCheat.readIndex();
+      assert.deepEqual(
+        entries.map((entry) => entry.id),
+        ["valid"],
+      );
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+});
+
+test("isPathInsideBackupDir 依赖缺失时返回 false", () => {
+  const originalRequire = globalThis.require;
+  globalThis.require = undefined;
+
+  try {
+    assert.equal(
+      SaveBackupCheat.isPathInsideBackupDir(`${backupDir()}/x.json`),
+      false,
+    );
+  } finally {
+    globalThis.require = originalRequire;
+  }
+});
+
+test("getSnapshotCodec 在 MZ + pako 下返回 pako", () => {
+  withTempCwd(() => {
+    const originalUtils = globalThis.Utils;
+    const originalPako = globalThis.pako;
+
+    globalThis.Utils = { isNwjs: () => true, RPGMAKER_NAME: "MZ" };
+    globalThis.pako = { deflate() {}, inflate() {} };
+    SaveBackupCheat.pakoCache = undefined;
+
+    try {
+      assert.equal(SaveBackupCheat.getSnapshotCodec(), "pako");
+      assert.equal(SaveBackupCheat.getPayloadExtension("pako"), ".rmmzsave");
+    } finally {
+      SaveBackupCheat.pakoCache = undefined;
+      globalThis.Utils = originalUtils;
+
+      if (originalPako === undefined) {
+        delete globalThis.pako;
+      } else {
+        globalThis.pako = originalPako;
+      }
+    }
+  });
+});
+
+test("writePayload 压缩结果为空时抛错", () => {
+  withTempCwd(() => {
+    const originalEncode = SaveBackupCheat.encodePayloadText;
+    SaveBackupCheat.encodePayloadText = () => "";
+
+    try {
+      assert.throws(
+        () => SaveBackupCheat.writePayload(meta("manual-s1-a"), "{}"),
+        /压缩|compress/i,
+      );
+    } finally {
+      SaveBackupCheat.encodePayloadText = originalEncode;
+    }
+  });
+});
+
 test("isPathInsideBackupDir：目录内接受、目录外拒绝", () => {
   withTempCwd(() => {
     SaveBackupCheat.ensureBackupDir();

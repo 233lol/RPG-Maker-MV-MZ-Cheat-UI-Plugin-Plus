@@ -269,3 +269,54 @@ test("KeyValueStorage：构造后才进入 nw.js 环境也能补上 fs", async (
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("KeyValueStorage detects nw.js failure and quarantines missing / locked files", async () => {
+  const dir = tempDir();
+  const file = path.join(dir, "kv.json");
+  const { KeyValueStorage } =
+    await import("../../cheat-engine/www/cheat/js/KeyValueStorage.js");
+
+  globalThis.Utils = {
+    isNwjs() {
+      throw new Error("utils broken");
+    },
+  };
+
+  try {
+    const browserMode = new KeyValueStorage(file);
+    assert.equal(browserMode.filePath, file);
+  } finally {
+    setNwjs(true);
+  }
+
+  try {
+    const storage = new KeyValueStorage(file);
+
+    assert.doesNotThrow(() =>
+      storage.__quarantineCorruptFile(new Error("missing")),
+    );
+
+    fs.writeFileSync(file, "{}", "utf8");
+    const originalRename = storage.fileSystem.renameSync;
+    const originalWarn = console.warn;
+    const warnings = [];
+    console.warn = (...args) => warnings.push(args);
+    storage.fileSystem.renameSync = () => {
+      throw new Error("locked file");
+    };
+
+    try {
+      assert.doesNotThrow(() =>
+        storage.__quarantineCorruptFile(new Error("corrupt")),
+      );
+    } finally {
+      storage.fileSystem.renameSync = originalRename;
+      console.warn = originalWarn;
+    }
+
+    assert.equal(warnings.length, 1);
+  } finally {
+    setNwjs(false);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

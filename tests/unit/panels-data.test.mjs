@@ -1088,3 +1088,115 @@ test("HealthSettingPanel：按钮方法转调 BattleCheat 并刷新", () => {
   ]);
   assert.equal(panel.refreshed, 7);
 });
+
+test("设置类面板 data / created / panelStateId 默认值", () => {
+  const switches = SwitchSettingPanel.data.call({});
+  assert.equal(switches.lockKind, "switch");
+  assert.deepEqual(
+    switches.tableHeaders.map((header) => header.key),
+    ["name", "value", "lock"],
+  );
+  assert.equal(SwitchSettingPanel.computed.panelStateId.call({}), "switches");
+  assert.deepEqual(
+    SwitchSettingPanel.computed.switchNames.call({ names: ["a", "b"] }),
+    ["a", "b"],
+  );
+
+  const variables = VariableSettingPanel.data.call({});
+  assert.equal(variables.lockKind, "variable");
+  assert.deepEqual(
+    variables.tableHeaders.map((header) => header.key),
+    ["name", "value", "lock"],
+  );
+  assert.deepEqual(variables.jsonDialog, {
+    show: false,
+    id: 0,
+    name: "",
+    text: "",
+    error: "",
+  });
+  assert.equal(
+    VariableSettingPanel.computed.panelStateId.call({}),
+    "variables",
+  );
+  assert.deepEqual(
+    VariableSettingPanel.computed.variableNames.call({ names: ["x"] }),
+    ["x"],
+  );
+
+  const skills = SkillSettingPanel.data.call({});
+  assert.equal(skills.selectedTab, null);
+  assert.deepEqual(skills.actors, []);
+  assert.deepEqual(skills.allSkills, []);
+  assert.deepEqual(
+    skills.skillHeaders.map((header) => header.key),
+    ["isLearned", "name", "description", "actions"],
+  );
+  assert.ok(Array.isArray(skills.itemsPerPageOptions));
+  assert.equal(SkillSettingPanel.computed.panelStateId.call({}), "skills");
+
+  let skillInitialized = 0;
+  SkillSettingPanel.created.call({
+    initializeVariables() {
+      skillInitialized++;
+    },
+  });
+  assert.equal(skillInitialized, 1);
+
+  const stats = StatsSettingPanel.data.call({});
+  assert.deepEqual(stats, {
+    selectedTab: null,
+    selectedSubTab: "attributes",
+    paramNames: [],
+    classOptions: [],
+    actors: [],
+  });
+  assert.equal(StatsSettingPanel.computed.panelStateId.call({}), "stats");
+
+  let statsInitialized = 0;
+  StatsSettingPanel.created.call({
+    initializeVariables() {
+      statsInitialized++;
+    },
+  });
+  assert.equal(statsInitialized, 1);
+});
+
+test("StatsSettingPanel 非法职业 / 状态输入不写游戏数据", () => {
+  const actor = {
+    setName() {},
+    setNickname() {},
+    setProfile() {},
+    changeClass() {},
+    addState() {},
+    removeState() {},
+    forceChangeEquip() {},
+  };
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = { members: () => [actor] };
+  globalThis.$dataClasses = [null, { id: 1, name: "Hero" }];
+  globalThis.$dataStates = [null, { id: 1, name: "Poison" }];
+
+  let refreshed = 0;
+  const panel = {
+    ...StatsSettingPanel.methods,
+    initializeVariables() {
+      refreshed++;
+    },
+  };
+
+  const item = { _actor: actor, classId: 1 };
+
+  // 与当前职业相同 / 非法 id / 数据库中不存在的职业：只刷新
+  panel.onClassChange(item, 1);
+  panel.onClassChange(item, 0);
+  panel.onClassChange(item, 99);
+  assert.equal(refreshed, 3);
+
+  // 非法状态 id / 数据库中不存在的状态：不处理
+  panel.onAddState({ _actor: actor, stateToAdd: 0 });
+  panel.onAddState({ _actor: actor, stateToAdd: 99 });
+  panel.onRemoveState({ _actor: actor }, 0);
+  assert.equal(refreshed, 3);
+});

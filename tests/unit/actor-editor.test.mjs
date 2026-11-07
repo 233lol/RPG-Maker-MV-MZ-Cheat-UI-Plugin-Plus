@@ -8,6 +8,7 @@ import {
   getEquipItem,
   getEquipOptions,
   getEquipSlotName,
+  getEquipTypeId,
   getEquipmentRows,
 } from "../../cheat-engine/www/cheat/js/actor/equipment.js";
 import {
@@ -43,6 +44,129 @@ afterEach(() => {
 
   Alert.handler = null;
   Alert.pending = [];
+});
+
+/* --------------------------------------------------- 异常与降级路径 */
+
+test("equipment / states / party 在引擎对象抛错时安全降级", () => {
+  assert.equal(
+    getEquipTypeId(
+      {
+        equipSlots() {
+          throw new Error("not ready");
+        },
+      },
+      0,
+    ),
+    0,
+  );
+
+  assert.deepEqual(
+    getEquipOptions(
+      {
+        equipSlots: () => [1],
+        canEquip() {
+          throw new Error("cannot check");
+        },
+      },
+      0,
+      [null, { id: 1, name: "Sword" }],
+      [],
+    ),
+    [{ title: "Sword", value: 1 }],
+  );
+
+  assert.deepEqual(
+    getEquipmentRows(
+      {
+        equips() {
+          throw new Error("not ready");
+        },
+      },
+      {},
+      [],
+      [],
+    ),
+    [],
+  );
+
+  assert.deepEqual(getEquipmentRows({ equips: () => null }, {}, [], []), []);
+
+  assert.deepEqual(
+    getActiveStates(
+      {
+        states() {
+          throw new Error("not ready");
+        },
+      },
+      [],
+    ),
+    [],
+  );
+
+  assert.deepEqual(getActiveStates({ states: () => "bad" }, []), []);
+
+  assert.deepEqual(
+    getAvailableStates(
+      {
+        isStateAffected() {
+          throw new Error("not ready");
+        },
+      },
+      [{ id: 1, name: "Poison" }],
+    ),
+    [{ title: "Poison", value: 1 }],
+  );
+
+  assert.equal(
+    getActorId({
+      actorId() {
+        throw new Error("not ready");
+      },
+      _actorId: 5,
+    }),
+    5,
+  );
+
+  assert.deepEqual(
+    getPartyMemberIds({
+      members() {
+        throw new Error("not ready");
+      },
+    }),
+    [],
+  );
+
+  assert.deepEqual(getPartyMemberIds({ members: () => null }), []);
+  assert.equal(
+    getMaxBattleMembers({
+      maxBattleMembers() {
+        throw new Error("not ready");
+      },
+    }),
+    0,
+  );
+
+  const rows = getPartyRows(
+    {
+      members: () => [
+        {
+          actorId: () => 1,
+          currentClass() {
+            throw new Error("not ready");
+          },
+          _classId: 2,
+          name: () => "",
+          level: 3,
+        },
+      ],
+    },
+    [null, { id: 1, name: "Actor 1" }],
+    [null, null, { id: 2, name: "Mage" }],
+  );
+
+  assert.equal(rows[0].className, "Mage");
+  assert.equal(rows[0].name, "");
 });
 
 /* --------------------------------------------------------------- equipment */
@@ -442,6 +566,12 @@ test("StatsSettingPanel.onEquipChange：缺少 forceChangeEquip 时退回 change
 
 /* --------------------------------------------------------------- Party panel */
 
+function captureAlerts() {
+  const messages = [];
+  Alert.setHandler((level, msg, err) => messages.push({ level, msg, err }));
+  return messages;
+}
+
 function makePartyPanel(overrides = {}) {
   return {
     ...PartyPanel.methods,
@@ -518,4 +648,212 @@ test("PartyPanel：添加 / 移除 / 移动成员，并保护最后一名成员"
   panel.removeMember({ id: 1, name: "Actor 1" });
   assert.equal(calls.length, 3);
   assert.equal(Alert.pending.length, 3);
+});
+
+test("PartyPanel.data / computed / created չ��Ĭ��ֵ", () => {
+  const data = PartyPanel.data.call({});
+
+  assert.deepEqual(data, {
+    partyRows: [],
+    availableRows: [],
+    battleMemberCount: 0,
+    selectedAddId: null,
+  });
+
+  assert.equal(PartyPanel.computed.panelStateId.call({}), "party");
+
+  assert.deepEqual(
+    PartyPanel.computed.availableOptions.call({
+      availableRows: [{ id: 2, name: "Actor 2" }],
+    }),
+    [{ title: "Actor 2", value: 2 }],
+  );
+
+  assert.equal(
+    PartyPanel.computed.canRemoveMember.call({ partyRows: [] }),
+    false,
+  );
+  assert.equal(
+    PartyPanel.computed.canRemoveMember.call({ partyRows: [{}] }),
+    false,
+  );
+  assert.equal(
+    PartyPanel.computed.canRemoveMember.call({ partyRows: [{}, {}] }),
+    true,
+  );
+
+  let initialized = 0;
+  PartyPanel.created.call({
+    initializeVariables() {
+      initialized++;
+    },
+  });
+  assert.equal(initialized, 1);
+});
+
+test("PartyPanel.getPanelStateSnapshot / applyPanelState ���ɵ�ǰѡ��", () => {
+  const panel = { selectedAddId: 9 };
+
+  assert.deepEqual(PartyPanel.methods.getPanelStateSnapshot.call(panel), {
+    selectedAddId: 9,
+  });
+
+  PartyPanel.methods.applyPanelState.call(panel, { selectedAddId: 3 });
+  assert.equal(panel.selectedAddId, 3);
+
+  PartyPanel.methods.applyPanelState.call(panel, {});
+  assert.equal(panel.selectedAddId, null);
+});
+
+test("PartyPanel.initializeVariables���鲻��ʱ���ã��ͱ��������ѡ��", () => {
+  const panel = makePartyPanel({
+    partyRows: [{}],
+    availableRows: [{}],
+    battleMemberCount: 4,
+    selectedAddId: 1,
+  });
+
+  panel.initializeVariables();
+  assert.deepEqual(panel.partyRows, []);
+  assert.deepEqual(panel.availableRows, []);
+  assert.equal(panel.battleMemberCount, 0);
+
+  const actor = makePartyActor(1);
+  const party = makeParty([actor]);
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = party;
+  globalThis.$dataActors = [null, { id: 1, name: "Actor 1" }];
+
+  panel.selectedAddId = null;
+  panel.initializeVariables();
+  assert.equal(panel.selectedAddId, null, "�ɼ���Ա���п�ʱѡ��Ϊ null");
+
+  const emptyPanel = makePartyPanel({ selectedAddId: 7 });
+  emptyPanel.initializeVariables();
+  assert.equal(emptyPanel.selectedAddId, null);
+});
+
+test("PartyPanel.moveMember���߽� / ��֧�ֺ��� / δ����ʱ������", () => {
+  const calls = [];
+  const party = {
+    members: () => [],
+    maxBattleMembers: () => 4,
+    swapOrder: (from, to) => calls.push([from, to]),
+  };
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = party;
+  globalThis.$dataActors = [];
+
+  const panel = makePartyPanel({
+    partyRows: [{ index: 0 }, { index: 1 }],
+    initializeVariables() {},
+  });
+
+  panel.moveMember({ index: 0 }, -1);
+  assert.equal(calls.length, 0, "Խ��ʱ���ƶ�");
+
+  delete party.swapOrder;
+  const alerts = captureAlerts();
+  panel.moveMember({ index: 0 }, 1);
+  assert.equal(calls.length, 0);
+  assert.equal(alerts.at(-1).level, "warn");
+
+  delete globalThis.$gamePlayer;
+  const before = alerts.length;
+  panel.moveMember({ index: 0 }, 1);
+  assert.equal(alerts.length, before + 1, "��Ϸδ����ʱ��ʾ");
+});
+
+test("PartyPanel.removeMember / addMember���쳣֧", () => {
+  const calls = [];
+  const party = {
+    members: () => [makePartyActor(1)],
+    maxBattleMembers: () => 4,
+    addActor: (id) => calls.push(["add", id]),
+    removeActor: (id) => calls.push(["remove", id]),
+  };
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = party;
+  globalThis.$dataActors = [null, { id: 1, name: "Actor 1" }];
+
+  const alerts = captureAlerts();
+  const panel = makePartyPanel({
+    partyRows: [{ id: 1, name: "Actor 1" }],
+    initializeVariables() {},
+  });
+
+  panel.removeMember({ id: 1, name: "Actor 1" });
+  assert.equal(calls.length, 0);
+  assert.equal(alerts.at(-1).level, "warn", "���һ����Ա����ɾ��");
+
+  panel.selectedAddId = 0;
+  panel.addMember();
+  assert.equal(calls.length, 0, "��Ч id ���������");
+
+  panel.selectedAddId = 3;
+  panel.addMember();
+  assert.deepEqual(calls.at(-1), ["add", 3]);
+  assert.match(alerts.at(-1).msg, /#3/);
+
+  delete globalThis.$gamePlayer;
+  const before = alerts.length;
+  panel.removeMember({ id: 1, name: "Actor 1" });
+  panel.addMember();
+  assert.equal(alerts.length, before + 2, "��Ϸδ����ʱ��ʾ");
+});
+
+test("StatsSettingPanel falls back without data tables", () => {
+  const actor = makeStatsActor();
+  const party = { members: () => [actor], maxBattleMembers: () => 4 };
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = party;
+  delete globalThis.$dataSystem;
+  delete globalThis.$dataClasses;
+  delete globalThis.$dataStates;
+  delete globalThis.$dataWeapons;
+  delete globalThis.$dataArmors;
+
+  const panel = {
+    ...StatsSettingPanel.methods,
+    selectedTab: 1,
+    selectedSubTab: "bad-tab",
+    paramNames: [],
+    classOptions: [],
+    actors: [],
+  };
+
+  panel.initializeVariables();
+
+  assert.deepEqual(panel.paramNames, []);
+  assert.deepEqual(panel.classOptions, []);
+  assert.equal(panel.selectedSubTab, "attributes");
+  assert.equal(panel.actors.length, 1);
+
+  const data = panel.extractActorData(actor);
+  assert.deepEqual(data.activeStates, []);
+  assert.deepEqual(data.availableStateOptions, []);
+  assert.equal(data.equipment.length, 2);
+});
+
+test("StatsSettingPanel.onEquipChange refreshes when equipment is unknown", () => {
+  const actor = makeStatsActor();
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = { members: () => [actor] };
+  globalThis.$dataWeapons = [];
+  globalThis.$dataArmors = [];
+
+  let refreshed = 0;
+  const panel = makeStatsPanel({
+    initializeVariables() {
+      refreshed++;
+    },
+  });
+
+  panel.onEquipChange({ _actor: actor }, { slotId: 0, slotTypeId: 1 }, 99);
+
+  assert.equal(refreshed, 1);
+  assert.equal(actor.forcedEquip, undefined);
 });

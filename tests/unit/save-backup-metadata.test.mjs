@@ -9,6 +9,7 @@ const STATIC_METHODS = [
   "readSaveText",
   "getMapInfo",
   "getSaveFilePath",
+  "requireFs",
 ];
 
 const originals = {};
@@ -47,6 +48,140 @@ test("parseAnySaveData：空值 / 对象 / JSON / JsonEx 兜底", () => {
   assert.deepEqual(SaveBackupCheat.parseAnySaveData("wrapped"), {
     wrapped: true,
   });
+});
+
+test("parseSaveMeta 本地模式读取失败时回退到存档头信息", () => {
+  SaveBackupCheat.isLocalMode = () => true;
+  SaveBackupCheat.readSavefileInfo = () => ({
+    timestamp: 1,
+    timestampText: "header",
+    playtimeFrames: 60,
+    playtimeText: "00:00:01",
+  });
+  SaveBackupCheat.getSaveFilePath = () => "/tmp/save.rpgsave";
+  SaveBackupCheat.requireFs = () => ({
+    existsSync() {
+      return true;
+    },
+    statSync() {
+      throw new Error("stat failed");
+    },
+  });
+
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    const meta = SaveBackupCheat.parseSaveMeta(4);
+    assert.equal(meta.savefileTimeText, "header");
+    assert.equal(meta.playtime, "00:00:01");
+    assert.equal(meta.dataSize, 0);
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
+});
+
+test("parseSaveMeta 非本地模式读取失败时忽略存档内容", () => {
+  SaveBackupCheat.isLocalMode = () => false;
+  SaveBackupCheat.readSavefileInfo = () => null;
+  SaveBackupCheat.readSaveText = () => {
+    throw new Error("read failed");
+  };
+
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    const meta = SaveBackupCheat.parseSaveMeta(5);
+    assert.equal(meta.mapId, 0);
+    assert.equal(meta.dataSize, 0);
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
+});
+
+test("parseSaveMeta 地图名抛错时不影响其他字段", () => {
+  SaveBackupCheat.isLocalMode = () => false;
+  SaveBackupCheat.readSavefileInfo = () => null;
+  SaveBackupCheat.readSaveText = () =>
+    JSON.stringify({ map: { _mapId: 3 }, system: {} });
+  SaveBackupCheat.getMapInfo = () => {
+    throw new Error("map data broken");
+  };
+
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    const meta = SaveBackupCheat.parseSaveMeta(6);
+    assert.equal(meta.slot, 6);
+    assert.equal(meta.mapId, 3);
+    assert.equal(meta.mapName, "");
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
+});
+
+test("parseSaveMeta 保留字符串 saveTime", () => {
+  SaveBackupCheat.isLocalMode = () => false;
+  SaveBackupCheat.readSavefileInfo = () => null;
+  SaveBackupCheat.readSaveText = () =>
+    JSON.stringify({ saveTime: "第 3 章", system: {} });
+
+  const meta = SaveBackupCheat.parseSaveMeta(7);
+  assert.equal(meta.saveTime, "第 3 章");
+  assert.equal(meta.savefileTimeText, "");
+});
+
+test("parseAnySaveData JsonEx 解析失败时返回 null 并告警", () => {
+  globalThis.JsonEx = {
+    parse() {
+      throw new Error("bad json");
+    },
+  };
+
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    assert.equal(SaveBackupCheat.parseAnySaveData("wrapped"), null);
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
+});
+
+test("validateSaveText 校验空文本 / 非法 JSON / 缺少存档结构", () => {
+  assert.throws(() => SaveBackupCheat.validateSaveText(""));
+  assert.throws(() => SaveBackupCheat.validateSaveText("   "));
+  assert.throws(
+    () => SaveBackupCheat.validateSaveText("not json", "标签"),
+    /标签/,
+  );
+  assert.throws(() =>
+    SaveBackupCheat.validateSaveText(JSON.stringify({ system: {}, party: {} })),
+  );
+
+  const valid = {
+    system: { _framesOnSave: 0 },
+    party: { _gold: 0 },
+    actors: [],
+  };
+  assert.deepEqual(
+    SaveBackupCheat.validateSaveText(JSON.stringify(valid)),
+    valid,
+  );
 });
 
 test("getMapInfo：读取 $dataMapInfos，缺失时返回 null", () => {

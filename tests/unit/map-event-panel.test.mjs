@@ -1188,6 +1188,85 @@ test("MapEventPanel.onCanvasClick：功能关闭 / 无地图 / 无 canvas 时直
   assert.equal(teleported, 1);
 });
 
+test("MapEventPanel.data / created / mounted / watch 生命周期", () => {
+  const data = MapEventPanel.data.call({
+    loadSetting(key, fallback) {
+      if (key === "mapEventPanel_limitedView") return false;
+      if (key === "mapEventPanel_clickToTeleport") return false;
+      if (key === "mapEventPanel_readInterval") return "750";
+      return fallback;
+    },
+    normalizeReadInterval(value) {
+      return Number(value);
+    },
+  });
+
+  assert.equal(data.limitedView, false);
+  assert.equal(data.clickToTeleportEnabled, false);
+  assert.equal(data.readInterval, 750);
+  assert.equal(data.canvasWidth, 550);
+  assert.equal(data.canvasHeight, 550);
+  assert.equal(data.maxViewSize, 25);
+  assert.equal(data.needsRedraw, true);
+
+  let initialized = 0;
+  MapEventPanel.created.call({
+    initializeMapDisplay() {
+      initialized++;
+    },
+  });
+  assert.equal(initialized, 1);
+
+  const mountedCalls = [];
+  const panel = {
+    isCanvasVisible: false,
+    $nextTick(callback) {
+      callback();
+    },
+    setupCanvasVisibilityObserver() {
+      mountedCalls.push("observe");
+    },
+    renderMap() {
+      mountedCalls.push("render");
+    },
+  };
+
+  MapEventPanel.mounted.call(panel);
+  assert.deepEqual(mountedCalls, ["observe"]);
+
+  panel.isCanvasVisible = true;
+  MapEventPanel.mounted.call(panel);
+  assert.deepEqual(mountedCalls, ["observe", "observe", "render"]);
+
+  const saved = [];
+  const watched = {
+    isCanvasVisible: true,
+    saveSetting(key, value) {
+      saved.push([key, value]);
+    },
+    updateCanvasSize() {
+      saved.push(["size"]);
+    },
+    $nextTick(callback) {
+      callback();
+    },
+    renderMap() {
+      saved.push(["render"]);
+    },
+  };
+
+  MapEventPanel.watch.limitedView.call(watched, false);
+  assert.deepEqual(saved, [
+    ["mapEventPanel_limitedView", false],
+    ["size"],
+    ["render"],
+  ]);
+
+  saved.length = 0;
+  MapEventPanel.watch.clickToTeleportEnabled.call(watched, false);
+  assert.deepEqual(saved, [["mapEventPanel_clickToTeleport", false]]);
+});
+
 test("MapEventPanel.beforeUnmount：断开观察者并清理定时器", () => {
   const originalClearInterval = globalThis.clearInterval;
   const cleared = [];
@@ -1234,4 +1313,71 @@ test("MapEventPanel.beforeUnmount：清理过程抛错也不影响卸载", () =>
   } finally {
     globalThis.clearInterval = originalClearInterval;
   }
+});
+
+test("MapEventPanel.getSettingsStorage reuses shared storage", () => {
+  const first = MapEventPanel.methods.getSettingsStorage.call({});
+  const second = MapEventPanel.methods.getSettingsStorage.call({});
+
+  assert.ok(first);
+  assert.equal(first, second);
+  assert.equal(typeof first.getItem, "function");
+  assert.equal(typeof first.setItem, "function");
+});
+
+test("MapEventPanel.isTilePassable defaults to true without $gameMap", () => {
+  const panel = makePanel({
+    mapData: { width: 5, height: 5, events: [] },
+  });
+
+  globalThis.$gameMap = { width: () => 5, height: () => 5 };
+
+  assert.equal(panel.isTilePassable(1, 1), true);
+  assert.equal(panel.isTilePassable(10, 10), false);
+});
+
+test("MapEventPanel.updatePlayerPosition redraws when either axis changes", () => {
+  globalThis.$gamePlayer = { x: 1, y: 2 };
+
+  const panel = makePanel({
+    playerPosition: { x: 0, y: 0 },
+    needsRedraw: false,
+  });
+  panel.updatePlayerPosition();
+  assert.deepEqual(panel.playerPosition, { x: 1, y: 2 });
+  assert.equal(panel.needsRedraw, true);
+
+  panel.needsRedraw = false;
+  panel.updatePlayerPosition();
+  assert.equal(panel.needsRedraw, false);
+
+  globalThis.$gamePlayer = { x: 1, y: 3 };
+  panel.updatePlayerPosition();
+  assert.deepEqual(panel.playerPosition, { x: 1, y: 3 });
+  assert.equal(panel.needsRedraw, true);
+});
+
+test("MapEventPanel.drawWalkableBoundaries draws right border", () => {
+  const ctx = createContext();
+
+  globalThis.$gamePlayer = {
+    canPass(x, y, direction) {
+      return direction !== 6;
+    },
+  };
+
+  const panel = makePanel({
+    cellSize: 10,
+    isTilePassable: () => true,
+    mapData: { width: 2, height: 2, events: [] },
+  });
+
+  globalThis.$gameMap = { mapId: () => 1, isPassable: () => true };
+  globalThis.$dataMap = { width: 2, height: 2, events: [] };
+
+  panel.drawWalkableBoundaries(ctx, 0, 0, 1, 1);
+
+  assert.ok(
+    ctx.calls.some(([name, x, y]) => name === "moveTo" && x === 10 && y === 0),
+  );
 });

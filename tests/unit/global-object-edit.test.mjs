@@ -168,3 +168,48 @@ test("toJsonText：BigInt / 函数 / 循环引用 / undefined", () => {
   assert.equal(toJsonText(() => 1).ok, false);
   assert.equal(toJsonText(null).text, "null");
 });
+
+test("getContainerKeys returns collected keys when enumeration throws", () => {
+  const root = new Proxy(
+    {},
+    {
+      ownKeys() {
+        throw new Error("cannot enumerate");
+      },
+    },
+  );
+
+  assert.deepEqual(getContainerKeys(root), []);
+});
+
+test("isTraversableContainer handles constructor access and proxy failures", () => {
+  const proto = Object.create(null);
+  Object.defineProperty(proto, "constructor", {
+    configurable: true,
+    get() {
+      throw new Error("constructor getter broken");
+    },
+  });
+
+  const value = Object.create(proto);
+  assert.equal(isTraversableContainer(value), true);
+
+  const revoked = Proxy.revocable({}, {});
+  revoked.revoke();
+  assert.equal(isTraversableContainer(revoked.proxy), false);
+});
+
+test("deleteChildValue reports delete failures", () => {
+  const container = new Proxy(
+    {},
+    {
+      deleteProperty() {
+        throw new Error("delete blocked");
+      },
+    },
+  );
+
+  const result = deleteChildValue(container, "a");
+  assert.equal(result.ok, false);
+  assert.match(result.message, /delete blocked/);
+});

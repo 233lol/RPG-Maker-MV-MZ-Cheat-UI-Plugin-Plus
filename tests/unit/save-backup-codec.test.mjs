@@ -257,3 +257,83 @@ test("resolveLZString / resolvePako：nw.js 下按游戏目录加载 CommonJS �
     assert.equal(pako.inflate('PAKO:{"a":1}'), '{"a":1}');
   });
 });
+
+test("resolvePako / resolveLZString 读取全局对象抛错时降级", () => {
+  resetCodec();
+
+  Object.defineProperty(globalThis, "pako", {
+    configurable: true,
+    get() {
+      throw new Error("pako getter broken");
+    },
+  });
+  Object.defineProperty(globalThis, "LZString", {
+    configurable: true,
+    get() {
+      throw new Error("LZString getter broken");
+    },
+  });
+
+  try {
+    assert.equal(SaveBackupCodec.resolvePako(), null);
+    assert.equal(SaveBackupCodec.resolveLZString(), null);
+  } finally {
+    delete globalThis.pako;
+    delete globalThis.LZString;
+  }
+});
+
+test("resolvePako / resolveLZString 在 require 抛错时返回 null", () => {
+  resetCodec();
+  globalThis.require = () => {
+    throw new Error("require unavailable");
+  };
+
+  assert.equal(SaveBackupCodec.resolvePako(), null);
+  assert.equal(SaveBackupCodec.resolveLZString(), null);
+});
+
+test("resolveLZString 回退到相对路径模块", () => {
+  resetCodec();
+  const fakeLz = makeFakeLZString();
+
+  globalThis.require = (name) => {
+    if (name === "fs") {
+      return { existsSync: () => false };
+    }
+    if (name === "path") {
+      return { resolve: (...parts) => parts.join("/") };
+    }
+    if (name.includes("lz-string")) {
+      return fakeLz;
+    }
+    return {};
+  };
+
+  assert.equal(SaveBackupCodec.getLZString(), fakeLz);
+});
+
+test("decodePayloadText 遇到非字符串解压结果 / 解压抛错时返回 null", () => {
+  resetCodec();
+  const originalWarn = console.warn;
+  console.warn = () => {};
+
+  try {
+    globalThis.pako = {
+      deflate: (text) => text,
+      inflate: () => 123,
+    };
+    SaveBackupCodec.pakoCache = undefined;
+    assert.equal(SaveBackupCodec.decodePayloadText("abc", "pako"), null);
+
+    globalThis.LZString = {
+      decompressFromBase64() {
+        throw new Error("lz broken");
+      },
+    };
+    SaveBackupCodec.lzStringCache = undefined;
+    assert.equal(SaveBackupCodec.decodePayloadText("abc", "lzstring"), null);
+  } finally {
+    console.warn = originalWarn;
+  }
+});

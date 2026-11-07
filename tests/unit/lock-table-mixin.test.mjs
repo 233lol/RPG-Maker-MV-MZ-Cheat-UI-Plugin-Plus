@@ -484,3 +484,19 @@ test("buildLockPayload：跳过 id <= 0 与非整数 id", () => {
     2: { lockEnabled: true, lockValue: true },
   });
 });
+
+test("lockTableMixin created loads persisted locks and initializes data", () => {
+  const calls = [];
+  const panel = {
+    ...methods,
+    readPersistedLocks() {
+      calls.push("read");
+    },
+    initializeVariables() {
+      calls.push("init");
+    },
+  };
+
+  assert.doesNotThrow(() => lockTableMixin.created.call(panel));
+  assert.deepEqual(calls, ["read", "init"]);
+});

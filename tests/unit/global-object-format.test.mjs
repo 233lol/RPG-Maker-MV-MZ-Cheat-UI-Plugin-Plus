@@ -180,3 +180,37 @@ test("parseValueByKind：未知类型按 JSON 字面量宽松解析", () => {
   });
   assert.equal(parseValueByKind("   ", "object").ok, false);
 });
+
+test("getValueKind / formatValuePreview handle DOM, typed arrays and revoked proxies", () => {
+  class FakeNode {
+    constructor(nodeName) {
+      this.nodeName = nodeName;
+    }
+  }
+
+  globalThis.Node = FakeNode;
+
+  try {
+    const node = new FakeNode("DIV");
+    assert.equal(getValueKind(node), "dom");
+    assert.match(formatValuePreview(node, "dom"), /DIV/);
+
+    const longNode = new FakeNode("N".repeat(200));
+    const preview = formatValuePreview(longNode, "dom");
+    assert.equal(typeof preview, "string");
+    assert.ok(preview.length <= 202);
+
+    const typed = new Uint8Array(4);
+    assert.equal(getValueKind(typed), "object");
+    assert.ok(formatValuePreview(typed, "object").length > 0);
+
+    const revoked = Proxy.revocable({}, {});
+    revoked.revoke();
+    assert.equal(getValueKind(revoked.proxy), "object");
+  } finally {
+    delete globalThis.Node;
+  }
+
+  assert.equal(parseValueByKind("false", "boolean").value, false);
+  assert.equal(parseValueByKind("true", "boolean").value, true);
+});

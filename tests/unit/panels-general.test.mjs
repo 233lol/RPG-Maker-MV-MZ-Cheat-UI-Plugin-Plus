@@ -6,6 +6,8 @@ import {
   GeneralCheat,
   GameSpeedCheat,
   SpeedCheat,
+  SceneCheat,
+  BattleCheat,
 } from "../../cheat-engine/www/cheat/js/CheatHelper.js";
 import { Alert } from "../../cheat-engine/www/cheat/js/AlertHelper.js";
 import { Key } from "../../cheat-engine/www/cheat/js/KeyCodes.js";
@@ -642,6 +644,295 @@ test("GeneralPanel：倍率变更 / 步进 / 场景开关互相排斥", () => {
 
 /* ----------------------------------------------------------------- ShortcutPanel */
 
+test("GeneralPanel.created / watch / beforeUnmount 生命周期钩子", () => {
+  let initialized = 0;
+  const panel = makeGeneralPanel({
+    initializeVariables() {
+      initialized++;
+    },
+  });
+
+  GeneralPanel.created.call(panel);
+  assert.equal(initialized, 1);
+
+  let guardUpdates = 0;
+  const watchPanel = makeGeneralPanel({
+    updatePopupEscapeKeyGuard() {
+      guardUpdates++;
+    },
+  });
+
+  GeneralPanel.watch.showEventInspectDialog.call(watchPanel);
+  assert.equal(guardUpdates, 1);
+
+  let enabled = 0;
+  let disabled = 0;
+  watchPanel.enableReplGlobalKeyGuard = () => enabled++;
+  watchPanel.disableReplGlobalKeyGuard = () => disabled++;
+
+  GeneralPanel.watch.showDebugReplDialog.call(watchPanel, true);
+  assert.equal(enabled, 1);
+  assert.equal(disabled, 0);
+  assert.equal(guardUpdates, 2);
+
+  GeneralPanel.watch.showDebugReplDialog.call(watchPanel, false);
+  assert.equal(disabled, 1);
+  assert.equal(guardUpdates, 3);
+
+  let popupDisabled = 0;
+  disabled = 0;
+  const unmountPanel = makeGeneralPanel({
+    disableReplGlobalKeyGuard() {
+      disabled++;
+    },
+    disablePopupEscapeKeyGuard() {
+      popupDisabled++;
+    },
+  });
+
+  GeneralPanel.beforeUnmount.call(unmountPanel);
+  assert.equal(disabled, 1);
+  assert.equal(popupDisabled, 1);
+});
+
+test("GeneralPanel.onLocaleChange 空值 / 相同语言直接返回", () => {
+  const panel = makeGeneralPanel();
+
+  assert.doesNotThrow(() => panel.onLocaleChange(""));
+  assert.doesNotThrow(() => panel.onLocaleChange(null));
+});
+
+test("GeneralPanel.localeTitle 找不到选项时回退到语言代码", () => {
+  const panel = makeGeneralPanel({
+    locale: "xx-YY",
+    localeOptions: [{ title: "English", value: "en" }],
+  });
+
+  assert.equal(GeneralPanel.computed.localeTitle.call(panel), "xx-YY");
+
+  panel.locale = "en";
+  assert.equal(GeneralPanel.computed.localeTitle.call(panel), "English");
+});
+
+test("GeneralPanel.inspectCurrentEvent 未知事件 / 空记录 / 成功 / 失败", async () => {
+  const nextTickCallbacks = [];
+  const basePanel = makeGeneralPanel({
+    $nextTick(callback) {
+      nextTickCallbacks.push(callback);
+    },
+    scrollToCurrentEventEntry() {
+      this.scrolled = true;
+    },
+  });
+
+  globalThis.window = {
+    requestAnimationFrame(callback) {
+      callback();
+    },
+  };
+
+  const noEventPanel = makeGeneralPanel({
+    ...basePanel,
+    getCurrentEventId: () => 0,
+    getCurrentEventCommandIndex: () => 0,
+  });
+
+  await GeneralPanel.methods.inspectCurrentEvent.call(noEventPanel);
+  assert.deepEqual(noEventPanel.inspectedEventRows, []);
+  assert.equal(noEventPanel.showEventInspectDialog, true);
+  assert.notEqual(noEventPanel.inspectedEventMessage, "");
+
+  const emptyPanel = makeGeneralPanel({
+    ...basePanel,
+    getCurrentEventId: () => 1,
+    getCurrentEventCommandIndex: () => 2,
+    formatEventListEntries: async () => [],
+  });
+
+  globalThis.$gameMap = {
+    event: () => ({ page: () => ({ list: [] }) }),
+  };
+
+  await GeneralPanel.methods.inspectCurrentEvent.call(emptyPanel);
+  assert.deepEqual(emptyPanel.inspectedEventRows, []);
+  assert.equal(emptyPanel.showEventInspectDialog, true);
+  assert.notEqual(emptyPanel.inspectedEventMessage, "");
+  assert.equal(nextTickCallbacks.length, 1);
+
+  nextTickCallbacks[0]();
+  assert.equal(emptyPanel.scrolled, true);
+
+  const rows = [{ text: "line" }];
+  const okPanel = makeGeneralPanel({
+    ...basePanel,
+    getCurrentEventId: () => 1,
+    getCurrentEventCommandIndex: () => 0,
+    formatEventListEntries: async () => rows,
+  });
+
+  await GeneralPanel.methods.inspectCurrentEvent.call(okPanel);
+  assert.deepEqual(okPanel.inspectedEventRows, rows);
+  assert.equal(okPanel.inspectedEventMessage, "");
+
+  const errorPanel = makeGeneralPanel({
+    ...basePanel,
+    getCurrentEventId: () => 1,
+    getCurrentEventCommandIndex: () => 0,
+  });
+
+  globalThis.$gameMap = {
+    event() {
+      throw new Error("boom");
+    },
+  };
+
+  await GeneralPanel.methods.inspectCurrentEvent.call(errorPanel);
+  assert.deepEqual(errorPanel.inspectedEventRows, []);
+  assert.match(errorPanel.inspectedEventMessage, /boom/);
+  assert.equal(errorPanel.showEventInspectDialog, true);
+
+  GeneralPanel.methods.closeEventInspectDialog.call(errorPanel);
+  assert.equal(errorPanel.showEventInspectDialog, false);
+});
+
+test("GeneralPanel.inspectCurrentEvent 令牌失效时丢弃异步结果", async () => {
+  let release = null;
+  const panel = makeGeneralPanel({
+    getCurrentEventId: () => 1,
+    getCurrentEventCommandIndex: () => 0,
+    async formatEventListEntries() {
+      await new Promise((resolve) => {
+        release = resolve;
+      });
+      return [{ text: "stale" }];
+    },
+  });
+
+  globalThis.$gameMap = {
+    event: () => ({ page: () => ({ list: [] }) }),
+  };
+
+  const pending = GeneralPanel.methods.inspectCurrentEvent.call(panel);
+
+  panel.__eventInspectToken = 1000;
+  release();
+  await pending;
+
+  assert.deepEqual(panel.inspectedEventRows, []);
+  assert.equal(panel.showEventInspectDialog, false);
+});
+
+test("GeneralPanel 弹窗 Esc 与 REPL 全局按键守卫", () => {
+  const listeners = new Map();
+  const windowStub = {
+    addEventListener(type, handler) {
+      listeners.set(`${type}:${handler}`, handler);
+    },
+    removeEventListener(type, handler) {
+      listeners.delete(`${type}:${handler}`);
+    },
+  };
+  globalThis.window = windowStub;
+
+  let closedRepl = 0;
+  let closedInspect = 0;
+  const panel = makeGeneralPanel({
+    popupEscapeKeyGuard: null,
+    replGlobalKeyGuard: null,
+    showEventInspectDialog: true,
+    showDebugReplDialog: true,
+    closeDebugRepl() {
+      closedRepl++;
+    },
+    closeEventInspectDialog() {
+      closedInspect++;
+    },
+  });
+
+  GeneralPanel.methods.enablePopupEscapeKeyGuard.call(panel);
+  assert.equal(listeners.size, 1);
+
+  GeneralPanel.methods.enablePopupEscapeKeyGuard.call(panel);
+  assert.equal(listeners.size, 1);
+
+  const guard = panel.popupEscapeKeyGuard;
+  const createEvent = (key) => ({
+    key,
+    stopped: 0,
+    stopImmediatePropagation() {
+      this.stopped++;
+    },
+    stopPropagation() {
+      this.stopped++;
+    },
+    preventDefault() {
+      this.stopped++;
+    },
+  });
+
+  panel.showEventInspectDialog = false;
+  panel.showDebugReplDialog = false;
+  guard(createEvent("Escape"));
+  assert.equal(closedRepl, 0);
+
+  panel.showEventInspectDialog = true;
+  panel.showDebugReplDialog = true;
+  guard(createEvent("Enter"));
+  assert.equal(closedRepl, 0);
+
+  const escapeEvent = createEvent("Escape");
+  guard(escapeEvent);
+  assert.equal(closedRepl, 1);
+  assert.equal(closedInspect, 1);
+  assert.equal(escapeEvent.stopped, 3);
+
+  GeneralPanel.methods.disablePopupEscapeKeyGuard.call(panel);
+  assert.equal(panel.popupEscapeKeyGuard, null);
+  assert.equal(listeners.size, 0);
+  assert.doesNotThrow(() =>
+    GeneralPanel.methods.disablePopupEscapeKeyGuard.call(panel),
+  );
+
+  const replPanel = makeGeneralPanel({
+    popupEscapeKeyGuard: null,
+    replGlobalKeyGuard: null,
+    showDebugReplDialog: true,
+    isNodeInsideDebugRepl(node) {
+      return node && node.inside === true;
+    },
+  });
+
+  GeneralPanel.methods.enableReplGlobalKeyGuard.call(replPanel);
+  assert.equal(listeners.size, 3);
+
+  GeneralPanel.methods.enableReplGlobalKeyGuard.call(replPanel);
+  assert.equal(listeners.size, 3);
+
+  const replGuard = replPanel.replGlobalKeyGuard;
+  const replEvent = createEvent("a");
+
+  replGuard({ ...replEvent, target: { inside: true } });
+  assert.equal(replEvent.stopped, 0);
+
+  const stopEvent = createEvent("a");
+  stopEvent.target = { inside: false };
+  replGuard(stopEvent);
+  assert.equal(stopEvent.stopped, 3);
+
+  replPanel.showDebugReplDialog = false;
+  const hiddenEvent = createEvent("b");
+  hiddenEvent.target = { inside: false };
+  replGuard(hiddenEvent);
+  assert.equal(hiddenEvent.stopped, 0);
+
+  GeneralPanel.methods.disableReplGlobalKeyGuard.call(replPanel);
+  assert.equal(replPanel.replGlobalKeyGuard, null);
+  assert.equal(listeners.size, 0);
+  assert.doesNotThrow(() =>
+    GeneralPanel.methods.disableReplGlobalKeyGuard.call(replPanel),
+  );
+});
+
 test("ShortcutPanel.convertToInternalData：复制设置并整理参数", () => {
   const panel = makeShortcutPanel();
   const shortcut = Key.fromString("ctrl c");
@@ -815,4 +1106,146 @@ test("ShortcutPanel.initializeVariables / restoreToDefault", () => {
 
   assert.equal(restored, 1);
   assert.equal(ShortcutPanel.computed.panelStateId.call(panel), "shortcuts");
+});
+
+test("GeneralPanel wrappers forward to SceneCheat / BattleCheat", () => {
+  const calls = [];
+  const originals = {
+    gotoTitle: SceneCheat.gotoTitle,
+    toggleSaveScene: SceneCheat.toggleSaveScene,
+    toggleLoadScene: SceneCheat.toggleLoadScene,
+    victory: BattleCheat.victory,
+    recoverAllParty: BattleCheat.recoverAllParty,
+    changeAllEnemyHealth: BattleCheat.changeAllEnemyHealth,
+  };
+
+  SceneCheat.gotoTitle = () => calls.push(["title"]);
+  SceneCheat.toggleSaveScene = () => calls.push(["save"]);
+  SceneCheat.toggleLoadScene = () => calls.push(["load"]);
+  BattleCheat.victory = () => calls.push(["victory"]);
+  BattleCheat.recoverAllParty = () => calls.push(["recover"]);
+  BattleCheat.changeAllEnemyHealth = (hp) => calls.push(["hp", hp]);
+
+  try {
+    const panel = makeGeneralPanel();
+    panel.gotoTitle();
+    panel.toggleSaveScene();
+    panel.toggleLoadScene();
+    panel.victory();
+    panel.recoverAllParty();
+    panel.changeAllEnemyHealth(5);
+  } finally {
+    Object.assign(SceneCheat, {
+      gotoTitle: originals.gotoTitle,
+      toggleSaveScene: originals.toggleSaveScene,
+      toggleLoadScene: originals.toggleLoadScene,
+    });
+    Object.assign(BattleCheat, {
+      victory: originals.victory,
+      recoverAllParty: originals.recoverAllParty,
+      changeAllEnemyHealth: originals.changeAllEnemyHealth,
+    });
+  }
+
+  assert.deepEqual(calls, [
+    ["title"],
+    ["save"],
+    ["load"],
+    ["victory"],
+    ["recover"],
+    ["hp", 5],
+  ]);
+});
+
+test("GeneralPanel.updatePopupEscapeKeyGuard toggles guards", () => {
+  const calls = [];
+  const panel = makeGeneralPanel({
+    enablePopupEscapeKeyGuard() {
+      calls.push("enable");
+    },
+    disablePopupEscapeKeyGuard() {
+      calls.push("disable");
+    },
+  });
+
+  panel.showEventInspectDialog = false;
+  panel.showDebugReplDialog = false;
+  GeneralPanel.methods.updatePopupEscapeKeyGuard.call(panel);
+  assert.deepEqual(calls, ["disable"]);
+
+  panel.showEventInspectDialog = true;
+  GeneralPanel.methods.updatePopupEscapeKeyGuard.call(panel);
+  assert.deepEqual(calls, ["disable", "enable"]);
+
+  panel.showEventInspectDialog = false;
+  panel.showDebugReplDialog = true;
+  GeneralPanel.methods.updatePopupEscapeKeyGuard.call(panel);
+  assert.deepEqual(calls, ["disable", "enable", "enable"]);
+});
+
+test("GeneralPanel.inspectCurrentEvent drops stale no-event result", async () => {
+  const panel = makeGeneralPanel({
+    getCurrentEventId() {
+      this.__eventInspectToken = 99;
+      return 0;
+    },
+    getCurrentEventCommandIndex: () => 0,
+  });
+
+  await GeneralPanel.methods.inspectCurrentEvent.call(panel);
+
+  assert.deepEqual(panel.inspectedEventRows, []);
+  assert.equal(panel.showEventInspectDialog, false);
+});
+
+test("GeneralPanel.inspectCurrentEvent drops stale error result", async () => {
+  const panel = makeGeneralPanel({
+    getCurrentEventId: () => 1,
+    getCurrentEventCommandIndex: () => 0,
+    formatEventListEntries() {
+      panel.__eventInspectToken = 500;
+      throw new Error("boom after invalidation");
+    },
+  });
+
+  globalThis.$gameMap = {
+    event: () => ({ page: () => ({ list: [] }) }),
+  };
+
+  await GeneralPanel.methods.inspectCurrentEvent.call(panel);
+
+  assert.deepEqual(panel.inspectedEventRows, []);
+  assert.equal(panel.showEventInspectDialog, false);
+});
+
+test("GeneralPanel.formatReplValue handles unstringifiable values", () => {
+  const panel = makeGeneralPanel();
+  const value = {
+    toJSON() {
+      throw new Error("json failed");
+    },
+    toString() {
+      throw new Error("string failed");
+    },
+  };
+
+  assert.equal(panel.formatReplValue(value), "[Unserializable value]");
+});
+
+test("GeneralPanel.highlightParamText highlights JSON and escapes failures", async () => {
+  const panel = makeGeneralPanel();
+
+  const html = await panel.highlightParamText('{"a":1}');
+  assert.equal(typeof html, "string");
+  assert.ok(html.length > 0);
+
+  const bad = {
+    toString() {
+      throw new Error("bad value");
+    },
+  };
+
+  const fallback = await panel.highlightParamText(bad);
+  assert.equal(typeof fallback, "string");
+  assert.ok(fallback.length > 0);
 });

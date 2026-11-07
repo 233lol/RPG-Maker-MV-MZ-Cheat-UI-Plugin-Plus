@@ -161,6 +161,44 @@ test("t：支持 {count} 复数条目", () => {
 
 test("formatNumber / formatDateTime：按当前语言输出", () => {
   assert.equal(formatNumber(1234567), "1,234,567");
+});
+
+test("复数与格式化在 Intl 不可用 / 非有限值时的回退", () => {
+  const originalPluralRules = Intl.PluralRules;
+  const originalNumberFormat = Intl.NumberFormat;
+  const originalDateTimeFormat = Intl.DateTimeFormat;
+
+  try {
+    Intl.PluralRules = class {
+      constructor() {
+        throw new Error("no plural rules");
+      }
+    };
+    assert.equal(t("common.seconds", { count: 5 }), "5 秒");
+    assert.equal(typeof t("time.minutesAgo", { count: Number.NaN }), "string");
+
+    Intl.NumberFormat = class {
+      constructor() {
+        throw new Error("no number format");
+      }
+    };
+    assert.equal(formatNumber(1234), "1234");
+
+    Intl.DateTimeFormat = class {
+      constructor() {
+        throw new Error("no date format");
+      }
+    };
+    assert.equal(formatDateTime(0), new Date(0).toISOString());
+  } finally {
+    Intl.PluralRules = originalPluralRules;
+    Intl.NumberFormat = originalNumberFormat;
+    Intl.DateTimeFormat = originalDateTimeFormat;
+  }
+});
+
+test("formatNumber / formatDateTime 数值与日期", () => {
+  assert.equal(formatNumber(1234567), "1,234,567");
   assert.equal(
     formatDateTime(new Date(2026, 0, 2, 3, 4, 5).getTime()),
     "2026/01/02 03:04:05",

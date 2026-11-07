@@ -1139,3 +1139,156 @@ test("MessageCheat.startSkip / stopSkip：合法加速时备份并恢复游戏�
     GameSpeedCheat.setGameSpeed = originalSetGameSpeed;
   }
 });
+
+test("GeneralCheat not-ready guards return early", () => {
+  const alerts = captureAlerts();
+
+  assert.doesNotThrow(() => GeneralCheat.toggleNoClip(true));
+  assert.doesNotThrow(() => GeneralCheat.godModeOn(new Game_Actor(1)));
+  assert.equal(GeneralCheat.godModeOn(new Game_Actor(1)), undefined);
+
+  const actor = new Game_Actor(1);
+  const map = GeneralCheat.getGodModeMap();
+  map.set(1, { actor, actorId: 1, godMode: true });
+  assert.doesNotThrow(() => GeneralCheat.godModeOff(actor));
+
+  assert.equal(alerts.filter((item) => item.level === "success").length, 0);
+});
+
+test("GeneralCheat.getGodModeActors ignores live actor lookup failures", () => {
+  const actor = new Game_Actor(1);
+  const map = GeneralCheat.getGodModeMap();
+  map.set(1, { actor, actorId: 1, godMode: true });
+  globalThis.$gameActors = {
+    actor() {
+      throw new Error("actor lookup failed");
+    },
+  };
+
+  assert.deepEqual(GeneralCheat.getGodModeActors(), [actor]);
+});
+
+test("GeneralCheat.syncGodModeInterval returns when interval exists", () => {
+  const actor = new Game_Actor(1);
+  const map = GeneralCheat.getGodModeMap();
+  map.set(1, { actor, actorId: 1, godMode: true });
+  GeneralCheat.godModeInterval = 123;
+
+  assert.doesNotThrow(() => GeneralCheat.syncGodModeInterval());
+  assert.equal(GeneralCheat.godModeInterval, 123);
+});
+
+test("GeneralCheat.syncGodModeInterval stops itself when actors disappear", () => {
+  const fake = installFakeTimers();
+  const actor = new Game_Actor(1);
+  const map = GeneralCheat.getGodModeMap();
+  map.set(1, { actor, actorId: 1, godMode: true });
+
+  try {
+    GeneralCheat.syncGodModeInterval();
+    const [interval] = [...fake.timers.values()];
+    assert.ok(interval);
+
+    map.clear();
+    interval.fn();
+
+    assert.equal(GeneralCheat.godModeInterval, undefined);
+    assert.equal(fake.timers.size, 0);
+  } finally {
+    fake.restore();
+  }
+});
+
+test("GeneralCheat.toggleGodMode dispatches by current state", () => {
+  const actor = new Game_Actor(1);
+  const originalOn = GeneralCheat.godModeOn;
+  const originalOff = GeneralCheat.godModeOff;
+  const calls = [];
+
+  GeneralCheat.godModeOn = () => calls.push("on");
+  GeneralCheat.godModeOff = () => calls.push("off");
+
+  try {
+    GeneralCheat.toggleGodMode(actor);
+    const map = GeneralCheat.getGodModeMap();
+    map.set(1, { actor, actorId: 1, godMode: true });
+    GeneralCheat.toggleGodMode(actor);
+  } finally {
+    GeneralCheat.godModeOn = originalOn;
+    GeneralCheat.godModeOff = originalOff;
+  }
+
+  assert.deepEqual(calls, ["on", "off"]);
+});
+
+test("GameSpeedCheat / SpeedCheat ignore corrupt settings JSON", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cheat-corrupt-"));
+  const previousCwd = process.cwd();
+  process.chdir(dir);
+
+  try {
+    const gameSpeedFile = getCheatSettingsPath("gameSpeed.json");
+    const speedFile = getCheatSettingsPath("speed.json");
+
+    fs.mkdirSync(path.dirname(gameSpeedFile), { recursive: true });
+    fs.writeFileSync(
+      gameSpeedFile,
+      JSON.stringify({ data: "{bad json" }),
+      "utf8",
+    );
+    fs.writeFileSync(speedFile, JSON.stringify({ data: "{bad json" }), "utf8");
+
+    assert.doesNotThrow(() => GameSpeedCheat.__readSettings());
+    assert.doesNotThrow(() => SpeedCheat.__readSettings());
+  } finally {
+    process.chdir(previousCwd);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("SpeedCheat.setFixSpeedInterval replaces an existing interval", () => {
+  const fake = installFakeTimers();
+  const originalRemove = SpeedCheat.removeFixSpeedInterval;
+  let removed = 0;
+
+  SpeedCheat.removeFixSpeedInterval = () => {
+    removed++;
+    SpeedCheat.fixed = undefined;
+  };
+
+  try {
+    SpeedCheat.fixed = 1;
+    SpeedCheat.setFixSpeedInterval(4);
+  } finally {
+    SpeedCheat.removeFixSpeedInterval = originalRemove;
+    fake.restore();
+  }
+
+  assert.equal(removed, 1);
+  assert.equal(typeof SpeedCheat.fixed, "number");
+});
+
+test("SceneCheat.quickSave / BattleCheat.encounterBattle not-ready guards", async () => {
+  assert.equal(await SceneCheat.quickSave(1), false);
+  assert.doesNotThrow(() => BattleCheat.encounterBattle());
+});
+
+test("BattleCheat.syncAfterGameChange tolerates hook errors", () => {
+  const originalSync = GeneralCheat.syncGodModeInterval;
+  const originalWarn = console.warn;
+  const warnings = [];
+
+  GeneralCheat.syncGodModeInterval = () => {
+    throw new Error("sync failed");
+  };
+  console.warn = (...args) => warnings.push(args);
+
+  try {
+    assert.doesNotThrow(() => BattleCheat.syncAfterGameChange());
+  } finally {
+    GeneralCheat.syncGodModeInterval = originalSync;
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
+});

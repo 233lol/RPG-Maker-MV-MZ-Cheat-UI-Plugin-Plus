@@ -15,7 +15,7 @@
     "typecheck": "node tools/ensure-cheat-artifacts.mjs && tsc -p jsconfig.json",
     "test:unit": "node tools/ensure-cheat-artifacts.mjs && node --test \"tests/unit/**/*.test.mjs\"",
     "test:coverage": "node tools/ensure-cheat-artifacts.mjs && node --test --experimental-test-coverage --test-coverage-include=\"cheat-engine/www/cheat/**/*.js\" --test-coverage-exclude=\"cheat-engine/www/cheat/libs/**\" --test-coverage-exclude=\"cheat-engine/www/cheat/version.js\" \"tests/unit/**/*.test.mjs\"",
-    "test:coverage:check": "node tools/ensure-cheat-artifacts.mjs && node --test --experimental-test-coverage --test-coverage-include=\"cheat-engine/www/cheat/**/*.js\" --test-coverage-exclude=\"cheat-engine/www/cheat/libs/**\" --test-coverage-exclude=\"cheat-engine/www/cheat/version.js\" --test-coverage-lines=80 --test-coverage-branches=75 --test-coverage-functions=75 \"tests/unit/**/*.test.mjs\"",
+    "test:coverage:check": "node tools/ensure-cheat-artifacts.mjs && node --test --experimental-test-coverage --test-coverage-include=\"cheat-engine/www/cheat/**/*.js\" --test-coverage-exclude=\"cheat-engine/www/cheat/libs/**\" --test-coverage-exclude=\"cheat-engine/www/cheat/version.js\" --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=90 \"tests/unit/**/*.test.mjs\"",
     "vendor:shiki": "node tools/build-shiki.mjs",
     "vendor:shiki:dev": "node tools/build-shiki.mjs dev",
     "vendor:vuetify": "node tools/build-vuetify.mjs",

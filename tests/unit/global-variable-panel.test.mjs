@@ -854,6 +854,116 @@ test("GlobalVariablePanel.scheduleInitialLoad / cancelInitialLoad / runInitialLo
   assert.equal(panel.entriesLoading, false);
 });
 
+test("GlobalVariablePanel.created / mounted / activated / deactivated / beforeUnmount", () => {
+  globalThis.window = { marker: true };
+
+  const panel = makePanel({
+    scheduleInitialLoad() {
+      this.scheduled = (this.scheduled || 0) + 1;
+    },
+    refresh(force) {
+      this.refreshed = force;
+    },
+    restartAutoRefresh() {
+      this.restarted = (this.restarted || 0) + 1;
+    },
+    stopAutoRefresh() {
+      this.stopped = (this.stopped || 0) + 1;
+    },
+    clearSearchTimer() {
+      this.searchCleared = (this.searchCleared || 0) + 1;
+    },
+    cancelDeepSearch() {
+      this.deepCancelled = (this.deepCancelled || 0) + 1;
+    },
+    cancelInitialLoad() {
+      this.initialCancelled = (this.initialCancelled || 0) + 1;
+    },
+  });
+
+  GlobalVariablePanel.created.call(panel);
+  assert.equal(panel.container, globalThis.window);
+  assert.equal(typeof panel.limitStorage.getItem, "function");
+  assert.equal(typeof panel.limitStorage.setItem, "function");
+
+  GlobalVariablePanel.mounted.call(panel);
+  assert.equal(panel.scheduled, 1);
+
+  panel.initialLoaded = true;
+  GlobalVariablePanel.activated.call(panel);
+  assert.equal(panel.refreshed, true);
+  assert.equal(panel.restarted, 1);
+
+  panel.initialLoaded = false;
+  GlobalVariablePanel.activated.call(panel);
+  assert.equal(panel.scheduled, 2);
+
+  GlobalVariablePanel.deactivated.call(panel);
+  assert.equal(panel.stopped, 1);
+  assert.equal(panel.searchCleared, 1);
+  assert.equal(panel.deepCancelled, 1);
+  assert.equal(panel.initialCancelled, 1);
+
+  GlobalVariablePanel.beforeUnmount.call(panel);
+  assert.equal(panel.stopped, 2);
+  assert.equal(panel.searchCleared, 2);
+  assert.equal(panel.deepCancelled, 2);
+  assert.equal(panel.initialCancelled, 2);
+});
+
+test("GlobalVariablePanel.watch 触发搜索、根筛选与自动刷新", () => {
+  const calls = [];
+  const panel = makePanel({
+    path: [],
+    isRoot: true,
+    __restoringPanelState: false,
+    deepSearchResults: [1],
+    deepSearchTruncated: true,
+    deepSearchLimitReason: "x",
+    scheduleSearch(immediate) {
+      calls.push(["search", immediate]);
+    },
+    navigateTo(path, options) {
+      calls.push(["navigate", path, options]);
+    },
+    restartAutoRefresh() {
+      calls.push(["restart"]);
+    },
+  });
+
+  GlobalVariablePanel.watch.search.call(panel);
+  assert.deepEqual(calls.at(-1), ["search", true]);
+
+  panel.__restoringPanelState = true;
+  GlobalVariablePanel.watch.search.call(panel);
+  assert.deepEqual(calls.at(-1), ["search", false]);
+
+  panel.__restoringPanelState = false;
+  GlobalVariablePanel.watch.deepSearch.call(panel);
+  assert.deepEqual(panel.deepSearchResults, []);
+  assert.equal(panel.deepSearchTruncated, false);
+  assert.equal(panel.deepSearchLimitReason, "");
+  assert.deepEqual(calls.at(-1), ["search", true]);
+
+  GlobalVariablePanel.watch.rootFilter.call(panel);
+  assert.deepEqual(calls.at(-1), ["navigate", [], {}]);
+
+  panel.__restoringPanelState = true;
+  const before = calls.length;
+  GlobalVariablePanel.watch.rootFilter.call(panel);
+  assert.equal(calls.length, before, "恢复状态时不导航");
+
+  panel.__restoringPanelState = false;
+  panel.path = ["nested"];
+  panel.isRoot = false;
+  GlobalVariablePanel.watch.rootFilter.call(panel);
+  assert.equal(calls.length, before, "非根路径不导航");
+
+  GlobalVariablePanel.watch.autoRefresh.call(panel);
+  GlobalVariablePanel.watch.refreshIntervalMs.call(panel);
+  assert.equal(calls.at(-1)[0], "restart");
+});
+
 test("GlobalVariablePanel.reloadAll / reloadRootGlobals / toggleDeepSearch", () => {
   const alerts = captureAlerts();
   const panel = makePanel({
@@ -875,4 +985,130 @@ test("GlobalVariablePanel.reloadAll / reloadRootGlobals / toggleDeepSearch", () 
   assert.equal(panel.deepSearch, true);
   panel.toggleDeepSearch();
   assert.equal(panel.deepSearch, false);
+});
+
+test("GlobalVariablePanel.requestIdleCallback scheduling and cancel", () => {
+  const idle = new Map();
+  let nextId = 1;
+
+  globalThis.window = {
+    requestIdleCallback(callback, options) {
+      const id = nextId++;
+      idle.set(id, { callback, options });
+      return id;
+    },
+    cancelIdleCallback(id) {
+      idle.delete(id);
+    },
+  };
+
+  const panel = makePanel({
+    initialLoaded: false,
+    initialLoadPending: false,
+    initialLoadTimer: null,
+    initialIdleHandle: null,
+    runInitialLoad() {
+      this.ran = true;
+    },
+  });
+
+  panel.scheduleInitialLoad();
+  assert.equal(panel.initialLoadPending, true);
+  assert.equal(idle.size, 1);
+  assert.equal(typeof panel.initialIdleHandle, "number");
+
+  const [{ callback }] = [...idle.values()];
+  panel.cancelInitialLoad();
+  assert.equal(idle.size, 0);
+  assert.equal(panel.initialLoadPending, false);
+
+  callback();
+  assert.equal(panel.ran, undefined);
+});
+
+test("GlobalVariablePanel.runInitialLoad resumes search after load", () => {
+  const panel = makePanel({
+    searchActive: true,
+    entriesLoading: true,
+    loadSearchLimits() {},
+    reloadRootGlobals() {},
+    rebuildEntries() {},
+    restartAutoRefresh() {},
+    scheduleSearch() {
+      this.searchScheduled = true;
+    },
+  });
+
+  panel.runInitialLoad();
+
+  assert.equal(panel.initialLoaded, true);
+  assert.equal(panel.entriesLoading, false);
+  assert.equal(panel.searchScheduled, true);
+});
+
+test("GlobalVariablePanel.reloadRootGlobals scans the window", () => {
+  globalThis.window = {
+    $gameParty: { members: () => [] },
+    $plugins: [],
+    customGlobal: 1,
+  };
+
+  const panel = makePanel();
+  panel.reloadRootGlobals(true);
+
+  assert.ok(Array.isArray(panel.rootScan.rpg));
+  assert.ok(Array.isArray(panel.rootScan.plugin));
+  assert.equal(typeof panel.pluginNameMap, "object");
+});
+
+test("GlobalVariablePanel.resolveContainer / rebuildEntries handle broken paths", () => {
+  globalThis.window = {};
+
+  const panel = makePanel({
+    path: ["missing"],
+    container: { stale: true },
+    entries: [1],
+  });
+
+  assert.equal(panel.resolveContainer(), false);
+  assert.equal(panel.container, null);
+  assert.notEqual(panel.containerError, "");
+
+  panel.entries = [{ key: "a" }];
+  panel.resolveContainer = () => false;
+  panel.rebuildEntries();
+  assert.deepEqual(panel.entries, []);
+});
+
+test("GlobalVariablePanel.buildEntries / goUp / buildSearchRoot", () => {
+  const navigations = [];
+  const panel = makePanel({
+    container: { a: 1 },
+    path: [],
+    rootScan: { rpg: ["$gameParty"], plugin: [] },
+    rootFilter: "all",
+    pluginNameMap: {},
+    isRoot: true,
+    navigateTo(path, options) {
+      navigations.push([path, options]);
+    },
+  });
+
+  assert.ok(Array.isArray(panel.buildEntries()));
+
+  panel.goUp();
+  assert.equal(navigations.length, 0, "root path does not navigate up");
+
+  panel.path = ["nested"];
+  panel.goUp();
+  assert.deepEqual(navigations.at(-1), [[], undefined]);
+
+  globalThis.window = { $gameParty: { members: () => [] } };
+  const root = panel.buildSearchRoot();
+  assert.equal(typeof root, "object");
+  assert.ok(Object.hasOwn(root, "$gameParty"));
+
+  panel.isRoot = false;
+  panel.container = { nested: true };
+  assert.equal(panel.buildSearchRoot(), panel.container);
 });
