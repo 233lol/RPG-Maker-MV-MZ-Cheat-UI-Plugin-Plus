@@ -162,6 +162,32 @@ test("readGameStats：缺失 / 异常对象时安全降级", () => {
   assert.equal(stats.playtimeSeconds, 0);
 });
 
+test("readGameStats：兼容旧版 _actors，并吞掉异常 getter / 方法", () => {
+  const stats = readGameStats({
+    gameParty: { _actors: [1, 2, 3] },
+    gameMap: {
+      mapId() {
+        throw new Error("broken");
+      },
+    },
+  });
+
+  assert.equal(stats.partySize, 3, "没有 members() 时应回退 _actors");
+  assert.equal(stats.mapId, 0, "mapId 抛错时应回退 0");
+
+  const throwingParty = Object.defineProperty({}, "_steps", {
+    get() {
+      throw new Error("broken");
+    },
+  });
+
+  assert.equal(
+    readGameStats({ gameParty: throwingParty }).steps,
+    0,
+    "字段 getter 抛错时应回退 0",
+  );
+});
+
 test("readGameStats：displayName 为空时回退 dataMapInfos", () => {
   const stats = readGameStats({
     gameMap: { mapId: () => 2, displayName: () => "" },
@@ -201,6 +227,21 @@ test("writePlaytime：优先写 Graphics.frameCount，非法值拒绝", () => {
 
   const frozen = Object.freeze({});
   assert.equal(writePlaytime(frozen, null, 1).ok, false);
+});
+
+test("writePlaytime：Graphics 写入抛错时回退 _framesOnSave", () => {
+  const graphics = {};
+
+  Object.defineProperty(graphics, "frameCount", {
+    set() {
+      throw new Error("readonly");
+    },
+  });
+
+  const gameSystem = { _framesOnSave: 0 };
+
+  assert.deepEqual(writePlaytime(gameSystem, graphics, 2), { ok: true });
+  assert.equal(gameSystem._framesOnSave, 120);
 });
 
 test("writeSteps：写入 _steps 并拒绝非法值", () => {

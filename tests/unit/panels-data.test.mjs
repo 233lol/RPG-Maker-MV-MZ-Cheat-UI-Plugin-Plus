@@ -2,6 +2,9 @@ import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 
 import { createItemDatabasePanel } from "../../cheat-engine/www/cheat/panels/ItemDatabasePanel.js";
+import ItemSettingPanel from "../../cheat-engine/www/cheat/panels/ItemSettingPanel.js";
+import WeaponSettingPanel from "../../cheat-engine/www/cheat/panels/WeaponSettingPanel.js";
+import ArmorSettingPanel from "../../cheat-engine/www/cheat/panels/ArmorSettingPanel.js";
 import SwitchSettingPanel from "../../cheat-engine/www/cheat/panels/SwitchSettingPanel.js";
 import VariableSettingPanel from "../../cheat-engine/www/cheat/panels/VariableSettingPanel.js";
 import StatsSettingPanel from "../../cheat-engine/www/cheat/panels/StatsSettingPanel.js";
@@ -34,6 +37,7 @@ afterEach(() => {
     "$gameMap",
     "$gameSystem",
     "$dataClasses",
+    "$dataItems",
     "$dataWeapons",
     "$dataArmors",
     "$dataStates",
@@ -88,6 +92,35 @@ test("createItemDatabasePanel：工厂组件初始化数据并转换表格行", 
   const emptyPanel = makePanel(EmptyPanel, { items: [{}] });
   EmptyPanel.created.call(emptyPanel);
   assert.deepEqual(emptyPanel.items, []);
+});
+
+test("物品 / 武器 / 防具面板：各自读取对应的数据库", () => {
+  globalThis.$dataItems = [{ name: "Potion", description: "Heals 50 HP" }];
+  globalThis.$dataWeapons = [{ name: "Sword", description: "Sharp" }];
+  globalThis.$dataArmors = [{ name: "Shield", description: "Tough" }];
+
+  const cases = [
+    [ItemSettingPanel, "item", "Potion", "Heals 50 HP"],
+    [WeaponSettingPanel, "weapon", "Sword", "Sharp"],
+    [ArmorSettingPanel, "armor", "Shield", "Tough"],
+  ];
+
+  for (const [Panel, stateKey, name, description] of cases) {
+    const panel = makePanel(Panel, { items: [], stateKey: "" });
+    const data = Panel.data.call(panel);
+
+    assert.equal(Panel.name.endsWith("SettingPanel"), true);
+    assert.equal(data.stateKey, stateKey);
+
+    Panel.created.call(panel);
+
+    assert.equal(panel.items.length, 1);
+    assert.equal(panel.items[0].name, name);
+    assert.deepEqual(panel.convertToTableData(panel.items[0]), {
+      name,
+      desc: description,
+    });
+  }
 });
 
 /* --------------------------------------------------------------- SwitchSettingPanel */

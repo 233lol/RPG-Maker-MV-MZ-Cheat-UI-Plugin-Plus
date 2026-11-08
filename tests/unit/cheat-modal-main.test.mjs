@@ -1,5 +1,6 @@
 import test, { afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 globalThis.Utils = {
   isNwjs: () => false,
@@ -24,6 +25,8 @@ const { GLOBAL_SHORTCUT } =
 const { Key } = await import("../../cheat-engine/www/cheat/js/KeyCodes.js");
 const { isGameInputBlocked, setGameInputBlocked } =
   await import("../../cheat-engine/www/cheat/js/ClickGuard.js");
+const { getLocale, setLocale } =
+  await import("../../cheat-engine/www/cheat/js/strings.js");
 
 globalThis.setInterval = originalSetInterval;
 globalThis.clearInterval = originalClearInterval;
@@ -219,6 +222,11 @@ test("CheatModal：拖动更新位置，松开 / buttons=0 结束拖动", () => 
     geometry: { x: 100, y: 100, width: 500, height: 400 },
   });
 
+  // 没有开始拖动时收到 pointermove 不应移动窗口
+  const initialGeometry = panel.geometry;
+  panel.onDragMove({ buttons: 1, clientX: 999, clientY: 999 });
+  assert.equal(panel.geometry, initialGeometry);
+
   const event = {
     button: 0,
     clientX: 120,
@@ -332,6 +340,25 @@ test("MainComponent.data：恢复上次面板 / 语言重建键 / 空输入状�
   assert.equal(typeof data.currentComponentName, "string");
   assert.ok(data.currentComponentName.length > 0);
   assert.equal(data.currentComponentName.includes("-panel"), true);
+});
+
+test("MainComponent：关闭窗口直接卸载，只保留打开时的 CSS 淡入", () => {
+  // 旧实现用 <v-fade-transition>，show=false 后还要等 0.3 秒 leave 动画才移除，
+  // 期间窗口仍覆盖页面，看起来像「关不掉」。这里用源码断言防止回退。
+  assert.doesNotMatch(MainComponent.template, /v-fade-transition/);
+  assert.match(MainComponent.template, /<cheat-modal[\s\S]*v-if="show"/);
+
+  const css = readFileSync(
+    new URL("../../cheat-engine/www/cheat/css/main.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    css,
+    /\.cheat-window\s*\{[^}]*animation:\s*cheat-window-fade-in/s,
+    "打开窗口时应使用 CSS 淡入动画",
+  );
+  assert.match(css, /@keyframes\s+cheat-window-fade-in/);
 });
 
 test("MainComponent.watch.currentComponentName：有值才写入面板状态", () => {
@@ -679,6 +706,30 @@ test("MainComponent.onGlobalKeyDown：普通按键 / repeat / 输入框 / UI 焦
     ["leave", "ctrl c"],
     ["enter", "ctrl c"],
   ]);
+});
+
+test("MainComponent.onGlobalKeyDown：target 没有 closest 时按非输入框处理", () => {
+  const calls = [];
+  GLOBAL_SHORTCUT.runKeyEnterEvent = (event, key) =>
+    calls.push(["enter", key.asString()]);
+  GLOBAL_SHORTCUT.runKeyLeaveEvent = () => calls.push(["leave"]);
+  GLOBAL_SHORTCUT.runKeyRepeatEvent = () => calls.push(["repeat"]);
+
+  const panel = makeMain();
+  // 合成事件 / 游戏注入的 DOM 事件可能没有 target.closest。
+  const event = {
+    key: "c",
+    keyCode: 67,
+    target: null,
+    repeat: false,
+    preventDefault() {},
+    stopPropagation() {},
+  };
+
+  panel.onGlobalKeyDown(event);
+
+  assert.deepEqual(calls, [["leave"], ["enter", "c"]]);
+  assert.equal(panel.currentKey.asString(), "c");
 });
 
 test("MainComponent.onGlobalKeyDown：Tab 在窗口内循环，Esc 关闭窗口", () => {
@@ -1116,6 +1167,18 @@ test("MainComponent.created 安装补丁 / 接管 CheatHelper / 注册监听", (
   assert.equal(typeof GeneralCheat.toggleCheatModal, "function");
   assert.equal(typeof GeneralCheat.openCheatModal, "function");
   assert.equal(typeof panel.__unsubscribeLocaleChange, "function");
+
+  // 切换语言时重建作弊 UI（只更新 localeKey，不重载游戏）
+  const originalLocale = getLocale();
+  const nextLocale = originalLocale === "en" ? "ja" : "en";
+
+  assert.equal(setLocale(nextLocale), true);
+  assert.equal(panel.localeKey, 1);
+
+  panel.__unsubscribeLocaleChange();
+  assert.equal(setLocale(originalLocale), true);
+  assert.equal(panel.localeKey, 1, "取消订阅后不应再响应语言变化");
+  panel.__unsubscribeLocaleChange = null;
 
   // 静态方法通过实例转发
   GeneralCheat.toggleCheatModal("x");

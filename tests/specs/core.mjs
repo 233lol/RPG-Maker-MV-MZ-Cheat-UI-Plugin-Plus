@@ -177,6 +177,50 @@ export function registerCore({ test, page, type, state }) {
     assert.equal(closed, true);
   });
 
+  test("关闭作弊窗口立即移除 DOM，打开时仍有淡入动画", async () => {
+    const result = await page.evaluate(async () => {
+      const api = window.__cheatTest;
+      const main = api.main();
+
+      main.openCheatModal("general-panel");
+      await main.$nextTick();
+
+      const modal = document.getElementById("cheat-modal");
+      const animationName = modal
+        ? getComputedStyle(modal).animationName || ""
+        : "";
+
+      main.closeCheatModal();
+      await main.$nextTick();
+      const afterNextTick = !!document.getElementById("cheat-modal");
+
+      // 旧实现用 v-fade-transition，关闭后元素还会在 DOM 里停留约 0.3 秒。
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      const afterDelay = !!document.getElementById("cheat-modal");
+
+      return {
+        opened: !!modal,
+        animationName,
+        afterNextTick,
+        afterDelay,
+        show: main.show,
+      };
+    });
+
+    assert.equal(result.opened, true, "作弊窗口没有打开");
+    assert.ok(
+      result.animationName.includes("cheat-window-fade-in"),
+      `打开时缺少淡入动画（实际: ${result.animationName || "无"}）`,
+    );
+    assert.equal(
+      result.afterNextTick,
+      false,
+      "关闭后窗口没有在下一个渲染帧立即移除（仍会遮挡界面）",
+    );
+    assert.equal(result.afterDelay, false, "关闭后窗口仍残留在 DOM 中");
+    assert.equal(result.show, false);
+  });
+
   test("17 个面板全部能挂载并读取游戏数据", async () => {
     const result = await page.evaluate(async (panels) => {
       const api = window.__cheatTest;

@@ -465,6 +465,30 @@ test("GlobalShortcut.readShortcutSettings 解析失败时回退默认值", () =>
   assert.equal(alerts.at(-1).level, "warn");
 });
 
+test("GlobalShortcut.openDevTool：NW.js 下打开开发者工具，浏览器下静默跳过", () => {
+  const opened = [];
+
+  globalThis.nw = {
+    Window: {
+      get: () => ({
+        showDevTools() {
+          opened.push(true);
+        },
+      }),
+    },
+  };
+
+  GLOBAL_SHORTCUT.getConfig("openDevTool").enterAction({});
+  assert.equal(opened.length, 1);
+
+  // 没有 nw / nw.Window 时不应抛错
+  delete globalThis.nw;
+  assert.doesNotThrow(() =>
+    GLOBAL_SHORTCUT.getConfig("openDevTool").enterAction({}),
+  );
+  assert.equal(opened.length, 1);
+});
+
 test("GlobalShortcut.migrateShortcutSettings：补齐缺失动作与新增参数", () => {
   delete GLOBAL_SHORTCUT.shortcutSettings.gotoTitle;
   GLOBAL_SHORTCUT.shortcutSettings.skipMessage.param = {};

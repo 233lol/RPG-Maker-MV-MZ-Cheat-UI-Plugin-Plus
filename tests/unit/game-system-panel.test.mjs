@@ -208,6 +208,66 @@ test("GameSystemPanel.confirmResetCounters / resetCounters", () => {
   assert.equal(alerts.at(-1).level, "success");
 });
 
+test("GameSystemPanel：各项写入失败与非法输入都有提示", () => {
+  const alerts = captureAlerts();
+
+  // 游玩时长：Graphics 和 _framesOnSave 都写不进去
+  installReadyGame();
+  Object.freeze(globalThis.Graphics);
+  Object.freeze(globalThis.$gameSystem);
+
+  let panel = makePanel();
+  panel.initializeVariables();
+  panel.playtimeSeconds = 5;
+  panel.onPlaytimeChange();
+  assert.equal(alerts.at(-1).level, "error");
+  assert.match(alerts.at(-1).msg, /游玩时长|playtime/i);
+
+  // 步数
+  installReadyGame();
+  Object.freeze(globalThis.$gameParty);
+  panel = makePanel();
+  panel.initializeVariables();
+  panel.steps = 10;
+  panel.onStepsChange();
+  assert.equal(alerts.at(-1).level, "error");
+
+  // 金币
+  installReadyGame();
+  Object.freeze(globalThis.$gameParty);
+  panel = makePanel();
+  panel.initializeVariables();
+  panel.gold = 1;
+  panel.onGoldChange();
+  assert.equal(alerts.at(-1).level, "error");
+
+  // 重置计数
+  installReadyGame();
+  Object.freeze(globalThis.$gameSystem);
+  panel = makePanel();
+  panel.initializeVariables();
+  panel.resetCounters();
+  assert.equal(alerts.at(-1).level, "error");
+
+  // 计数 / 金币的非法输入
+  installReadyGame();
+  panel = makePanel();
+  panel.initializeVariables();
+
+  panel.saveCount = "bad";
+  panel.onCounterChange("saveCount");
+  assert.equal(alerts.at(-1).level, "warn");
+
+  panel.gold = "bad";
+  panel.onGoldChange();
+  assert.equal(alerts.at(-1).level, "warn");
+
+  // 未知计数键也能给出提示，而不是抛错
+  panel.unknownCount = "bad";
+  panel.onCounterChange("unknownCount");
+  assert.equal(alerts.at(-1).level, "warn");
+});
+
 test("GameSystemPanel.getGameEnv：缺少全局对象时返回 null", () => {
   const panel = makePanel();
   const env = panel.getGameEnv();
