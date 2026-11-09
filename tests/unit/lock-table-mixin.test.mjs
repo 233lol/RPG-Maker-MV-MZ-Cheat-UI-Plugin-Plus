@@ -40,6 +40,46 @@ afterEach(() => {
   delete globalThis.window;
 });
 
+test("startLockSync / stopLockSync：重复调用不会叠加定时器", () => {
+  const timers = new Map();
+  const cleared = [];
+  let nextId = 1;
+
+  globalThis.window = {
+    setInterval(callback, delay) {
+      const id = nextId++;
+      timers.set(id, { callback, delay });
+      return id;
+    },
+    clearInterval(id) {
+      cleared.push(id);
+      timers.delete(id);
+    },
+  };
+
+  const panel = makePanel();
+  let syncCount = 0;
+  panel.syncLockedRows = () => {
+    syncCount += 1;
+  };
+
+  panel.startLockSync();
+  panel.startLockSync();
+
+  assert.equal(timers.size, 1);
+  assert.equal([...timers.values()][0].delay, 1000);
+
+  [...timers.values()][0].callback();
+  assert.equal(syncCount, 1);
+
+  panel.stopLockSync();
+  panel.stopLockSync();
+
+  assert.deepEqual(cleared, [1]);
+  assert.equal(timers.size, 0);
+  assert.equal(panel.__lockSyncTimer, null);
+});
+
 test("lockTableMixin.data：默认字段与面板状态额外键", () => {
   const data = lockTableMixin.data.call({});
 

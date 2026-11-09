@@ -115,9 +115,11 @@ export default {
         <div
             :style="'width: calc(100% - ' + navWidth + 'px - 1px);'"
             class="fill-height d-inline pa-2 overflow-y-auto hide-scrollbar">
-            <!-- 只缓存全局变量面板：切走再切回不再销毁重建（该面板初始化要扫描 window） -->
+            <!-- 缓存全部面板：切走再切回保留搜索词、分页、滚动位置与画布状态。
+                 各面板必须在 deactivated 里暂停定时器 / 监听器，见 js/GameDataWatcher.js
+                 与各面板的 activated/deactivated 实现。 -->
             <panel-error-boundary :panel-name="modelValue">
-                <keep-alive :include="['GlobalVariablePanel']">
+                <keep-alive>
                     <component :is="modelValue"></component>
                 </keep-alive>
             </panel-error-boundary>

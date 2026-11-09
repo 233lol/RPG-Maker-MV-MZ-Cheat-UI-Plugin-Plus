@@ -196,6 +196,11 @@ export const panelStateMixin = {
     );
   },
 
+  deactivated() {
+    // 面板被 keep-alive 缓存时不再走 beforeUnmount，切走时立即落盘。
+    flushPanelState();
+  },
+
   beforeUnmount() {
     if (this.__panelStateUnwatch) {
       this.__panelStateUnwatch();

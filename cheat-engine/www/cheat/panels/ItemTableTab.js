@@ -161,18 +161,19 @@ export default {
   },
 
   mounted() {
-    // LockService 每秒会把锁定数量写回游戏，但不会通知面板。
-    // 只同步已锁定行，避免覆盖用户正在编辑的未锁定行。
-    this.__itemLockSyncTimer = window.setInterval(() => {
-      this.syncLockedRows();
-    }, 1000);
+    this.startLockSync();
+  },
+
+  activated() {
+    this.startLockSync();
+  },
+
+  deactivated() {
+    this.stopLockSync();
   },
 
   beforeUnmount() {
-    if (this.__itemLockSyncTimer) {
-      window.clearInterval(this.__itemLockSyncTimer);
-      this.__itemLockSyncTimer = null;
-    }
+    this.stopLockSync();
   },
 
   computed: {
@@ -213,6 +214,25 @@ export default {
 
   methods: {
     t,
+
+    startLockSync() {
+      if (this.__itemLockSyncTimer) {
+        return;
+      }
+
+      // LockService 每秒会把锁定数量写回游戏，但不会通知面板。
+      // 只同步已锁定行，避免覆盖用户正在编辑的未锁定行。
+      this.__itemLockSyncTimer = window.setInterval(() => {
+        this.syncLockedRows();
+      }, 1000);
+    },
+
+    stopLockSync() {
+      if (this.__itemLockSyncTimer) {
+        window.clearInterval(this.__itemLockSyncTimer);
+        this.__itemLockSyncTimer = null;
+      }
+    },
 
     initializeVariables() {
       this.tableHeaders = this.headers.slice(0);

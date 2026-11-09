@@ -28,6 +28,7 @@ export function createItemDatabasePanel({
     template: `
 <v-card flat class="ma-0 pa-0">
     <item-table-tab
+        ref="itemTable"
         :state-key="stateKey"
         :items="items"
         :headers="headers"
@@ -56,6 +57,22 @@ export function createItemDatabasePanel({
 
     created() {
       this.initializeVariables();
+    },
+
+    activated() {
+      // ItemTableTab 是子组件，不会收到 keep-alive 的 deactivated；
+      // 由父面板在切回时恢复它的锁定同步定时器。
+      const table = this.$refs.itemTable;
+      if (table && typeof table.startLockSync === "function") {
+        table.startLockSync();
+      }
+    },
+
+    deactivated() {
+      const table = this.$refs.itemTable;
+      if (table && typeof table.stopLockSync === "function") {
+        table.stopLockSync();
+      }
     },
 
     methods: {

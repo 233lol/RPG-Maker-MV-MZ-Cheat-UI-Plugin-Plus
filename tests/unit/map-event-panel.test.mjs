@@ -60,6 +60,8 @@ function makePanel(overrides = {}) {
       if (callback) callback();
     },
 
+    activated: MapEventPanel.activated,
+    deactivated: MapEventPanel.deactivated,
     beforeUnmount: MapEventPanel.beforeUnmount,
 
     ...overrides,
@@ -1334,6 +1336,59 @@ test("MapEventPanel.beforeUnmount：清理过程抛错也不影响卸载", () =>
   try {
     assert.doesNotThrow(() => panel.beforeUnmount());
   } finally {
+    globalThis.clearInterval = originalClearInterval;
+  }
+});
+
+test("MapEventPanel.activated / deactivated：恢复与停止轮询、可见性监听", () => {
+  const originalSetInterval = globalThis.setInterval;
+  const originalClearInterval = globalThis.clearInterval;
+  const timers = new Map();
+  const cleared = [];
+  let nextId = 1;
+
+  globalThis.setInterval = (callback, delay) => {
+    const id = nextId++;
+    timers.set(id, { callback, delay });
+    return id;
+  };
+  globalThis.clearInterval = (id) => {
+    cleared.push(id);
+    timers.delete(id);
+  };
+
+  const calls = [];
+  const panel = makePanel({
+    isCanvasVisible: true,
+    setupCanvasVisibilityObserver() {
+      calls.push("setup");
+    },
+    teardownCanvasVisibilityObserver() {
+      calls.push("teardown");
+    },
+    renderMap() {
+      calls.push("render");
+    },
+  });
+
+  try {
+    panel.activated();
+    assert.equal(timers.size, 1);
+    assert.deepEqual(calls, ["setup", "render"]);
+
+    panel.deactivated();
+    assert.equal(timers.size, 0);
+    assert.deepEqual(cleared, [1]);
+    assert.deepEqual(calls, ["setup", "render", "teardown"]);
+
+    panel.activated();
+    assert.equal(timers.size, 1, "重新激活后应恢复轮询");
+    assert.deepEqual(calls, ["setup", "render", "teardown", "setup", "render"]);
+
+    panel.deactivated();
+    assert.equal(timers.size, 0);
+  } finally {
+    globalThis.setInterval = originalSetInterval;
     globalThis.clearInterval = originalClearInterval;
   }
 });

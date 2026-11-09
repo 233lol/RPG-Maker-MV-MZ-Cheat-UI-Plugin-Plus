@@ -94,6 +94,39 @@ test("createItemDatabasePanel：工厂组件初始化数据并转换表格行", 
   assert.deepEqual(emptyPanel.items, []);
 });
 
+test("createItemDatabasePanel：activated / deactivated 转发给物品表格", () => {
+  const Panel = createItemDatabasePanel({
+    name: "ItemSettingPanel",
+    stateKey: "item",
+    getItems: () => [],
+    descTitleKey: "items.desc",
+  });
+
+  const calls = [];
+  const panel = makePanel(Panel, {
+    $refs: {
+      itemTable: {
+        startLockSync() {
+          calls.push("start");
+        },
+        stopLockSync() {
+          calls.push("stop");
+        },
+      },
+    },
+  });
+
+  Panel.activated.call(panel);
+  Panel.deactivated.call(panel);
+
+  assert.deepEqual(calls, ["start", "stop"]);
+
+  // 子组件尚未挂载时不应抛错
+  const emptyPanel = makePanel(Panel, { $refs: {} });
+  assert.doesNotThrow(() => Panel.activated.call(emptyPanel));
+  assert.doesNotThrow(() => Panel.deactivated.call(emptyPanel));
+});
+
 test("物品 / 武器 / 防具面板：各自读取对应的数据库", () => {
   globalThis.$dataItems = [{ name: "Potion", description: "Heals 50 HP" }];
   globalThis.$dataWeapons = [{ name: "Sword", description: "Sharp" }];

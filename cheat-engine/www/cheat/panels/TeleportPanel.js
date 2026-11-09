@@ -176,15 +176,20 @@ export default {
   created() {
     this.initializeVariables();
     this.updateCurrentPosition();
-    this.updateTimer = setInterval(() => {
-      this.updateCurrentPosition();
-    }, 1000);
+    this.startUpdateTimer();
+  },
+
+  activated() {
+    this.updateCurrentPosition();
+    this.startUpdateTimer();
+  },
+
+  deactivated() {
+    this.stopUpdateTimer();
   },
 
   beforeUnmount() {
-    if (this.updateTimer) {
-      clearInterval(this.updateTimer);
-    }
+    this.stopUpdateTimer();
   },
 
   computed: {
@@ -215,6 +220,23 @@ export default {
 
   methods: {
     t,
+
+    startUpdateTimer() {
+      if (this.updateTimer) {
+        return;
+      }
+
+      this.updateTimer = setInterval(() => {
+        this.updateCurrentPosition();
+      }, 1000);
+    },
+
+    stopUpdateTimer() {
+      if (this.updateTimer) {
+        clearInterval(this.updateTimer);
+        this.updateTimer = null;
+      }
+    },
 
     async initializeVariables() {
       if (

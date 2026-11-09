@@ -1546,7 +1546,15 @@ test("TeleportPanel.data / created / beforeUnmount 定时器", () => {
   assert.equal(positionUpdates, 1);
   assert.notEqual(panel.updateTimer, null);
 
+  TeleportPanel.deactivated.call(panel);
+  assert.equal(panel.updateTimer, null);
+
+  TeleportPanel.activated.call(panel);
+  assert.equal(positionUpdates, 2);
+  assert.notEqual(panel.updateTimer, null);
+
   TeleportPanel.beforeUnmount.call(panel);
+  assert.equal(panel.updateTimer, null);
   // 没有定时器时重复调用也不应报错
   assert.doesNotThrow(() => TeleportPanel.beforeUnmount.call(panel));
 });

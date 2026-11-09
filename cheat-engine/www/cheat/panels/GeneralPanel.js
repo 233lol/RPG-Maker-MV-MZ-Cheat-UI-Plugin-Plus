@@ -350,6 +350,15 @@ export default {
     this.initializeVariables();
   },
 
+  deactivated() {
+    // 弹窗通过 teleport 挂在 #app 上，面板被 keep-alive 隐藏后仍会浮在游戏上。
+    // 切走时直接关闭，并立即摘掉全局键盘守卫（watcher 是异步的，不能只靠它）。
+    this.closeEventInspectDialog();
+    this.closeDebugRepl();
+    this.disableReplGlobalKeyGuard();
+    this.disablePopupEscapeKeyGuard();
+  },
+
   watch: {
     showEventInspectDialog() {
       this.updatePopupEscapeKeyGuard();

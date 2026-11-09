@@ -134,6 +134,49 @@ function partyWithItems(amounts) {
   };
 }
 
+test("ItemTableTab.startLockSync / stopLockSync：幂等启停定时器", () => {
+  const timers = new Map();
+  const cleared = [];
+  let nextId = 1;
+
+  globalThis.window = {
+    setInterval(callback, delay) {
+      const id = nextId++;
+      timers.set(id, { callback, delay });
+      return id;
+    },
+    clearInterval(id) {
+      cleared.push(id);
+      timers.delete(id);
+    },
+  };
+
+  const panel = makeItemPanel();
+  let syncCount = 0;
+  panel.syncLockedRows = () => {
+    syncCount += 1;
+  };
+
+  try {
+    panel.startLockSync();
+    panel.startLockSync();
+
+    assert.equal(timers.size, 1);
+    assert.equal([...timers.values()][0].delay, 1000);
+
+    [...timers.values()][0].callback();
+    assert.equal(syncCount, 1);
+
+    panel.stopLockSync();
+    panel.stopLockSync();
+
+    assert.deepEqual(cleared, [1]);
+    assert.equal(panel.__itemLockSyncTimer, null);
+  } finally {
+    delete globalThis.window;
+  }
+});
+
 test("ItemTableTab：panelStateId 区分不同物品类型", () => {
   assert.equal(
     ItemTableTab.computed.panelStateId.call({ stateKey: "item" }),

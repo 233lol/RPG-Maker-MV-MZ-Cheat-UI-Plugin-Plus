@@ -41,6 +41,90 @@ test("gameDataWatcherMixin：数据变化后防抖调用 initializeVariables", a
   }
 });
 
+test("gameDataWatcherMixin：隐藏期间只记 dirty，重新激活后刷新一次", async () => {
+  const calls = [];
+  const component = makeComponent({
+    initializeVariables() {
+      calls.push("init");
+    },
+  });
+
+  gameDataWatcherMixin.created.call(component);
+  gameDataWatcherMixin.activated.call(component);
+
+  try {
+    gameDataWatcherMixin.deactivated.call(component);
+
+    notifyGameDataChanged("hidden-1");
+    notifyGameDataChanged("hidden-2");
+    await sleep(90);
+
+    assert.deepEqual(calls, [], "隐藏面板不应在后台刷新");
+    assert.equal(component.__gameDataDirty, true);
+
+    gameDataWatcherMixin.activated.call(component);
+    await sleep(90);
+
+    assert.deepEqual(calls, ["init"], "重新激活后只补一次刷新");
+    assert.equal(component.__gameDataDirty, false);
+  } finally {
+    gameDataWatcherMixin.beforeUnmount.call(component);
+  }
+});
+
+test("gameDataWatcherMixin：deactivated 会取消尚未执行的防抖刷新", async () => {
+  const calls = [];
+  const component = makeComponent({
+    initializeVariables() {
+      calls.push("init");
+    },
+  });
+
+  gameDataWatcherMixin.created.call(component);
+  gameDataWatcherMixin.activated.call(component);
+
+  try {
+    notifyGameDataChanged("before-deactivate");
+    gameDataWatcherMixin.deactivated.call(component);
+
+    await sleep(90);
+    assert.deepEqual(calls, []);
+
+    gameDataWatcherMixin.activated.call(component);
+    await sleep(90);
+    assert.deepEqual(calls, ["init"]);
+  } finally {
+    gameDataWatcherMixin.beforeUnmount.call(component);
+  }
+});
+
+test("gameDataWatcherMixin：从未 activated 的子组件保持原有订阅行为", async () => {
+  const calls = [];
+  const component = makeComponent({
+    initializeVariables() {
+      calls.push("init");
+    },
+  });
+
+  gameDataWatcherMixin.created.call(component);
+
+  try {
+    notifyGameDataChanged("child-1");
+    await sleep(90);
+    assert.deepEqual(calls, ["init"]);
+
+    // 嵌套子组件不会收到 keep-alive 的 deactivated；即使被误调用，
+    // 也不能把一直处于活跃状态的子组件停掉。
+    gameDataWatcherMixin.deactivated.call(component);
+
+    notifyGameDataChanged("child-2");
+    await sleep(90);
+    assert.deepEqual(calls, ["init", "init"]);
+  } finally {
+    gameDataWatcherMixin.beforeUnmount.call(component);
+  }
+});
+
 test("gameDataWatcherMixin：没有 initializeVariables 时回退到 reload", async () => {
   const calls = [];
   const component = makeComponent({

@@ -271,6 +271,21 @@ export default {
     });
   },
 
+  activated() {
+    // keep-alive 切回：恢复轮询和可见性监听，并立即按当前地图状态重绘。
+    this.startRenderLoop();
+    this.$nextTick(() => {
+      this.setupCanvasVisibilityObserver();
+      if (this.isCanvasVisible) this.renderMap();
+    });
+  },
+
+  deactivated() {
+    // 面板被缓存隐藏时必须停掉定时器和 scroll/resize 监听，避免后台空转。
+    this.stopRenderLoop();
+    this.teardownCanvasVisibilityObserver();
+  },
+
   watch: {
     limitedView(newValue) {
       this.saveSetting("mapEventPanel_limitedView", newValue);
@@ -292,26 +307,8 @@ export default {
   },
 
   beforeUnmount() {
-    // Clean up observer and interval when component is destroyed
-    try {
-      if (
-        this.visibilityObserver &&
-        typeof this.visibilityObserver.disconnect === "function"
-      ) {
-        this.visibilityObserver.disconnect();
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    try {
-      if (this.renderIntervalId) {
-        clearInterval(this.renderIntervalId);
-        this.renderIntervalId = null;
-      }
-    } catch (e) {
-      // ignore
-    }
+    this.stopRenderLoop();
+    this.teardownCanvasVisibilityObserver();
   },
 
   computed: {
@@ -680,9 +677,14 @@ export default {
       }
       this.updatePlayerPosition();
       this.updateMapEvents(); // Now handles all event classification in one pass
+      this.startRenderLoop();
+    },
+
+    startRenderLoop() {
+      this.stopRenderLoop();
 
       // Update every readInterval to reflect real-time changes
-      // store interval id so we can clear it when component is destroyed
+      // store interval id so we can clear it when component is hidden / destroyed
       this.renderIntervalId = setInterval(() => {
         this.checkForMapChange();
         this.updatePlayerPosition();
@@ -692,7 +694,19 @@ export default {
           this.renderMap();
           this.needsRedraw = false;
         }
-      }, this.readInterval);
+      }, this.normalizeReadInterval(this.readInterval));
+    },
+
+    stopRenderLoop() {
+      try {
+        if (this.renderIntervalId) {
+          clearInterval(this.renderIntervalId);
+          this.renderIntervalId = null;
+        }
+      } catch (e) {
+        // 定时器已失效（例如窗口正在关闭）时忽略，不影响卸载流程
+        this.renderIntervalId = null;
+      }
     },
 
     // 设置文件里的值可能是旧版本 / 手改 / 空串，直接进 setInterval
@@ -714,19 +728,7 @@ export default {
         this.readInterval = valid;
       }
       this.saveSetting("mapEventPanel_readInterval", valid);
-      if (this.renderIntervalId) {
-        clearInterval(this.renderIntervalId);
-        this.renderIntervalId = null;
-      }
-      this.renderIntervalId = setInterval(() => {
-        this.checkForMapChange();
-        this.updatePlayerPosition();
-        this.updateEnemyPositions();
-        if (this.isCanvasVisible && this.needsRedraw) {
-          this.renderMap();
-          this.needsRedraw = false;
-        }
-      }, valid);
+      this.startRenderLoop();
     },
 
     // $gameMap 在游戏对象创建前是 undefined（例如自动恢复上次面板时）。
@@ -838,7 +840,26 @@ export default {
     // Visibility observer setup: use IntersectionObserver when available,
     // otherwise fall back to listening to window scroll/resize and checking
     // bounding rect intersection.
+    teardownCanvasVisibilityObserver() {
+      try {
+        if (
+          this.visibilityObserver &&
+          typeof this.visibilityObserver.disconnect === "function"
+        ) {
+          this.visibilityObserver.disconnect();
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      this.visibilityObserver = null;
+    },
+
     setupCanvasVisibilityObserver() {
+      // activated 可能重复触发（首次挂载 + keep-alive 激活），先断开旧的，
+      // 避免 scroll / resize 监听和 IntersectionObserver 越挂越多。
+      this.teardownCanvasVisibilityObserver();
+
       const canvas = this.$refs.mapCanvas;
       if (!canvas) return;
 

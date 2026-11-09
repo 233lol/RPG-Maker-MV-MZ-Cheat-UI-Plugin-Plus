@@ -49,18 +49,20 @@ export const lockTableMixin = {
   mixins: [tablePanelMixin],
 
   mounted() {
-    // LockService 每秒会把被锁的值写回游戏，但不会通知面板。
-    // 面板必须定期把锁定行的显示值同步回来，否则会一直显示旧值。
-    this.__lockSyncTimer = window.setInterval(() => {
-      this.syncLockedRows();
-    }, 1000);
+    this.startLockSync();
+  },
+
+  activated() {
+    // keep-alive 切回时恢复同步；重复调用 startLockSync 是幂等的。
+    this.startLockSync();
+  },
+
+  deactivated() {
+    this.stopLockSync();
   },
 
   beforeUnmount() {
-    if (this.__lockSyncTimer) {
-      window.clearInterval(this.__lockSyncTimer);
-      this.__lockSyncTimer = null;
-    }
+    this.stopLockSync();
   },
 
   data() {
@@ -97,6 +99,25 @@ export const lockTableMixin = {
   },
 
   methods: {
+    startLockSync() {
+      if (this.__lockSyncTimer) {
+        return;
+      }
+
+      // LockService 每秒会把被锁的值写回游戏，但不会通知面板。
+      // 面板必须定期把锁定行的显示值同步回来，否则会一直显示旧值。
+      this.__lockSyncTimer = window.setInterval(() => {
+        this.syncLockedRows();
+      }, 1000);
+    },
+
+    stopLockSync() {
+      if (this.__lockSyncTimer) {
+        window.clearInterval(this.__lockSyncTimer);
+        this.__lockSyncTimer = null;
+      }
+    },
+
     isVariableLock() {
       return this.lockKind === "variable";
     },

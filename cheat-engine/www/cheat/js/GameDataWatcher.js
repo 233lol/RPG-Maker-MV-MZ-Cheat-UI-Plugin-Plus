@@ -11,23 +11,52 @@ import { subscribeGameData } from "./GameDataState.js";
 export const gameDataWatcherMixin = {
   created() {
     this.__gameDataRefreshTimer = null;
+    this.__gameDataUnsubscribe = null;
+    this.__gameDataDirty = false;
+    // 默认活跃：没有 activated/deactivated 的嵌套组件（例如物品表格）
+    // 仍保持原来的订阅行为。
+    this.__gameDataActive = true;
+    this.__gameDataHasActivated = false;
+
     this.__gameDataUnsubscribe = subscribeGameData(() => {
-      if (this.__gameDataRefreshTimer) {
-        clearTimeout(this.__gameDataRefreshTimer);
+      if (!this.__gameDataActive) {
+        // 面板被 keep-alive 隐藏时只记一笔，重新激活时再刷新一次。
+        this.__gameDataDirty = true;
+        return;
       }
 
-      this.__gameDataRefreshTimer = setTimeout(() => {
-        this.__gameDataRefreshTimer = null;
-        this.__refreshFromGameData();
-      }, 50);
+      this.__scheduleGameDataRefresh();
     });
   },
 
-  beforeUnmount() {
-    if (this.__gameDataRefreshTimer) {
-      clearTimeout(this.__gameDataRefreshTimer);
-      this.__gameDataRefreshTimer = null;
+  activated() {
+    this.__gameDataHasActivated = true;
+    this.__gameDataActive = true;
+
+    if (this.__gameDataDirty) {
+      this.__gameDataDirty = false;
+      this.__scheduleGameDataRefresh();
     }
+  },
+
+  deactivated() {
+    // 子组件不会收到 deactivated；只有真正被 keep-alive 缓存的面板才暂停。
+    if (!this.__gameDataHasActivated) {
+      return;
+    }
+
+    // 防抖还没执行就切走时，把这次变化记成 dirty，切回后再补刷新。
+    if (this.__gameDataRefreshTimer) {
+      this.__gameDataDirty = true;
+    }
+
+    this.__gameDataActive = false;
+    this.__clearGameDataRefreshTimer();
+  },
+
+  beforeUnmount() {
+    this.__clearGameDataRefreshTimer();
+    this.__gameDataDirty = false;
 
     if (this.__gameDataUnsubscribe) {
       this.__gameDataUnsubscribe();
@@ -36,6 +65,22 @@ export const gameDataWatcherMixin = {
   },
 
   methods: {
+    __clearGameDataRefreshTimer() {
+      if (this.__gameDataRefreshTimer) {
+        clearTimeout(this.__gameDataRefreshTimer);
+        this.__gameDataRefreshTimer = null;
+      }
+    },
+
+    __scheduleGameDataRefresh() {
+      this.__clearGameDataRefreshTimer();
+
+      this.__gameDataRefreshTimer = setTimeout(() => {
+        this.__gameDataRefreshTimer = null;
+        this.__refreshFromGameData();
+      }, 50);
+    },
+
     __refreshFromGameData() {
       try {
         let result = null;

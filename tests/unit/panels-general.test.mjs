@@ -102,6 +102,26 @@ test("GeneralPanel.initializeVariables：游戏未就绪时使用安全默认值
   assert.equal(panel.applyBattleForGameSpeed, false);
 });
 
+test("GeneralPanel.deactivated：关闭弹窗并摘掉全局键盘守卫", () => {
+  const calls = [];
+  const panel = makeGeneralPanel({
+    showEventInspectDialog: true,
+    showDebugReplDialog: true,
+    disableReplGlobalKeyGuard() {
+      calls.push("repl");
+    },
+    disablePopupEscapeKeyGuard() {
+      calls.push("popup");
+    },
+  });
+
+  GeneralPanel.deactivated.call(panel);
+
+  assert.equal(panel.showEventInspectDialog, false);
+  assert.equal(panel.showDebugReplDialog, false);
+  assert.deepEqual(calls, ["repl", "popup"]);
+});
+
 test("GeneralPanel.initializeVariables：读取穿墙 / 速度 / 金币与战斗场景选项", () => {
   globalThis.$gamePlayer = {
     _through: true,
