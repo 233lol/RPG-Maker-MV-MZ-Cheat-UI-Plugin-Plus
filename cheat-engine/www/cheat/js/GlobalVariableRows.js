@@ -266,7 +266,7 @@ export function findPageOfKey(entries, key, perPage) {
 }
 
 // 自动刷新用：两次构建结果的显示字段全部一致时复用旧数组，
-// 避免每 2 秒整体替换 entries 触发整列表 diff 与重渲染。
+// 避免默认每 2 秒整体替换 entries 触发整列表 diff 与重渲染。
 export function entriesShallowEqual(a, b) {
   if (a === b) {
     return true;

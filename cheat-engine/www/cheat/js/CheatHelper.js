@@ -621,8 +621,7 @@ export class BattleCheat {
   static recover(member) {
     member.setHp(member.mhp);
     member.setMp(member.mmp);
-    // member.setTp(member.maxTp())
-    // Some games use TP for lust value, so do not recover TP
+    // 不恢复 TP：部分游戏把 TP 当其它数值（例如欲望值）使用。
   }
 
   static recoverAllEnemy() {
@@ -824,7 +823,8 @@ export class BattleCheat {
   }
 
   // 读档 / 新游戏后重新套用「不跨存档」以外的状态：
-  //  - 无敌模式绑定在角色实例上，换实例后由 GeneralCheat 清理；
+  //  - 无敌状态按 actorId 记录，猴补丁挂在当时的角色实例上；换实例后
+  //    syncGodModeInterval() 会丢弃过期记录，避免 UI 误报「已开启」；
   //  - 禁止随机遇敌是玩家主动开的全局开关，需要 patch 到新的 $gamePlayer。
   static syncAfterGameChange() {
     try {
@@ -838,8 +838,8 @@ export class BattleCheat {
     }
   }
 
-  // 读档 / 新游戏 / 地图切换 / 战斗结束都通过 GameDataState 统一通知，
-  // 不再各自包一层 DataManager.setupNewGame（两套猴补丁会互相嵌套）。
+  // 读档 / 新游戏 / 地图切换 / 战斗结束都通过 GameDataState 统一通知；
+  // 面板刷新不再各自包一层 DataManager.setupNewGame（两套猴补丁会互相嵌套）。
   static installGameStateHooks() {
     if (this.gameStateHooksInstalled) {
       return true;

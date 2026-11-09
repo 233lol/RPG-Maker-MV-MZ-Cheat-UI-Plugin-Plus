@@ -91,7 +91,8 @@ function copyDirectoryMissing(source, target) {
   }
 }
 
-// 只在 MZ 下执行，且新目录不存在时才迁移，避免覆盖用户已经使用的新设置。
+// 只在 MZ 下执行。新目录不存在时整体迁移；已存在时只补缺失文件，
+// 避免覆盖用户已经使用的新设置，也能在迁移中断后继续补。
 // 浏览器环境没有 fs，直接跳过。
 export function migrateLegacySettings() {
   if (!isMZEngine()) {

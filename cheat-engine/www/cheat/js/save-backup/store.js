@@ -344,7 +344,7 @@ export class SaveBackupStore {
     this.writeMeta(meta);
   }
 
-  // 返回快照里存的明文 JSON 文本，直接可以交给 writeSaveText
+  // 返回快照载荷解压后的明文 JSON 文本，直接可以交给 writeSaveText
   /** @this {SaveBackupApi} */
   static readPayload(meta) {
     const fs = this.requireFs();

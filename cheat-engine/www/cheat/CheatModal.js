@@ -426,9 +426,10 @@ export default {
         }
 
         // 不能在这个回调里同步写回尺寸：CSS resize 手柄会给出小数尺寸，
-        // 写回整数宽高会在同一次观察循环里再次触发布局，Chromium 报
-        // "ResizeObserver loop completed with undelivered notifications"，
-        // 而 MZ 的全局 error 处理会因此停掉游戏循环。放到下一个任务里再写。
+        // 写回整数宽高会在同一次观察循环里再次触发布局，Chromium 会反复报
+        // "ResizeObserver loop completed with undelivered notifications"。
+        // init/import.js 虽然已经过滤这条错误，但循环本身仍会拖慢窗口缩放，
+        // 所以放到下一个任务里再写。
         this.scheduleSizeSync(width, height);
       });
 

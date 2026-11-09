@@ -935,7 +935,7 @@ export default {
       window.addEventListener("scroll", throttledCheck, true);
       window.addEventListener("resize", throttledCheck);
 
-      // store observer-like object so beforeDestroy can cleanup listeners
+      // store observer-like object so beforeUnmount can cleanup listeners
       this.visibilityObserver = {
         disconnect() {
           window.removeEventListener("scroll", throttledCheck, true);

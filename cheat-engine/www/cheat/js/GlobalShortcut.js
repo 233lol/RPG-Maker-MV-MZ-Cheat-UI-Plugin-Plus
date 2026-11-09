@@ -126,7 +126,7 @@ export function isInValueInRange(value, lowerBound, upperBound) {
   return false;
 }
 
-// immutable
+// 快捷键定义：运行时由 ShortcutConfig 包装，本对象本身不会被修改。
 const shortcutConfig = {
   toggleCheatModal: {
     nameKey: "shortcutAction.toggleCheatModal",

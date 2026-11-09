@@ -946,7 +946,7 @@ export default {
 
       const next = this.buildEntries();
 
-      // 值没有变化时复用旧数组：自动刷新每 2 秒跑一次，
+      // 值没有变化时复用旧数组：自动刷新默认每 2 秒跑一次，
       // 直接整体替换会触发整列表的全量 diff 与重渲染。
       if (entriesShallowEqual(this.entries, next)) {
         return;

@@ -35,6 +35,7 @@ function getStorageManager() {
  * - store.js：索引、元数据、载荷文件读写
  * - metadata.js：存档数据解析与校验
  * - transfer.js：导入 / 导出
+ * - selection.js：按快照 id 过滤要导出的条目
  * - settings.js：设置与自动快照钩子
  *
  * 本文件保留环境探测、StorageManager 读写、快照列表 / 还原等核心流程，
@@ -242,9 +243,9 @@ export class SaveBackupCheat {
 
   // 取回存档的 JSON 文本；不存在返回 null，压缩方式不认识时抛错。
   //
-  // 只在「读」的时候解压一次：快照里存的是明文 JSON，还原时再压缩一次写盘。
-  // （早期实现把 .rpgsave 的 base64 直接再压缩一层存起来，快照体积翻倍且
-  //  语义混乱 —— 现在快照文件本身就是 JSON + LZString 压缩，可以直接查看。）
+  // 读盘时解码一次成明文 JSON；写入快照时再按当前引擎的 codec 压缩，
+  // 这样快照文件能直接改名成 .rpgsave / .rmmzsave，也不会把 base64
+  // 再包一层导致体积翻倍。
   /** @this {SaveBackupApi} */
   static readSaveText(slot) {
     slot = Number(slot);
@@ -483,7 +484,7 @@ export class SaveBackupCheat {
   //
   // 用途：早期版本建的快照没记这两个字段，若该槽位现在还是那个存档
   // （游戏里读的就是它），用存档头的值补进去是准确的 —— 比永远显示
-  // 「未记录」有用得多。地图名无法这样补（存档头里没有），只能保持未知。
+  // 「未记录」有用得多。地图名没法从存档头补，下面会再从快照自身的载荷读取。
   //
   // 两种「补不到」要区分开：
   //   a. 存档头临时读不到（磁盘忙 / 槽位刚被删）→ 下次还能再试；
