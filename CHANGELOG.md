@@ -9,6 +9,17 @@
 
 ## [Unreleased]
 
+### Changed
+
+- 全部面板启用 `keep-alive`：切走再切回保留搜索词、分页、滚动位置与画布状态；
+  隐藏时暂停游戏数据刷新、锁定同步、传送位置刷新与地图渲染定时器。
+- 常用面板的金币写入改用 `js/game-system/stats.js` 的 `writeGold()`，
+  与「游戏统计」面板共用同一套校验 / 回退逻辑。
+- 存档时间机器拆分模块（`SaveBackupHelper` 与 `save-backup/*`）全部启用 `@ts-check`，
+  新增 `SaveBackupApi` 类型合并，移除类型覆盖测试里的旧 allowlist。
+
+## [1.4.0] - 2026-11-07
+
 ### Added
 
 - 角色 / 队伍 / 装备编辑器：角色页新增姓名、昵称、简介、职业切换、装备槽更换、状态增删；
