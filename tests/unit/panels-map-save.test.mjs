@@ -1502,7 +1502,7 @@ test("SaveBackupPanel.importBackups / onImportFileChange：文件选择、大小
 
 /* --------------------------------------------------- SaveRecallPanel (补充) */
 
-test("TeleportPanel.data / created / beforeUnmount ��ʱ��", () => {
+test("TeleportPanel.data / created / beforeUnmount 定时器", () => {
   const data = TeleportPanel.data.call({});
 
   assert.equal(data.inputX, "0");
@@ -1551,7 +1551,7 @@ test("TeleportPanel.data / created / beforeUnmount ��ʱ��", () => {
   assert.doesNotThrow(() => TeleportPanel.beforeUnmount.call(panel));
 });
 
-test("SaveRecallPanel.data / computed չ��Ĭ��ֵ", () => {
+test("SaveRecallPanel.data / computed 展开默认值", () => {
   const data = SaveRecallPanel.data.call({});
 
   assert.equal(data.locationAliasInput, "");
@@ -1564,7 +1564,7 @@ test("SaveRecallPanel.data / computed չ��Ĭ��ֵ", () => {
   assert.equal(SaveRecallPanel.computed.panelStateId.call({}), "save-recall");
 });
 
-test("SaveRecallPanel.mounted���ȡ��λ���ݲ��۽��������", () => {
+test("SaveRecallPanel.mounted：读取定位数据并聚焦输入框", () => {
   let initialized = 0;
   let focused = 0;
 
@@ -1587,7 +1587,7 @@ test("SaveRecallPanel.mounted���ȡ��λ���ݲ��۽�����
   assert.equal(focused, 1);
 });
 
-test("SaveRecallPanel.tableItems���ֵ�ͼ�� / ȱʧ / ���������", () => {
+test("SaveRecallPanel.tableItems：名称 / 地图缺失 / 未知地图", () => {
   globalThis.$dataMapInfos = [
     null,
     { id: 1, name: "World" },
@@ -1621,7 +1621,7 @@ test("SaveRecallPanel.tableItems���ֵ�ͼ�� / ȱʧ / ������
   assert.equal(rowsWithoutData[0].mapName, "NULL");
 });
 
-test("SaveRecallPanel.filteredTableItems�������ֶι���", () => {
+test("SaveRecallPanel.filteredTableItems：按名称和地图字段过滤", () => {
   globalThis.$dataMapInfos = [null, { id: 1, name: "World" }];
 
   const panel = makePanel(SaveRecallPanel, {
@@ -1655,7 +1655,7 @@ test("SaveRecallPanel.filteredTableItems�������ֶι���", () 
   );
 });
 
-test("SaveRecallPanel.initializeVariables������Ϸ�� / δ������֧", async () => {
+test("SaveRecallPanel.initializeVariables：游戏就绪 / 未就绪分支", async () => {
   const stored = new Map();
   KEY_VALUE_STORAGE.getItem = (key) => stored.get(key) ?? null;
   KEY_VALUE_STORAGE.setItem = (key, value) => stored.set(key, value);
@@ -1684,7 +1684,7 @@ test("SaveRecallPanel.initializeVariables������Ϸ�� / δ���
   assert.equal(panel.currentMapName, "World / Town");
 });
 
-test("SaveRecallPanel.saveLocations / loadLocations�߽�", () => {
+test("SaveRecallPanel.saveLocations / loadLocations：边界", () => {
   const stored = new Map();
   KEY_VALUE_STORAGE.getItem = (key) => stored.get(key) ?? null;
   KEY_VALUE_STORAGE.setItem = (key, value) => stored.set(key, value);
@@ -1705,7 +1705,7 @@ test("SaveRecallPanel.saveLocations / loadLocations�߽�", () => {
   assert.deepEqual(panel.locations, []);
 });
 
-test("SaveRecallPanel.backupCorruptLocations��д��ʧ��ʱ���׳�", () => {
+test("SaveRecallPanel.backupCorruptLocations：写入失败时不抛错", () => {
   KEY_VALUE_STORAGE.setItem = () => {
     throw new Error("disk full");
   };

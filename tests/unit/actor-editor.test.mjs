@@ -650,7 +650,7 @@ test("PartyPanel：添加 / 移除 / 移动成员，并保护最后一名成员"
   assert.equal(Alert.pending.length, 3);
 });
 
-test("PartyPanel.data / computed / created չ��Ĭ��ֵ", () => {
+test("PartyPanel.data / computed / created 展开默认值", () => {
   const data = PartyPanel.data.call({});
 
   assert.deepEqual(data, {
@@ -691,7 +691,7 @@ test("PartyPanel.data / computed / created չ��Ĭ��ֵ", () => {
   assert.equal(initialized, 1);
 });
 
-test("PartyPanel.getPanelStateSnapshot / applyPanelState ���ɵ�ǰѡ��", () => {
+test("PartyPanel.getPanelStateSnapshot / applyPanelState 保存并恢复当前选中项", () => {
   const panel = { selectedAddId: 9 };
 
   assert.deepEqual(PartyPanel.methods.getPanelStateSnapshot.call(panel), {
@@ -705,7 +705,7 @@ test("PartyPanel.getPanelStateSnapshot / applyPanelState ���ɵ�ǰѡ��
   assert.equal(panel.selectedAddId, null);
 });
 
-test("PartyPanel.initializeVariables���鲻��ʱ���ã��ͱ��������ѡ��", () => {
+test("PartyPanel.initializeVariables：重置列表并校验选中项", () => {
   const panel = makePartyPanel({
     partyRows: [{}],
     availableRows: [{}],
@@ -726,14 +726,14 @@ test("PartyPanel.initializeVariables���鲻��ʱ���ã��ͱ��
 
   panel.selectedAddId = null;
   panel.initializeVariables();
-  assert.equal(panel.selectedAddId, null, "�ɼ���Ա���п�ʱѡ��Ϊ null");
+  assert.equal(panel.selectedAddId, null, "可选队员列表为空时选中项为 null");
 
   const emptyPanel = makePartyPanel({ selectedAddId: 7 });
   emptyPanel.initializeVariables();
   assert.equal(emptyPanel.selectedAddId, null);
 });
 
-test("PartyPanel.moveMember���߽� / ��֧�ֺ��� / δ����ʱ������", () => {
+test("PartyPanel.moveMember：边界 / 不支持函数 / 未加载时告警", () => {
   const calls = [];
   const party = {
     members: () => [],
@@ -751,7 +751,7 @@ test("PartyPanel.moveMember���߽� / ��֧�ֺ��� / δ���
   });
 
   panel.moveMember({ index: 0 }, -1);
-  assert.equal(calls.length, 0, "Խ��ʱ���ƶ�");
+  assert.equal(calls.length, 0, "越界时不移动");
 
   delete party.swapOrder;
   const alerts = captureAlerts();
@@ -762,10 +762,10 @@ test("PartyPanel.moveMember���߽� / ��֧�ֺ��� / δ���
   delete globalThis.$gamePlayer;
   const before = alerts.length;
   panel.moveMember({ index: 0 }, 1);
-  assert.equal(alerts.length, before + 1, "��Ϸδ����ʱ��ʾ");
+  assert.equal(alerts.length, before + 1, "游戏未加载时提示");
 });
 
-test("PartyPanel.removeMember / addMember���쳣֧", () => {
+test("PartyPanel.removeMember / addMember：异常分支", () => {
   const calls = [];
   const party = {
     members: () => [makePartyActor(1)],
@@ -786,11 +786,11 @@ test("PartyPanel.removeMember / addMember���쳣֧", () => {
 
   panel.removeMember({ id: 1, name: "Actor 1" });
   assert.equal(calls.length, 0);
-  assert.equal(alerts.at(-1).level, "warn", "���һ����Ա����ɾ��");
+  assert.equal(alerts.at(-1).level, "warn", "最后一名队员不能删除");
 
   panel.selectedAddId = 0;
   panel.addMember();
-  assert.equal(calls.length, 0, "��Ч id ���������");
+  assert.equal(calls.length, 0, "无效 id 不添加成员");
 
   panel.selectedAddId = 3;
   panel.addMember();
@@ -801,7 +801,7 @@ test("PartyPanel.removeMember / addMember���쳣֧", () => {
   const before = alerts.length;
   panel.removeMember({ id: 1, name: "Actor 1" });
   panel.addMember();
-  assert.equal(alerts.length, before + 2, "��Ϸδ����ʱ��ʾ");
+  assert.equal(alerts.length, before + 2, "游戏未加载时提示");
 });
 
 test("StatsSettingPanel falls back without data tables", () => {
