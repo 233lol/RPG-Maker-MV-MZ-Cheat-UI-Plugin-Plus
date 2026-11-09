@@ -46,7 +46,7 @@ function makeHealthPanel(overrides = {}) {
   return panel;
 }
 
-function makeMember(id, name, hp, mhp, mp, mmp) {
+function makeMember(id, name, hp, mhp, mp, mmp, tp = 0, maxTp = 100) {
   return {
     id,
     name: () => name,
@@ -54,6 +54,8 @@ function makeMember(id, name, hp, mhp, mp, mmp) {
     mhp,
     mp,
     mmp,
+    tp,
+    maxTp: () => maxTp,
   };
 }
 
@@ -62,7 +64,7 @@ test("HealthSettingTab：表头与初始编辑列表", () => {
 
   assert.deepEqual(
     panel.tableHeaders.map((header) => header.key),
-    ["name", "hp", "mp"],
+    ["name", "hp", "mp", "tp"],
   );
   assert.deepEqual(panel.editingItems, []);
 });
@@ -80,11 +82,22 @@ test("HealthSettingTab：items 变化时把队员映射成可编辑行", () => {
       name: row.name,
       hp: row.hp,
       mp: row.mp,
+      tp: row.tp,
     })),
     [
-      { name: "Alice", hp: { hp: 120, mhp: 500 }, mp: { mp: 30, mmp: 100 } },
+      {
+        name: "Alice",
+        hp: { hp: 120, mhp: 500 },
+        mp: { mp: 30, mmp: 100 },
+        tp: { tp: 0, maxTp: 100 },
+      },
       // 引擎偶尔给出字符串，编辑框需要数字才能正确比较 / 写入
-      { name: "Bob", hp: { hp: 80, mhp: 400 }, mp: { mp: 0, mmp: 50 } },
+      {
+        name: "Bob",
+        hp: { hp: 80, mhp: 400 },
+        mp: { mp: 0, mmp: 50 },
+        tp: { tp: 0, maxTp: 100 },
+      },
     ],
   );
   assert.equal(panel.editingItems[0]._member, alice);

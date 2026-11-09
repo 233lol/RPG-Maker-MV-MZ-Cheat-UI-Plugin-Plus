@@ -55,6 +55,7 @@ export default {
     globalVariable: "Global Variables",
     switch: "Switches",
     saveLocation: "Save Locations",
+    saveSlots: "Save Slots",
     saveBackup: "Save Time Machine",
     teleport: "Teleport",
     mapEvent: "Map Events",
@@ -137,6 +138,7 @@ export default {
     party: "Party",
     enemyDetail: "Enemy details",
     partyDetail: "Party details",
+    partyStates: "Party states",
     hp: "HP",
     mp: "MP",
     recover: "Recover",
@@ -344,6 +346,27 @@ export default {
     delete: "Delete",
     saveFeature: "save current location",
     teleportFeature: "teleport to saved location",
+  },
+
+  saveSlots: {
+    title: "Save slots",
+    unavailable: "Save slots need nw.js file access.",
+    notReady: "The game is not ready yet.",
+    current: "Current",
+    slotHeader: "Slot",
+    mapHeader: "Map",
+    playtimeHeader: "Playtime",
+    savedAtHeader: "Saved at",
+    sizeHeader: "Size",
+    actionsHeader: "Actions",
+    empty: "Empty slot",
+    noRecord: "No record",
+    load: "Load",
+    save: "Overwrite",
+    loadConfirm: "Load save slot {slot}? Unsaved progress will be lost.",
+    saveConfirm: "Save current progress to slot {slot}?",
+    overwriteConfirm:
+      "Slot {slot} already exists. Overwrite it? This cannot be undone.",
   },
 
   saveBackup: {

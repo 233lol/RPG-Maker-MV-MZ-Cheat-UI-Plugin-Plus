@@ -55,6 +55,7 @@ export default {
     globalVariable: "グローバル変数",
     switch: "スイッチ",
     saveLocation: "セーブ位置",
+    saveSlots: "セーブスロット",
     saveBackup: "セーブタイムマシン",
     teleport: "テレポート",
     mapEvent: "マップイベント",
@@ -137,6 +138,7 @@ export default {
     party: "パーティ",
     enemyDetail: "敵の詳細",
     partyDetail: "パーティの詳細",
+    partyStates: "味方の状態",
     hp: "HP",
     mp: "MP",
     recover: "回復",
@@ -345,6 +347,29 @@ export default {
     delete: "削除",
     saveFeature: "現在位置を保存",
     teleportFeature: "保存した位置へテレポート",
+  },
+
+  saveSlots: {
+    title: "セーブスロット一覧",
+    unavailable:
+      "セーブスロットの読み込みには nw.js のファイルアクセスが必要です。",
+    notReady: "ゲームがまだ読み込まれていません。",
+    current: "現在",
+    slotHeader: "スロット",
+    mapHeader: "マップ",
+    playtimeHeader: "プレイ時間",
+    savedAtHeader: "セーブ日時",
+    sizeHeader: "サイズ",
+    actionsHeader: "操作",
+    empty: "空きスロット",
+    noRecord: "記録なし",
+    load: "ロード",
+    save: "上書き保存",
+    loadConfirm:
+      "セーブスロット {slot} をロードしますか？未保存の進行状況は失われます。",
+    saveConfirm: "現在の進行状況をスロット {slot} に保存しますか？",
+    overwriteConfirm:
+      "スロット {slot} は既に存在します。上書きしますか？元に戻せません。",
   },
 
   saveBackup: {

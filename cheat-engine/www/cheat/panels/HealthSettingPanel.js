@@ -2,8 +2,9 @@
 import RefreshButton from "../components/RefreshButton.js";
 import HealthSettingTab from "./HealthSettingTab.js";
 import { BattleCheat } from "../js/CheatHelper.js";
-import { isPartyReady } from "../js/GameState.js";
+import { isPartyReady, requirePartyReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
+import { getActiveStates, getAvailableStates } from "../js/actor/states.js";
 import { markRaw } from "../libs/vue.js";
 import { t } from "../js/strings.js";
 
@@ -75,6 +76,52 @@ export default {
             </health-setting-tab>
         </v-card-text>
     </template>
+
+    <template v-if="partyStateRows.length > 0">
+        <v-card-subtitle class="text-body-small pb-1">{{ t("battle.partyStates") }}</v-card-subtitle>
+        <v-card-text class="pt-0 pb-2">
+            <div
+                v-for="row in partyStateRows"
+                :key="row.id"
+                class="mb-2">
+                <div class="d-flex align-center flex-wrap">
+                    <span class="text-body-small mr-2">{{ row.name }}</span>
+                    <v-chip
+                        v-for="state in row.activeStates"
+                        :key="state.id"
+                        size="small"
+                        class="mr-1 mb-1"
+                        closable
+                        @click:close="removePartyState(row, state.id)">
+                        {{ state.name }}
+                    </v-chip>
+                    <span
+                        v-if="row.activeStates.length === 0"
+                        class="text-body-small text-grey-lighten-1">
+                        {{ t("stats.noStates") }}
+                    </span>
+                </div>
+                <div class="d-flex align-center mt-1">
+                    <v-select
+                        v-model="row.stateToAdd"
+                        :items="row.availableStateOptions"
+                        :label="t('stats.statePlaceholder')"
+                        variant="outlined"
+                        density="compact"
+                        hide-details
+                        clearable></v-select>
+                    <v-btn
+                        class="ml-2"
+                        color="teal"
+                        size="small"
+                        :disabled="row.stateToAdd == null"
+                        @click="addPartyState(row)">
+                        {{ t("common.add") }}
+                    </v-btn>
+                </div>
+            </div>
+        </v-card-text>
+    </template>
     <refresh-button
         btn-style="position: absolute; top: 0px; right: 0px;"
         @click="initializeVariables">
@@ -87,6 +134,7 @@ export default {
       disableRandomEncounter: false,
       enemy: [],
       party: [],
+      partyStateRows: [],
     };
   },
 
@@ -101,12 +149,33 @@ export default {
       if (!isPartyReady() || typeof $gameTroop === "undefined" || !$gameTroop) {
         this.enemy = [];
         this.party = [];
+        this.partyStateRows = [];
         this.disableRandomEncounter = BattleCheat.isDisableRandomEncounter();
         return;
       }
 
       this.enemy = markRaw($gameTroop.members().slice());
       this.party = markRaw($gameParty.members().slice());
+      const dataStates =
+        typeof $dataStates !== "undefined" ? $dataStates : null;
+      this.partyStateRows = this.party.map((member, index) => {
+        const actorId =
+          typeof member.actorId === "function"
+            ? Number(member.actorId()) || 0
+            : 0;
+
+        return {
+          id: actorId || `party-${index}`,
+          _member: markRaw(member),
+          name:
+            typeof member.name === "function"
+              ? String(member.name())
+              : `#${actorId || index + 1}`,
+          stateToAdd: null,
+          activeStates: getActiveStates(member, dataStates),
+          availableStateOptions: getAvailableStates(member, dataStates),
+        };
+      });
       this.disableRandomEncounter = BattleCheat.isDisableRandomEncounter();
     },
 
@@ -173,13 +242,51 @@ export default {
 
         const hp = Number(item.hp.hp);
         const mp = Number(item.mp.mp);
+        const tp = Number(item.tp && item.tp.tp);
         if (Number.isFinite(hp)) {
           member.setHp(hp);
         }
         if (Number.isFinite(mp)) {
           member.setMp(mp);
         }
+        if (Number.isFinite(tp) && typeof member.setTp === "function") {
+          member.setTp(tp);
+        }
       }
+      this.initializeVariables();
+    },
+
+    addPartyState(row) {
+      if (!requirePartyReady(t("features.modifyState"))) return;
+
+      const stateId = Number(row && row.stateToAdd) || 0;
+      const member = row && row._member;
+      if (stateId <= 0 || !member || typeof member.addState !== "function") {
+        return;
+      }
+
+      if (
+        typeof $dataStates !== "undefined" &&
+        $dataStates &&
+        !$dataStates[stateId]
+      ) {
+        return;
+      }
+
+      member.addState(stateId);
+      this.initializeVariables();
+    },
+
+    removePartyState(row, stateId) {
+      if (!requirePartyReady(t("features.modifyState"))) return;
+
+      const id = Number(stateId) || 0;
+      const member = row && row._member;
+      if (id <= 0 || !member || typeof member.removeState !== "function") {
+        return;
+      }
+
+      member.removeState(id);
       this.initializeVariables();
     },
   },

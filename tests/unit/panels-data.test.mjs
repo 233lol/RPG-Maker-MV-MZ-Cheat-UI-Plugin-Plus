@@ -1065,11 +1065,73 @@ test("HealthSettingPanel.initializeVariables：队伍未就绪时清空并同步
   assert.equal(panel.disableRandomEncounter, true);
 });
 
-test("HealthSettingPanel.onDetailChange：只写回有效 HP / MP 并刷新", () => {
+test("HealthSettingPanel：我方状态列表与增删状态", () => {
+  const calls = [];
+  const activeStates = [{ id: 1, name: "Poison", iconIndex: 0 }];
+  const member = {
+    actorId: () => 3,
+    name: () => "Alice",
+    states: () => activeStates,
+    isStateAffected: (id) => activeStates.some((state) => state.id === id),
+    addState(id) {
+      calls.push(["add", id]);
+      activeStates.push({ id, name: "Sleep", iconIndex: 0 });
+    },
+    removeState(id) {
+      calls.push(["remove", id]);
+      const index = activeStates.findIndex((state) => state.id === id);
+      if (index >= 0) activeStates.splice(index, 1);
+    },
+  };
+
+  globalThis.$gamePlayer = {};
+  globalThis.$gameParty = { members: () => [member] };
+  globalThis.$gameTroop = { members: () => [] };
+  globalThis.$dataStates = [
+    null,
+    { id: 1, name: "Poison" },
+    { id: 2, name: "Sleep" },
+  ];
+
+  const panel = makePanel(HealthSettingPanel);
+
+  panel.initializeVariables();
+  assert.equal(panel.partyStateRows.length, 1);
+  assert.equal(panel.partyStateRows[0].name, "Alice");
+  assert.deepEqual(
+    panel.partyStateRows[0].activeStates.map((state) => state.id),
+    [1],
+  );
+  assert.deepEqual(
+    panel.partyStateRows[0].availableStateOptions.map((state) => state.value),
+    [2],
+  );
+
+  panel.partyStateRows[0].stateToAdd = 2;
+  panel.addPartyState(panel.partyStateRows[0]);
+  assert.deepEqual(calls, [["add", 2]]);
+  assert.deepEqual(
+    panel.partyStateRows[0].activeStates.map((state) => state.id),
+    [1, 2],
+  );
+
+  panel.removePartyState(panel.partyStateRows[0], 1);
+  assert.deepEqual(calls, [
+    ["add", 2],
+    ["remove", 1],
+  ]);
+  assert.deepEqual(
+    panel.partyStateRows[0].activeStates.map((state) => state.id),
+    [2],
+  );
+});
+
+test("HealthSettingPanel.onDetailChange：只写回有效 HP / MP / TP 并刷新", () => {
   const calls = [];
   const member = {
     setHp: (hp) => calls.push(["hp", hp]),
     setMp: (mp) => calls.push(["mp", mp]),
+    setTp: (tp) => calls.push(["tp", tp]),
   };
 
   const panel = makePanel(HealthSettingPanel, {
@@ -1079,14 +1141,25 @@ test("HealthSettingPanel.onDetailChange：只写回有效 HP / MP 并刷新", ()
   });
 
   panel.onDetailChange([
-    { _member: member, hp: { hp: "50" }, mp: { mp: "20" } },
-    { _member: null, hp: { hp: 1 }, mp: { mp: 1 } },
-    { _member: member, hp: { hp: "bad" }, mp: { mp: "bad" } },
+    {
+      _member: member,
+      hp: { hp: "50" },
+      mp: { mp: "20" },
+      tp: { tp: "30" },
+    },
+    { _member: null, hp: { hp: 1 }, mp: { mp: 1 }, tp: { tp: 1 } },
+    {
+      _member: member,
+      hp: { hp: "bad" },
+      mp: { mp: "bad" },
+      tp: { tp: "bad" },
+    },
   ]);
 
   assert.deepEqual(calls, [
     ["hp", 50],
     ["mp", 20],
+    ["tp", 30],
   ]);
   assert.equal(panel.refreshed, true);
 
