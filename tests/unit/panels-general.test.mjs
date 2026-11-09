@@ -11,6 +11,10 @@ import {
 } from "../../cheat-engine/www/cheat/js/CheatHelper.js";
 import { Alert } from "../../cheat-engine/www/cheat/js/AlertHelper.js";
 import { Key } from "../../cheat-engine/www/cheat/js/KeyCodes.js";
+import {
+  getLocale,
+  setLocale,
+} from "../../cheat-engine/www/cheat/js/strings.js";
 import * as BuildVersion from "../../cheat-engine/www/cheat/version.js";
 
 // ShortcutPanel 会创建 GlobalShortcut 单例，模块加载阶段就需要 Utils。
@@ -1135,6 +1139,34 @@ test("ShortcutPanel.initializeVariables / restoreToDefault", () => {
 
   assert.equal(restored, 1);
   assert.equal(ShortcutPanel.computed.panelStateId.call(panel), "shortcuts");
+});
+
+test("ShortcutPanel.created：语言变化后重建快捷键文案", () => {
+  let rebuilt = 0;
+  const panel = {
+    initializeVariables() {
+      rebuilt++;
+    },
+  };
+
+  const originalLocale = getLocale();
+  const nextLocale = originalLocale === "en" ? "ja" : "en";
+
+  ShortcutPanel.created.call(panel);
+
+  try {
+    assert.equal(rebuilt, 1);
+
+    assert.equal(setLocale(nextLocale), true);
+    assert.equal(rebuilt, 2, "快捷键名称是缓存字符串，切语言后应重建一次");
+
+    panel.__unsubscribeLocale();
+    assert.equal(setLocale(originalLocale), true);
+    assert.equal(rebuilt, 2, "取消订阅后不应再重建");
+  } finally {
+    panel.__unsubscribeLocale?.();
+    setLocale(originalLocale);
+  }
 });
 
 test("GeneralPanel wrappers forward to SceneCheat / BattleCheat", () => {

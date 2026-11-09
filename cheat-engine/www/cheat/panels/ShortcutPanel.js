@@ -7,7 +7,7 @@ import { Key } from "../js/KeyCodes.js";
 import { Alert } from "../js/AlertHelper.js";
 import { filterByKeyword } from "../js/SearchFilter.js";
 import { tablePanelMixin } from "../js/TablePanelMixin.js";
-import { t } from "../js/strings.js";
+import { subscribeLocaleChange, t } from "../js/strings.js";
 
 export default {
   name: "ShortcutPanel",
@@ -178,6 +178,18 @@ export default {
 
   created() {
     this.initializeVariables();
+    // 快捷键名称 / 描述来自 GLOBAL_SHORTCUT 的 getter，initializeVariables 会把
+    // 它们读成普通字符串；语言变化后重建一次即可，不需要重挂面板。
+    this.__unsubscribeLocale = subscribeLocaleChange(() => {
+      this.initializeVariables();
+    });
+  },
+
+  beforeUnmount() {
+    if (this.__unsubscribeLocale) {
+      this.__unsubscribeLocale();
+      this.__unsubscribeLocale = null;
+    }
   },
 
   computed: {
