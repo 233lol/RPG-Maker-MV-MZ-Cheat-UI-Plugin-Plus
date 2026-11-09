@@ -260,11 +260,17 @@ export default {
   },
 
   created() {
+    this.__panelActive = true;
     this.initializeMapDisplay();
   },
 
   mounted() {
     this.$nextTick(() => {
+      // $nextTick 可能在快速切走之后才执行，先确认面板仍然可见。
+      if (this.__panelActive === false) {
+        return;
+      }
+
       // Start observing canvas visibility and do an initial render only if visible
       this.setupCanvasVisibilityObserver();
       if (this.isCanvasVisible) this.renderMap();
@@ -273,8 +279,13 @@ export default {
 
   activated() {
     // keep-alive 切回：恢复轮询和可见性监听，并立即按当前地图状态重绘。
+    this.__panelActive = true;
     this.startRenderLoop();
     this.$nextTick(() => {
+      if (this.__panelActive === false) {
+        return;
+      }
+
       this.setupCanvasVisibilityObserver();
       if (this.isCanvasVisible) this.renderMap();
     });
@@ -282,6 +293,7 @@ export default {
 
   deactivated() {
     // 面板被缓存隐藏时必须停掉定时器和 scroll/resize 监听，避免后台空转。
+    this.__panelActive = false;
     this.stopRenderLoop();
     this.teardownCanvasVisibilityObserver();
   },
@@ -307,6 +319,7 @@ export default {
   },
 
   beforeUnmount() {
+    this.__panelActive = false;
     this.stopRenderLoop();
     this.teardownCanvasVisibilityObserver();
   },
@@ -683,6 +696,10 @@ export default {
     startRenderLoop() {
       this.stopRenderLoop();
 
+      if (this.__panelActive === false) {
+        return;
+      }
+
       // Update every readInterval to reflect real-time changes
       // store interval id so we can clear it when component is hidden / destroyed
       this.renderIntervalId = setInterval(() => {
@@ -859,6 +876,10 @@ export default {
       // activated 可能重复触发（首次挂载 + keep-alive 激活），先断开旧的，
       // 避免 scroll / resize 监听和 IntersectionObserver 越挂越多。
       this.teardownCanvasVisibilityObserver();
+
+      if (this.__panelActive === false) {
+        return;
+      }
 
       const canvas = this.$refs.mapCanvas;
       if (!canvas) return;

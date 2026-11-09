@@ -163,14 +163,8 @@ export default {
     this.startLockSync();
   },
 
-  activated() {
-    this.startLockSync();
-  },
-
-  deactivated() {
-    this.stopLockSync();
-  },
-
+  // ItemTableTab 是 keep-alive 面板的子组件，不会收到 activated / deactivated；
+  // 父面板 ItemDatabasePanel 会在自己的生命周期里转发 startLockSync / stopLockSync。
   beforeUnmount() {
     this.stopLockSync();
   },

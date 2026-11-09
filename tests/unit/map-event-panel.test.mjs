@@ -1393,6 +1393,27 @@ test("MapEventPanel.activated / deactivated：恢复与停止轮询、可见性�
   }
 });
 
+test("MapEventPanel：切走后延迟执行的 $nextTick 不再恢复观察者", () => {
+  let setups = 0;
+  let pendingTick = null;
+  const panel = makePanel({
+    $nextTick(callback) {
+      pendingTick = callback;
+    },
+    setupCanvasVisibilityObserver() {
+      setups += 1;
+    },
+  });
+
+  panel.activated();
+  assert.equal(typeof pendingTick, "function");
+
+  panel.deactivated();
+  pendingTick();
+
+  assert.equal(setups, 0);
+});
+
 test("MapEventPanel.getSettingsStorage reuses shared storage", () => {
   const first = MapEventPanel.methods.getSettingsStorage.call({});
   const second = MapEventPanel.methods.getSettingsStorage.call({});
