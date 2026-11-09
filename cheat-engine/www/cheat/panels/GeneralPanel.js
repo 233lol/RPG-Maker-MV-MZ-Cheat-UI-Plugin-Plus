@@ -10,6 +10,7 @@ import {
 import RefreshButton from "../components/RefreshButton.js";
 import { Alert } from "../js/AlertHelper.js";
 import interpretCodes from "../js/eventCodes.js";
+import { writeGold } from "../js/game-system/stats.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { saveLocale } from "../js/LocaleService.js";
 import { getAvailableLocales, getLocale, setLocale, t } from "../js/strings.js";
@@ -447,15 +448,18 @@ export default {
         return;
       }
 
-      const diff = value - $gameParty._gold;
+      // 写回逻辑与「游戏统计」面板共用，避免两处各自的 diff / 回退行为分叉。
+      const result = writeGold($gameParty, value);
 
-      if (diff < 0) {
-        $gameParty.loseGold(-diff);
-      } else if (diff > 0) {
-        $gameParty.gainGold(diff);
+      if (!result.ok) {
+        Alert.warn(
+          t("gameSystem.writeFailed", {
+            label: t("general.gold"),
+            message: result.message || "",
+          }),
+        );
       }
 
-      this.gold = $gameParty._gold;
       this.initializeVariables();
     },
 

@@ -225,12 +225,16 @@ test("GeneralPanel.onGoldChange：非法输入回滚，缺少队伍时提示", (
 });
 
 test("GeneralPanel.onGoldChange：增加 / 减少金币并同步显示", () => {
+  const changes = [];
+
   globalThis.$gameParty = {
     _gold: 100,
     gainGold(amount) {
+      changes.push(["gain", amount]);
       this._gold += amount;
     },
     loseGold(amount) {
+      changes.push(["lose", amount]);
       this._gold -= amount;
     },
   };
@@ -251,6 +255,11 @@ test("GeneralPanel.onGoldChange：增加 / 减少金币并同步显示", () => {
   assert.equal(globalThis.$gameParty._gold, 80);
   assert.equal(panel.gold, 80);
   assert.equal(panel.refreshed, 2);
+  // 写入统一走 stats.js 的 writeGold，而不是绕过引擎 API 直接改 _gold。
+  assert.deepEqual(changes, [
+    ["gain", 20],
+    ["lose", 40],
+  ]);
 });
 
 test("GeneralPanel.getCurrentEventId / getCurrentEventCommandIndex：解释器位置", () => {
