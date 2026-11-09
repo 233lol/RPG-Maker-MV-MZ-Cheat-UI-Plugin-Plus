@@ -3,10 +3,7 @@ import PaginationFooter from "../components/PaginationFooter.js";
 import RefreshButton from "../components/RefreshButton.js";
 import SearchField from "../components/SearchField.js";
 import { markRaw } from "../libs/vue.js";
-import {
-  getItemsPerPageOptions,
-  getPageCount,
-} from "../js/PaginationHelper.js";
+import { getPageCount } from "../js/PaginationHelper.js";
 import { isPartyReady, requirePartyReady } from "../js/GameState.js";
 import { gameDataWatcherMixin } from "../js/GameDataWatcher.js";
 import { panelStateMixin } from "../js/PanelState.js";
@@ -130,8 +127,20 @@ export default {
       selectedTab: null,
       actors: [],
       allSkills: [],
-      itemsPerPageOptions: getItemsPerPageOptions(),
-      skillHeaders: [
+    };
+  },
+
+  created() {
+    this.initializeVariables();
+  },
+
+  computed: {
+    panelStateId() {
+      return "skills";
+    },
+
+    skillHeaders() {
+      return [
         {
           title: t("skill.learned"),
           key: "isLearned",
@@ -155,17 +164,7 @@ export default {
           sortable: false,
           align: "center",
         },
-      ],
-    };
-  },
-
-  created() {
-    this.initializeVariables();
-  },
-
-  computed: {
-    panelStateId() {
-      return "skills";
+      ];
     },
   },
 

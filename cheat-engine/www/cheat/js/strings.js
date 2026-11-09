@@ -2,8 +2,9 @@
 // 共享 UI 文案 + 轻量国际化。
 //
 // 默认语言是简体中文；`t()` 每次调用都会按当前语言查表。
-// 切换语言时调用 `setLocale()`，主界面会订阅变更并重挂作弊 UI（不重载游戏），
-// 因此模块级常量不能直接保存 `t()` 的结果，应改成函数 / getter 按需求值。
+// `t()` 会读取一个内部响应式版本号，因此 Vue 渲染 / computed 会在 `setLocale()`
+// 后自动重新求值（不重载游戏，也不重建整个作弊窗口）。
+// 模块级常量仍然不能直接保存 `t()` 的结果，应改成函数 / getter 按需求值。
 //
 // 用法：
 //   import { t } from "../js/strings.js";
@@ -17,6 +18,7 @@ import zhCN from "./locales/zh-CN.js";
 import en from "./locales/en.js";
 import ja from "./locales/ja.js";
 import { loadSavedLocale } from "./LocaleService.js";
+import { ref } from "../libs/vue.js";
 
 const DICTIONARIES = {
   "zh-CN": zhCN,
@@ -43,6 +45,15 @@ const PLURAL_FORMS = new Set(["zero", "one", "two", "few", "many", "other"]);
 let currentLocale = loadSavedLocale();
 const localeChangeListeners = new Set();
 
+// 语言版本号：t() / 数字 / 时间格式化都会读它一次。
+// Vue 在渲染或 computed 中执行这些函数时会把它收集成依赖，
+// 因此 setLocale() 只需递增版本号，界面就会自动重新求值，不再整窗重建。
+const localeVersion = ref(0);
+
+function trackLocale() {
+  void localeVersion.value;
+}
+
 // 同步 <html lang>，让屏幕阅读器 / 拼写检查按当前界面语言工作。
 // 单元测试与构建脚本没有 document，静默跳过。
 function applyDocumentLanguage(locale) {
@@ -62,11 +73,14 @@ function applyDocumentLanguage(locale) {
 applyDocumentLanguage(currentLocale);
 
 export function getLocale() {
+  trackLocale();
   return currentLocale;
 }
 
 /**
- * 切换当前界面语言，并通知订阅者（主界面会重挂作弊 UI）。
+ * 切换当前界面语言。
+ * 递增 localeVersion 会触发所有读取 t() 的 Vue 渲染 / computed，
+ * 同时通知需要执行额外逻辑的订阅者（例如重新加载非响应式数据）。
  * 只接受 DICTIONARIES 里存在的语言；返回是否真的发生了变化。
  *
  * @param {string} locale
@@ -82,6 +96,7 @@ export function setLocale(locale) {
   }
 
   currentLocale = locale;
+  localeVersion.value += 1;
   applyDocumentLanguage(locale);
 
   for (const listener of localeChangeListeners) {
@@ -121,6 +136,7 @@ export function getAvailableLocales() {
 }
 
 export function getIntlLocale() {
+  trackLocale();
   return INTL_LOCALES[currentLocale] || currentLocale;
 }
 
@@ -191,10 +207,12 @@ function resolveText(key, params) {
 }
 
 export function hasTranslation(key) {
+  trackLocale();
   return resolveText(key, {}) !== null;
 }
 
 export function t(key, params = {}) {
+  trackLocale();
   const text = resolveText(key, params);
 
   if (text === null) {

@@ -105,19 +105,29 @@ test("PaginationFooter：分页范围、页数与文案", () => {
 });
 
 test("PaginationFooter / SearchField / RefreshButton：props 默认值保持可用", () => {
+  assert.deepEqual(PaginationFooter.props.itemsPerPageOptions.default(), []);
   assert.deepEqual(
-    PaginationFooter.props.itemsPerPageOptions.default(),
+    PaginationFooter.computed.resolvedItemsPerPageOptions.call({
+      itemsPerPageOptions: [],
+    }),
     getItemsPerPageOptions(),
   );
   assert.equal(PaginationFooter.props.total.default, 0);
   assert.equal(PaginationFooter.props.itemsPerPage.default, 5);
 
-  assert.equal(typeof SearchField.props.label.default(), "string");
-  assert.notEqual(SearchField.props.label.default(), "");
+  assert.equal(SearchField.props.label.default, "");
+  const resolvedLabel = SearchField.computed.resolvedLabel.call({ label: "" });
+  assert.equal(typeof resolvedLabel, "string");
+  assert.notEqual(resolvedLabel, "");
   assert.equal(SearchField.props.fieldClass.default, "flex-grow-1");
   assert.equal(SearchField.props.modelValue.default, "");
 
-  assert.equal(typeof RefreshButton.props.tooltip.default(), "string");
+  assert.equal(RefreshButton.props.tooltip.default, "");
+  const resolvedTooltip = RefreshButton.computed.resolvedTooltip.call({
+    tooltip: "",
+  });
+  assert.equal(typeof resolvedTooltip, "string");
+  assert.notEqual(resolvedTooltip, "");
   assert.equal(RefreshButton.props.color.default, "pink");
   assert.equal(RefreshButton.props.icon.default, "mdi-refresh");
 

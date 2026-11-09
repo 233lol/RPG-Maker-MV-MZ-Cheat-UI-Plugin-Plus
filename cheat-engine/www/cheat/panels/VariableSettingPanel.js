@@ -150,9 +150,23 @@ export default {
   data() {
     return {
       lockKind: "variable",
-      lockLabel: t("variable.label"),
+      jsonDialog: {
+        show: false,
+        id: 0,
+        name: "",
+        text: "",
+        error: "",
+      },
+    };
+  },
 
-      tableHeaders: [
+  computed: {
+    panelStateId() {
+      return "variables";
+    },
+
+    tableHeaders() {
+      return [
         {
           title: t("variable.name"),
           key: "name",
@@ -167,20 +181,7 @@ export default {
           sortable: false,
           width: 72,
         },
-      ],
-      jsonDialog: {
-        show: false,
-        id: 0,
-        name: "",
-        text: "",
-        error: "",
-      },
-    };
-  },
-
-  computed: {
-    panelStateId() {
-      return "variables";
+      ];
     },
 
     // e2e / 调试用：引擎里的变量名表

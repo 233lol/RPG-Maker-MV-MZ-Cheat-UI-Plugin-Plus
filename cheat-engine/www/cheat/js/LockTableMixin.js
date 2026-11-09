@@ -68,7 +68,6 @@ export const lockTableMixin = {
   data() {
     return {
       lockKind: "switch",
-      lockLabel: t("switch.label"),
       excludeNameless: true,
       // e2e / 调试读取的名字表（面板通过 computed 暴露成 switchNames 等）
       names: [],
@@ -85,6 +84,12 @@ export const lockTableMixin = {
   },
 
   computed: {
+    lockLabel() {
+      return this.lockKind === "variable"
+        ? t("variable.label")
+        : t("switch.label");
+    },
+
     allFilteredLocked() {
       const lockableItems = this.filteredTableItems.filter(
         (item) => item.id > 0,

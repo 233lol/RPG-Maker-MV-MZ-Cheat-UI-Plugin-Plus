@@ -603,22 +603,10 @@ export default {
       // 自动刷新
       autoRefresh: true,
       refreshIntervalMs: 2000,
-      refreshIntervalOptions: [
-        { title: t("common.seconds", { count: 1 }), value: 1000 },
-        { title: t("common.seconds", { count: 2 }), value: 2000 },
-        { title: t("common.seconds", { count: 5 }), value: 5000 },
-      ],
       refreshTimer: null,
 
       // 分页
       pagination: { page: 1, itemsPerPage: 50 },
-      itemsPerPageOptions: [
-        10,
-        20,
-        50,
-        100,
-        { title: t("common.all"), value: -1 },
-      ],
       panelStateExtraKeys: [
         "rootFilter",
         "autoRefresh",
@@ -721,6 +709,18 @@ export default {
   computed: {
     panelStateId() {
       return "global-variables";
+    },
+
+    refreshIntervalOptions() {
+      return [
+        { title: t("common.seconds", { count: 1 }), value: 1000 },
+        { title: t("common.seconds", { count: 2 }), value: 2000 },
+        { title: t("common.seconds", { count: 5 }), value: 5000 },
+      ];
+    },
+
+    itemsPerPageOptions() {
+      return [10, 20, 50, 100, { title: t("common.all"), value: -1 }];
     },
 
     isRoot() {

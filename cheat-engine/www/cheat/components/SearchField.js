@@ -12,7 +12,7 @@ export default {
     },
     label: {
       type: String,
-      default: () => t("common.search"),
+      default: "",
     },
     clearable: {
       type: Boolean,
@@ -34,10 +34,16 @@ export default {
 
   emits: ["update:modelValue"],
 
+  computed: {
+    resolvedLabel() {
+      return this.label || t("common.search");
+    },
+  },
+
   template: `
 <v-text-field
     :model-value="modelValue"
-    :label="label"
+    :label="resolvedLabel"
     variant="solo"
     bg-color="grey-darken-3"
     density="compact"

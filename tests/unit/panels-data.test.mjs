@@ -16,6 +16,7 @@ import {
 } from "../../cheat-engine/www/cheat/js/CheatHelper.js";
 import { ConfirmDialog } from "../../cheat-engine/www/cheat/js/DialogHelper.js";
 import { Alert } from "../../cheat-engine/www/cheat/js/AlertHelper.js";
+import { tablePanelMixin } from "../../cheat-engine/www/cheat/js/TablePanelMixin.js";
 
 globalThis.Game_Actor = class Game_Actor {};
 
@@ -71,9 +72,10 @@ test("createItemDatabasePanel：工厂组件初始化数据并转换表格行", 
   assert.equal(Panel.name, "ItemSettingPanel");
   assert.equal(data.stateKey, "item");
   assert.equal(data.items.length, 0);
-  assert.equal(data.headers[0].key, "name");
-  assert.equal(data.headers[1].key, "desc");
-  assert.equal(typeof data.headers[0].title, "string");
+  const headers = Panel.computed.headers.call({});
+  assert.equal(headers[0].key, "name");
+  assert.equal(headers[1].key, "desc");
+  assert.equal(typeof headers[0].title, "string");
 
   Panel.created.call(panel);
   assert.equal(panel.items, source);
@@ -1159,7 +1161,9 @@ test("设置类面板 data / created / panelStateId 默认值", () => {
   const switches = SwitchSettingPanel.data.call({});
   assert.equal(switches.lockKind, "switch");
   assert.deepEqual(
-    switches.tableHeaders.map((header) => header.key),
+    SwitchSettingPanel.computed.tableHeaders
+      .call(switches)
+      .map((header) => header.key),
     ["name", "value", "lock"],
   );
   assert.equal(SwitchSettingPanel.computed.panelStateId.call({}), "switches");
@@ -1171,7 +1175,9 @@ test("设置类面板 data / created / panelStateId 默认值", () => {
   const variables = VariableSettingPanel.data.call({});
   assert.equal(variables.lockKind, "variable");
   assert.deepEqual(
-    variables.tableHeaders.map((header) => header.key),
+    VariableSettingPanel.computed.tableHeaders
+      .call(variables)
+      .map((header) => header.key),
     ["name", "value", "lock"],
   );
   assert.deepEqual(variables.jsonDialog, {
@@ -1195,10 +1201,19 @@ test("设置类面板 data / created / panelStateId 默认值", () => {
   assert.deepEqual(skills.actors, []);
   assert.deepEqual(skills.allSkills, []);
   assert.deepEqual(
-    skills.skillHeaders.map((header) => header.key),
+    SkillSettingPanel.computed.skillHeaders
+      .call(skills)
+      .map((header) => header.key),
     ["isLearned", "name", "description", "actions"],
   );
-  assert.ok(Array.isArray(skills.itemsPerPageOptions));
+  assert.ok(
+    Array.isArray(
+      tablePanelMixin.computed.itemsPerPageOptions.call({
+        search: "",
+        pagination: { page: 1, itemsPerPage: 5 },
+      }),
+    ),
+  );
   assert.equal(SkillSettingPanel.computed.panelStateId.call({}), "skills");
 
   let skillInitialized = 0;

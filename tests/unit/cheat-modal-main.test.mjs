@@ -25,8 +25,6 @@ const { GLOBAL_SHORTCUT } =
 const { Key } = await import("../../cheat-engine/www/cheat/js/KeyCodes.js");
 const { isGameInputBlocked, setGameInputBlocked } =
   await import("../../cheat-engine/www/cheat/js/ClickGuard.js");
-const { getLocale, setLocale } =
-  await import("../../cheat-engine/www/cheat/js/strings.js");
 
 globalThis.setInterval = originalSetInterval;
 globalThis.clearInterval = originalClearInterval;
@@ -56,14 +54,30 @@ function resetGlobals() {
 beforeEach(resetGlobals);
 afterEach(resetGlobals);
 
+function applyComputed(target, definition) {
+  for (const [name, getter] of Object.entries(definition.computed || {})) {
+    Object.defineProperty(target, name, {
+      configurable: true,
+      get() {
+        return getter.call(this);
+      },
+    });
+  }
+
+  return target;
+}
+
 function makeModal(overrides = {}) {
-  return {
-    ...CheatModal.methods,
-    ...CheatModal.data.call({ modelValue: "general-panel" }),
-    $refs: {},
-    $emit() {},
-    ...overrides,
-  };
+  return applyComputed(
+    {
+      ...CheatModal.methods,
+      ...CheatModal.data.call({ modelValue: "general-panel" }),
+      $refs: {},
+      $emit() {},
+      ...overrides,
+    },
+    CheatModal,
+  );
 }
 
 function makeMain(overrides = {}) {
@@ -72,7 +86,6 @@ function makeMain(overrides = {}) {
     currentKey: Key.createEmpty(),
     show: false,
     currentComponentName: "general-panel",
-    localeKey: 0,
     get shouldBlockGameInput() {
       return this.show && this.currentComponentName !== "map-event-panel";
     },
@@ -331,11 +344,11 @@ test("CheatModal：面板状态保存 / 恢复与导航点击", () => {
 
 /* ---------------------------------------------------------------- MainComponent */
 
-test("MainComponent.data：恢复上次面板 / 语言重建键 / 空输入状态", () => {
+test("MainComponent.data：恢复上次面板 / 空输入状态", () => {
   const data = MainComponent.data.call({});
 
   assert.equal(data.show, false);
-  assert.equal(data.localeKey, 0);
+  assert.equal(Object.hasOwn(data, "localeKey"), false);
   assert.ok(data.currentKey);
   assert.equal(typeof data.currentComponentName, "string");
   assert.ok(data.currentComponentName.length > 0);
@@ -370,7 +383,7 @@ test("MainComponent.watch.currentComponentName：有值才写入面板状态", (
   );
 });
 
-test("MainComponent.beforeUnmount：移除全局监听并取消语言订阅", () => {
+test("MainComponent.beforeUnmount：移除全局监听并释放输入状态", () => {
   const removed = [];
   globalThis.window = {
     removeEventListener(...args) {
@@ -383,11 +396,7 @@ test("MainComponent.beforeUnmount：移除全局监听并取消语言订阅", ()
     },
   };
 
-  let unsubscribed = 0;
   const panel = makeMain({
-    __unsubscribeLocaleChange() {
-      unsubscribed++;
-    },
     teardownInputGuard() {
       this.guardTornDown = true;
     },
@@ -400,8 +409,6 @@ test("MainComponent.beforeUnmount：移除全局监听并取消语言订阅", ()
 
   assert.equal(panel.keyReleased, true);
   assert.equal(panel.guardTornDown, true);
-  assert.equal(unsubscribed, 1);
-  assert.equal(panel.__unsubscribeLocaleChange, null);
   assert.ok(removed.includes("keydown"));
   assert.ok(removed.includes("keyup"));
   assert.ok(removed.includes("keypress"));
@@ -1145,7 +1152,6 @@ test("MainComponent.created 安装补丁 / 接管 CheatHelper / 注册监听", (
 
   const calls = [];
   const panel = {
-    localeKey: 0,
     toggleCheatModal(name) {
       calls.push(["toggle", name]);
     },
@@ -1166,19 +1172,7 @@ test("MainComponent.created 安装补丁 / 接管 CheatHelper / 注册监听", (
   );
   assert.equal(typeof GeneralCheat.toggleCheatModal, "function");
   assert.equal(typeof GeneralCheat.openCheatModal, "function");
-  assert.equal(typeof panel.__unsubscribeLocaleChange, "function");
-
-  // 切换语言时重建作弊 UI（只更新 localeKey，不重载游戏）
-  const originalLocale = getLocale();
-  const nextLocale = originalLocale === "en" ? "ja" : "en";
-
-  assert.equal(setLocale(nextLocale), true);
-  assert.equal(panel.localeKey, 1);
-
-  panel.__unsubscribeLocaleChange();
-  assert.equal(setLocale(originalLocale), true);
-  assert.equal(panel.localeKey, 1, "取消订阅后不应再响应语言变化");
-  panel.__unsubscribeLocaleChange = null;
+  assert.equal(Object.hasOwn(panel, "__unsubscribeLocaleChange"), false);
 
   // 静态方法通过实例转发
   GeneralCheat.toggleCheatModal("x");

@@ -109,9 +109,16 @@ export default {
   data() {
     return {
       lockKind: "switch",
-      lockLabel: t("switch.label"),
+    };
+  },
 
-      tableHeaders: [
+  computed: {
+    panelStateId() {
+      return "switches";
+    },
+
+    tableHeaders() {
+      return [
         {
           title: t("switch.name"),
           key: "name",
@@ -126,13 +133,7 @@ export default {
           sortable: false,
           width: 72,
         },
-      ],
-    };
-  },
-
-  computed: {
-    panelStateId() {
-      return "switches";
+      ];
     },
 
     // e2e / 调试用：引擎里的开关名表

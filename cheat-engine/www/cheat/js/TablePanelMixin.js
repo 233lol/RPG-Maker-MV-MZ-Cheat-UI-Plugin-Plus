@@ -20,13 +20,17 @@ export const tablePanelMixin = {
     return {
       search: "",
       pagination: { page: 1, itemsPerPage: 5 },
-      itemsPerPageOptions: getItemsPerPageOptions(),
       // 除 search / pagination 之外，还需要写进 panel-state.json 的字段名
       panelStateExtraKeys: [],
     };
   },
 
   computed: {
+    // 每次语言变化后重新生成，「全部」选项不会停留在旧语言。
+    itemsPerPageOptions() {
+      return getItemsPerPageOptions();
+    },
+
     // 默认取 filteredTableItems 的长度；过滤结果叫别的名字的面板
     // （filteredMaps / filteredShortcuts / filteredEntries）自行覆盖。
     totalCount() {

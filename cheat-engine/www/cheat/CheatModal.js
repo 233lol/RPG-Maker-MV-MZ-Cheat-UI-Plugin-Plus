@@ -142,9 +142,20 @@ export default {
     return {
       geometry: getDefaultGeometry(),
       navWidth: 160,
-      openedGroups: [t("nav.items")],
+    };
+  },
 
-      navTreeItems: [
+  computed: {
+    panelStateId() {
+      return "cheat-window";
+    },
+
+    openedGroups() {
+      return [t("nav.items")];
+    },
+
+    navTreeItems() {
+      return [
         {
           name: t("nav.general"),
           icon: "mdi-hammer-screwdriver",
@@ -236,13 +247,7 @@ export default {
           icon: "mdi-keyboard-outline",
           component: "shortcut-panel",
         },
-      ],
-    };
-  },
-
-  computed: {
-    panelStateId() {
-      return "cheat-window";
+      ];
     },
 
     cardStyle() {

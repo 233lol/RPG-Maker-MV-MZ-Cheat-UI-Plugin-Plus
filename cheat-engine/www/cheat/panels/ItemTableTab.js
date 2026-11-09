@@ -123,7 +123,6 @@ export default {
     return {
       excludeNameless: true,
       onlyOwnedItems: false,
-      tableHeaders: [],
       tableItems: [],
       panelStateExtraKeys: ["excludeNameless", "onlyOwnedItems"],
     };
@@ -177,6 +176,22 @@ export default {
   },
 
   computed: {
+    tableHeaders() {
+      return [
+        ...this.headers,
+        {
+          title: t("items.amount"),
+          key: "amount",
+        },
+        {
+          title: t("items.lock"),
+          key: "lock",
+          sortable: false,
+          width: 72,
+        },
+      ];
+    },
+
     panelStateId() {
       return `item-table-${this.stateKey}`;
     },
@@ -235,20 +250,6 @@ export default {
     },
 
     initializeVariables() {
-      this.tableHeaders = this.headers.slice(0);
-      this.tableHeaders.push(
-        {
-          title: t("items.amount"),
-          key: "amount",
-        },
-        {
-          title: t("items.lock"),
-          key: "lock",
-          sortable: false,
-          width: 72,
-        },
-      );
-
       if (!isPartyReady()) {
         this.tableItems = [];
         return;

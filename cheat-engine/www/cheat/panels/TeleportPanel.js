@@ -151,25 +151,6 @@ export default {
       maps: [],
 
       panelStateExtraKeys: ["excludeFullPath"],
-
-      tableHeaders: [
-        {
-          title: "ID",
-          key: "id",
-        },
-        {
-          title: t("teleport.nameHeader"),
-          key: "name",
-        },
-        {
-          title: t("teleport.fullPathHeader"),
-          key: "fullPath",
-        },
-        {
-          title: t("teleport.actionsHeader"),
-          key: "actions",
-        },
-      ],
     };
   },
 
@@ -197,12 +178,35 @@ export default {
       return "teleport";
     },
 
+    tableHeaders() {
+      return [
+        {
+          title: "ID",
+          key: "id",
+        },
+        {
+          title: t("teleport.nameHeader"),
+          key: "name",
+        },
+        {
+          title: t("teleport.fullPathHeader"),
+          key: "fullPath",
+        },
+        {
+          title: t("teleport.actionsHeader"),
+          key: "actions",
+        },
+      ];
+    },
+
     filteredTableHeaders() {
+      const headers = /** @type {any} */ (this.tableHeaders);
+
       if (this.excludeFullPath) {
-        return this.tableHeaders.filter((header) => header.key !== "fullPath");
+        return headers.filter((header) => header.key !== "fullPath");
       }
 
-      return this.tableHeaders;
+      return headers;
     },
 
     filteredMaps() {

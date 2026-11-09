@@ -798,7 +798,9 @@ test("SaveBackupPanel.data / created / panelStateId", () => {
   assert.deepEqual(data.selectedBackupIds, []);
   assert.deepEqual(data.panelStateExtraKeys, ["slotFilter"]);
   assert.deepEqual(
-    data.tableHeaders.map((header) => header.key),
+    SaveBackupPanel.computed.tableHeaders
+      .call(data)
+      .map((header) => header.key),
     ["slot", "progress", "createdText", "actions"],
   );
   assert.equal(SaveBackupPanel.computed.panelStateId.call({}), "save-backup");
@@ -1510,7 +1512,7 @@ test("TeleportPanel.data / created / beforeUnmount 定时器", () => {
   assert.deepEqual(data.panelStateExtraKeys, ["excludeFullPath"]);
   assert.equal(TeleportPanel.computed.panelStateId.call({}), "teleport");
 
-  const headers = data.tableHeaders;
+  const headers = TeleportPanel.computed.tableHeaders.call(data);
   const fullPanel = {
     tableHeaders: headers,
     excludeFullPath: false,
@@ -1566,7 +1568,9 @@ test("SaveRecallPanel.data / computed 展开默认值", () => {
   assert.deepEqual(data.locations, []);
   assert.equal(data.currentMapName, "");
   assert.deepEqual(
-    data.tableHeaders.map((header) => header.key),
+    SaveRecallPanel.computed.tableHeaders
+      .call(data)
+      .map((header) => header.key),
     ["name", "mapName", "coord", "actions"],
   );
   assert.equal(SaveRecallPanel.computed.panelStateId.call({}), "save-recall");

@@ -8,7 +8,7 @@ export default {
   props: {
     tooltip: {
       type: String,
-      default: () => t("common.reloadGameData"),
+      default: "",
     },
     color: {
       type: String,
@@ -42,6 +42,12 @@ export default {
 
   emits: ["click"],
 
+  computed: {
+    resolvedTooltip() {
+      return this.tooltip || t("common.reloadGameData");
+    },
+  },
+
   template: `
 <v-tooltip location="bottom">
     <template #activator="{ props }">
@@ -52,13 +58,13 @@ export default {
             :variant="variant"
             :class="btnClass"
             :style="btnStyle || undefined"
-            :aria-label="tooltip"
+            :aria-label="resolvedTooltip"
             v-bind="props"
             @click="$emit('click')">
             <v-icon :size="iconSize || undefined" aria-hidden="true">{{ icon }}</v-icon>
         </v-btn>
     </template>
-    <span>{{ tooltip }}</span>
+    <span>{{ resolvedTooltip }}</span>
 </v-tooltip>
     `,
 };

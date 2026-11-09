@@ -129,8 +129,21 @@ export default {
       locations: [],
 
       currentMapName: "",
+    };
+  },
 
-      tableHeaders: [
+  mounted() {
+    this.initializeVariables();
+    this.$refs.locationAliasField.focus();
+  },
+
+  computed: {
+    panelStateId() {
+      return "save-recall";
+    },
+
+    tableHeaders() {
+      return [
         {
           title: t("saveRecall.aliasHeader"),
           key: "name",
@@ -147,18 +160,7 @@ export default {
           title: t("saveRecall.actionsHeader"),
           key: "actions",
         },
-      ],
-    };
-  },
-
-  mounted() {
-    this.initializeVariables();
-    this.$refs.locationAliasField.focus();
-  },
-
-  computed: {
-    panelStateId() {
-      return "save-recall";
+      ];
     },
 
     tableItems() {

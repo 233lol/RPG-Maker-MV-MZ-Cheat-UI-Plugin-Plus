@@ -19,6 +19,7 @@ import {
 import zhCN from "../../cheat-engine/www/cheat/js/locales/zh-CN.js";
 import en from "../../cheat-engine/www/cheat/js/locales/en.js";
 import ja from "../../cheat-engine/www/cheat/js/locales/ja.js";
+import { effect } from "../../cheat-engine/www/cheat/libs/vue.js";
 
 test("t：读取共享文案", () => {
   assert.equal(t("common.search"), "搜索...");
@@ -119,6 +120,26 @@ test("setLocale：切换后 t() 立即变化，并通知订阅者", () => {
   } finally {
     unsubscribe();
     setLocale("zh-CN");
+  }
+});
+
+test("setLocale：读取 t() 的 Vue effect 会自动重新求值", () => {
+  const texts = [];
+  const stop = effect(() => {
+    texts.push(t("common.search"));
+  });
+
+  try {
+    assert.deepEqual(texts, ["搜索..."]);
+
+    assert.equal(setLocale("en"), true);
+    assert.deepEqual(texts, ["搜索...", "Search..."]);
+
+    assert.equal(setLocale("ja"), true);
+    assert.deepEqual(texts, ["搜索...", "Search...", "検索..."]);
+  } finally {
+    setLocale("zh-CN");
+    stop();
   }
 });
 

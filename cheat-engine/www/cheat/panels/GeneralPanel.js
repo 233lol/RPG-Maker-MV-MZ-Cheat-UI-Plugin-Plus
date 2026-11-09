@@ -389,8 +389,9 @@ export default {
       }
 
       saveLocale(locale);
-      // 只切换运行时语言并通知主界面重挂作弊 UI；不重载游戏窗口，
-      // 否则玩家当前未保存的进度会丢失。
+      // 只切换运行时语言；t() 的响应式版本号会让界面自动更新，
+      // 不重载游戏窗口，也不重建作弊窗口。
+      this.locale = locale;
       setLocale(locale);
     },
 

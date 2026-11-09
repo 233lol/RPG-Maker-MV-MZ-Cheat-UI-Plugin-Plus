@@ -172,8 +172,21 @@ export default {
 
       hideDesc: true,
       shortcutSearch: Key.createEmpty(),
+      panelStateExtraKeys: ["hideDesc"],
+    };
+  },
 
-      tableHeaders: [
+  created() {
+    this.initializeVariables();
+  },
+
+  computed: {
+    panelStateId() {
+      return "shortcuts";
+    },
+
+    tableHeaders() {
+      return [
         {
           title: t("shortcut.nameHeader"),
           key: "name",
@@ -190,22 +203,12 @@ export default {
           title: t("shortcut.paramHeader"),
           key: "param",
         },
-      ],
-      panelStateExtraKeys: ["hideDesc"],
-    };
-  },
-
-  created() {
-    this.initializeVariables();
-  },
-
-  computed: {
-    panelStateId() {
-      return "shortcuts";
+      ];
     },
 
     filteredHeaders() {
-      return this.tableHeaders.filter(
+      const headers = /** @type {any} */ (this.tableHeaders);
+      return headers.filter(
         (header) => !this.hideDesc || header.key !== "desc",
       );
     },

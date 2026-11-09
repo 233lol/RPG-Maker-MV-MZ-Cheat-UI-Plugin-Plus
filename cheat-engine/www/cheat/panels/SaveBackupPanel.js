@@ -333,10 +333,22 @@ export default {
 
       slotFilter: "all",
       panelStateExtraKeys: ["slotFilter"],
+    };
+  },
 
-      // 面板只有 ~600px 宽：三列就够，表头纵向换行的坑见 css/main.css 的
-      // .cheat-save-backup-table。槽位列既要放 #N 也要放存档次数，给宽一点。
-      tableHeaders: [
+  created() {
+    this.reload();
+  },
+
+  computed: {
+    panelStateId() {
+      return "save-backup";
+    },
+
+    // 面板只有 ~600px 宽：三列就够，表头纵向换行的坑见 css/main.css 的
+    // .cheat-save-backup-table。槽位列既要放 #N 也要放存档次数，给宽一点。
+    tableHeaders() {
+      return [
         {
           title: t("saveBackup.slot"),
           key: "slot",
@@ -360,17 +372,7 @@ export default {
           width: 60,
           align: "center",
         },
-      ],
-    };
-  },
-
-  created() {
-    this.reload();
-  },
-
-  computed: {
-    panelStateId() {
-      return "save-backup";
+      ];
     },
 
     // 状态压成一行：槽位 · 地图 · 快照计数 · 占用。

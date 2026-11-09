@@ -13,7 +13,6 @@ import { isCheatUiTarget, setGameInputBlocked } from "./js/ClickGuard.js";
 import { installGameDataHooks } from "./js/GameDataState.js";
 import { loadPanelState, savePanelState } from "./js/PanelState.js";
 import { Key } from "./js/KeyCodes.js";
-import { subscribeLocaleChange } from "./js/strings.js";
 
 function getInitialPanelName() {
   const state = loadPanelState("main-window", {
@@ -48,7 +47,6 @@ export default {
         id="cheat-modal"
         ref="cheatModal"
         class="opaque-on-mouseover"
-        :key="localeKey"
         v-model="currentComponentName"
         v-if="show"
         @close="closeCheatModal"
@@ -63,9 +61,6 @@ export default {
       currentKey: Key.createEmpty(),
       show: false,
       currentComponentName: getInitialPanelName(),
-      // 语言切换时递增，用来重挂 cheat-modal，让 data() 里缓存的文案重新求值。
-      // 只重建作弊 UI，不重载游戏，也不会丢玩家进度。
-      localeKey: 0,
     };
   },
 
@@ -112,10 +107,6 @@ export default {
     window.addEventListener("keyup", this.onGlobalKeyUp, true);
     window.addEventListener("keypress", this.onGlobalKeyPress, true);
     window.addEventListener("blur", this.onWindowBlur);
-
-    this.__unsubscribeLocaleChange = subscribeLocaleChange(() => {
-      this.localeKey += 1;
-    });
   },
 
   mounted() {
@@ -132,11 +123,6 @@ export default {
     window.removeEventListener("blur", this.onWindowBlur);
     document.removeEventListener("focusin", this.onDocumentFocusIn, true);
     this.teardownInputGuard();
-
-    if (this.__unsubscribeLocaleChange) {
-      this.__unsubscribeLocaleChange();
-      this.__unsubscribeLocaleChange = null;
-    }
   },
 
   methods: {

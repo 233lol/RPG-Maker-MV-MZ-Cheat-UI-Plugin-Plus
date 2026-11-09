@@ -42,7 +42,12 @@ export function createItemDatabasePanel({
       return {
         stateKey,
         items: [],
-        headers: [
+      };
+    },
+
+    computed: {
+      headers() {
+        return [
           {
             title: t("items.name"),
             key: "name",
@@ -51,8 +56,8 @@ export function createItemDatabasePanel({
             title: t(descTitleKey),
             key: "desc",
           },
-        ],
-      };
+        ];
+      },
     },
 
     created() {

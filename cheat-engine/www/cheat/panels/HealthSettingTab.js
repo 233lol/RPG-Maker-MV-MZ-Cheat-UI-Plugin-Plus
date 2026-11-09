@@ -56,7 +56,13 @@ export default {
 
   data() {
     return {
-      tableHeaders: [
+      editingItems: [],
+    };
+  },
+
+  computed: {
+    tableHeaders() {
+      return [
         {
           title: t("battle.memberName"),
           key: "name",
@@ -69,10 +75,8 @@ export default {
           title: "MP",
           key: "mp",
         },
-      ],
-
-      editingItems: [],
-    };
+      ];
+    },
   },
 
   props: {

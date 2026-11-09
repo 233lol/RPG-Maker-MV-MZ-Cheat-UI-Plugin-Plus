@@ -35,7 +35,7 @@ export default {
     },
     itemsPerPageOptions: {
       type: Array,
-      default: () => getItemsPerPageOptions(),
+      default: () => [],
     },
     totalVisible: {
       type: Number,
@@ -70,6 +70,12 @@ export default {
       return t("common.perPage");
     },
 
+    resolvedItemsPerPageOptions() {
+      return this.itemsPerPageOptions.length > 0
+        ? this.itemsPerPageOptions
+        : getItemsPerPageOptions();
+    },
+
     bounds() {
       return getPageBounds(this.total, this.page, this.itemsPerPage);
     },
@@ -97,7 +103,7 @@ export default {
         <span class="text-body-small mr-2">{{ perPageLabel }}</span>
         <v-select
             :model-value="itemsPerPage"
-            :items="itemsPerPageOptions"
+            :items="resolvedItemsPerPageOptions"
             density="compact"
             hide-details
             variant="outlined"

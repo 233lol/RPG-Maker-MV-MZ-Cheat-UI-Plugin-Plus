@@ -21,8 +21,18 @@ afterEach(() => {
 
 /* ------------------------------------------------------------ HealthSettingTab */
 
+function defineComputed(target, name, getter) {
+  Object.defineProperty(target, name, {
+    configurable: true,
+    get() {
+      return getter.call(this);
+    },
+  });
+  return target;
+}
+
 function makeHealthPanel(overrides = {}) {
-  return {
+  const panel = {
     ...HealthSettingTab.data(),
     ...HealthSettingTab.methods,
     events: [],
@@ -31,6 +41,9 @@ function makeHealthPanel(overrides = {}) {
     },
     ...overrides,
   };
+
+  defineComputed(panel, "tableHeaders", HealthSettingTab.computed.tableHeaders);
+  return panel;
 }
 
 function makeMember(id, name, hp, mhp, mp, mmp) {
@@ -102,7 +115,7 @@ test("HealthSettingTab.onDataChange：只在编辑列表是数组时向上抛出
 /* --------------------------------------------------------------- ItemTableTab */
 
 function makeItemPanel(overrides = {}) {
-  return {
+  const panel = {
     ...ItemTableTab.data(),
     ...ItemTableTab.methods,
 
@@ -115,6 +128,9 @@ function makeItemPanel(overrides = {}) {
 
     ...overrides,
   };
+
+  defineComputed(panel, "tableHeaders", ItemTableTab.computed.tableHeaders);
+  return panel;
 }
 
 function partyWithItems(amounts) {
