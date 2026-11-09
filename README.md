@@ -344,7 +344,7 @@ make vendor            # 生成全部 vendor 文件
 
 ## 版本与发布
 
-- `package.json` 的 `version` 是唯一的语义化版本来源（当前 `1.4.0`）。
+- `package.json` 的 `version` 是唯一的语义化版本来源（当前开发版本 `1.4.1`，最近发布 `1.4.0`）。
 - 构建时 `tools/gen-version.mjs` 会把版本与 commit 写进 `cheat/version.js`（`RPGSEMVER` / `RPGVERSION`），面板底部显示 `v<版本> · <commit>`。
 - 每次发版请同时更新 `package.json`、`CHANGELOG.md`，并打 `vX.Y.Z` 标签；压缩包仍按 commit 短哈希命名。
 - 版本历史见 [`CHANGELOG.md`](CHANGELOG.md)。
