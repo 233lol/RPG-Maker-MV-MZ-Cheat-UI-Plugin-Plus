@@ -10,11 +10,8 @@ const repoRoot = path.resolve(
 );
 const cheatRoot = path.join(repoRoot, "cheat-engine", "www", "cheat");
 
-// Files that intentionally do not carry `// @ts-check` yet:
-// - vendor bundles / generated version file are excluded for the same reason
-//   as in jsconfig.json.
-const UNTYPED_ALLOWLIST = new Set([]);
-
+// Vendor bundles / generated version file are checked by their own build
+// tooling, not by the cheat source type-coverage guard.
 const IGNORED_PREFIXES = ["libs/"];
 const IGNORED_FILES = new Set(["version.js"]);
 
@@ -38,10 +35,9 @@ function relativeToCheat(file) {
   return path.relative(cheatRoot, file).split(path.sep).join("/");
 }
 
-test("源码类型覆盖：除 allowlist 外所有运行时 JS 都启用 @ts-check", () => {
+test("源码类型覆盖：所有运行时 JS 都启用 @ts-check", () => {
   const files = collectJsFiles(cheatRoot);
   const missing = [];
-  const staleAllowlist = new Set(UNTYPED_ALLOWLIST);
 
   for (const file of files) {
     const rel = relativeToCheat(file);
@@ -55,20 +51,8 @@ test("源码类型覆盖：除 allowlist 外所有运行时 JS 都启用 @ts-che
     }
 
     const source = readFileSync(file, "utf8");
-    const typed = /^\s*\/\/\s*@ts-check\b/m.test(source);
 
-    if (UNTYPED_ALLOWLIST.has(rel)) {
-      staleAllowlist.delete(rel);
-
-      assert.equal(
-        typed,
-        false,
-        `${rel} 已经启用 @ts-check，请从 type-coverage.test.mjs 的 allowlist 移除`,
-      );
-      continue;
-    }
-
-    if (!typed) {
+    if (!/^\s*\/\/\s*@ts-check\b/m.test(source)) {
       missing.push(rel);
     }
   }
@@ -77,11 +61,6 @@ test("源码类型覆盖：除 allowlist 外所有运行时 JS 都启用 @ts-che
     missing,
     [],
     `以下文件缺少 // @ts-check：\n${missing.join("\n")}`,
-  );
-  assert.deepEqual(
-    [...staleAllowlist],
-    [],
-    "allowlist 里的文件已不存在，请更新 type-coverage.test.mjs",
   );
 });
 

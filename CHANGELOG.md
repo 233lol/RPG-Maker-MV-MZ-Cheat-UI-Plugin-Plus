@@ -20,6 +20,7 @@
   与「游戏统计」面板共用同一套校验 / 回退逻辑。
 - 存档时间机器拆分模块（`SaveBackupHelper` 与 `save-backup/*`）全部启用 `@ts-check`，
   新增 `SaveBackupApi` 类型合并，移除类型覆盖测试里的旧 allowlist。
+- 清理类型覆盖测试中已经为空的 allowlist 分支；README 增加 1.4 版本亮点并修正 CI 步骤编号。
 
 ## [1.4.0] - 2026-11-07
 

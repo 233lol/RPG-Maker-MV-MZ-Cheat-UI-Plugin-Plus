@@ -4,6 +4,16 @@
 
 Vue 2 + Vuetify 2 迁移至 Vue 3，UI 框架已升级至 Vuetify 4。
 
+## 1.4 版本亮点
+
+- 新增角色 / 队伍 / 装备编辑器：姓名、昵称、简介、职业、装备槽、状态、队伍成员与战斗顺序。
+- 全局变量面板支持按完整路径收藏，以及最近 50 次编辑的撤销。
+- 物品 / 武器 / 防具数量锁定：可逐项或批量锁定，并兼容背包 99 上限。
+- 地图事件工具：查看 / 切换独立开关 A-D、执行公共事件、强制触发当前事件。
+- 新增「游戏统计」面板：游玩时长、步数、金钱、存档 / 战斗 / 胜利 / 逃跑次数。
+- 界面支持简体中文 / English / 日本語，切换语言不再重建整个作弊窗口。
+- 面板状态持久化、窗口尺寸 / 位置记忆、游戏数据变化后自动刷新。
+
 ## 变化 / 功能
 - Vue 3 + Vuetify 4 重构
 - Makefile 构建系统
@@ -357,8 +367,8 @@ GitHub Actions 在推送到 `main`、`vue-3`（以及相关 `pull_request`）时
 2. `pnpm run test:unit`（纯函数单测）
 3. `pnpm run test:coverage:check`（覆盖率报告与最低门槛）
 4. `pnpm run typecheck`（`// @ts-check` 文件的 TypeScript 检查）
-4. `make` 构建 MV / MZ 压缩包
-5. `pnpm run test:packaging` 校验压缩包目录结构与入口路径
+5. `make` 构建 MV / MZ 压缩包
+6. `pnpm run test:packaging` 校验压缩包目录结构与入口路径
 
 最后上传两个 `.zip` 产物。完整的 nw.js 无头测试仍需本地准备 `mv/`、`mz/` 测试游戏，未放进 CI。
 
