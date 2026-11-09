@@ -26,21 +26,21 @@ export function registerSettingsLocale({ test, page }) {
       const mapIdAfter =
         typeof $gameMap !== "undefined" && $gameMap ? $gameMap.mapId() : 0;
 
-      // 切换语言会重挂作弊窗口，等待新的「常用」面板后再切回去。
-      const restoredPanel = await api.waitFor(
+      // 语言切换是原地响应式更新：面板实例保持不变，Vue 重新执行渲染后
+      // 界面上的文案应该变成新语言，不再重建整个作弊窗口。
+      const renderedText = await api.waitFor(
         () => {
-          const current = api.panel("GeneralPanel");
-          return current && current !== panel ? current : null;
+          const modalText = document.querySelector("#cheat-modal")?.innerText;
+          return modalText?.includes(strings.t("general.saveScene"))
+            ? modalText
+            : null;
         },
         5000,
         50,
       );
+      const samePanel = api.panel("GeneralPanel") === panel;
 
-      if (!restoredPanel) {
-        throw new Error("切换语言后常用面板没有重新挂载");
-      }
-
-      restoredPanel.onLocaleChange(original);
+      panel.onLocaleChange(original);
       await api.waitFor(() => strings.getLocale() === original, 5000, 50);
 
       return {
@@ -52,6 +52,8 @@ export function registerSettingsLocale({ test, page }) {
         sameScene,
         mapIdBefore,
         mapIdAfter,
+        samePanel,
+        rendered: !!renderedText,
         restored: strings.getLocale(),
       };
     });
@@ -68,6 +70,12 @@ export function registerSettingsLocale({ test, page }) {
       result.mapIdBefore,
       "切换语言后当前地图发生了变化",
     );
+    assert.equal(
+      result.samePanel,
+      true,
+      "切换语言后常用面板被重新挂载了（应原地响应式更新）",
+    );
+    assert.equal(result.rendered, true, "切换语言后界面文案没有重新渲染");
     assert.equal(result.restored, result.original, "界面语言没有还原");
   });
 
