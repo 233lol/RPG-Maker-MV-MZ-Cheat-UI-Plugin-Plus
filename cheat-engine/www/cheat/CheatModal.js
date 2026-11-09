@@ -19,6 +19,7 @@ import VariableSettingPanel from "./panels/VariableSettingPanel.js";
 import GlobalVariablePanel from "./panels/GlobalVariablePanel.js";
 import SwitchSettingPanel from "./panels/SwitchSettingPanel.js";
 import SaveRecallPanel from "./panels/SaveRecallPanel.js";
+import SaveSlotPanel from "./panels/SaveSlotPanel.js";
 import SaveBackupPanel from "./panels/SaveBackupPanel.js";
 import TeleportPanel from "./panels/TeleportPanel.js";
 import MapEventPanel from "./panels/MapEventPanel.js";
@@ -42,6 +43,7 @@ export default {
     GlobalVariablePanel,
     SwitchSettingPanel,
     SaveRecallPanel,
+    SaveSlotPanel,
     SaveBackupPanel,
     TeleportPanel,
     MapEventPanel,
@@ -226,6 +228,11 @@ export default {
           name: t("nav.saveLocation"),
           icon: "mdi-map-marker-plus",
           component: "save-recall-panel",
+        },
+        {
+          name: t("nav.saveSlots"),
+          icon: "mdi-content-save-all",
+          component: "save-slot-panel",
         },
         {
           name: t("nav.saveBackup"),

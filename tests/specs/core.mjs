@@ -14,6 +14,7 @@ const PANELS = [
   { nav: "global-variable-panel", component: "GlobalVariablePanel" },
   { nav: "switch-setting-panel", component: "SwitchSettingPanel" },
   { nav: "save-recall-panel", component: "SaveRecallPanel" },
+  { nav: "save-slot-panel", component: "SaveSlotPanel" },
   { nav: "save-backup-panel", component: "SaveBackupPanel" },
   { nav: "teleport-panel", component: "TeleportPanel" },
   { nav: "map-event-panel", component: "MapEventPanel" },
@@ -221,7 +222,7 @@ export function registerCore({ test, page, type, state }) {
     assert.equal(result.show, false);
   });
 
-  test("17 个面板全部能挂载并读取游戏数据", async () => {
+  test("18 个面板全部能挂载并读取游戏数据", async () => {
     const result = await page.evaluate(async (panels) => {
       const api = window.__cheatTest;
       const output = {};
@@ -245,6 +246,7 @@ export function registerCore({ test, page, type, state }) {
           locations: Array.isArray(proxy.locations)
             ? proxy.locations.length
             : undefined,
+          slots: Array.isArray(proxy.slots) ? proxy.slots.length : undefined,
           entries: Array.isArray(proxy.entries)
             ? proxy.entries.length
             : undefined,
