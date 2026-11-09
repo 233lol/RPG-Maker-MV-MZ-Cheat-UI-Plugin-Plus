@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 存档数据解析、元数据整理与校验。
  */
@@ -14,6 +15,7 @@ export class SaveBackupMetadata {
   //      与菜单完全一致，而且不依赖整份存档能解压；
   //   2. 自己解压整份存档 —— 用来补 savefileInfo 里没有的地图信息（尽力而为）。
   // 任何一步失败都只是少几个展示字段，绝不影响快照本身。
+  /** @this {SaveBackupApi} */
   static parseSaveMeta(slot) {
     const meta = {
       slot: slot,
@@ -135,6 +137,7 @@ export class SaveBackupMetadata {
     return meta;
   }
 
+  /** @this {SaveBackupApi} */
   static parseAnySaveData(raw) {
     if (raw === null || raw === undefined || raw === "") {
       return null;
@@ -163,6 +166,7 @@ export class SaveBackupMetadata {
   // 写回存档 / 导入快照前的最后一道校验：宁可报错，也不要把损坏数据
   // 覆盖到玩家的存档上。RPG Maker 的存档一定包含 system / party / actors
   // 等对象，这里只要求至少命中一个，避免误伤改过结构的游戏。
+  /** @this {SaveBackupApi} */
   static validateSaveText(jsonText, label = null) {
     label = label || t("saveBackup.saveData");
     if (typeof jsonText !== "string" || jsonText.trim() === "") {
@@ -202,6 +206,7 @@ export class SaveBackupMetadata {
     return data;
   }
 
+  /** @this {SaveBackupApi} */
   static getMapInfo(mapId) {
     try {
       if (
@@ -218,6 +223,7 @@ export class SaveBackupMetadata {
     return null;
   }
 
+  /** @this {SaveBackupApi} */
   static formatFrames(frames) {
     const value = Number(frames);
     // 0 帧视为「没有记录」而不是 00:00:00 —— 旧快照 / 读不到存档头时

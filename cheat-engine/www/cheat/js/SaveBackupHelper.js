@@ -1,3 +1,4 @@
+// @ts-check
 import { Alert } from "./AlertHelper.js";
 import { ConfirmDialog } from "./DialogHelper.js";
 import { isMZEngine } from "./SettingsPath.js";
@@ -17,6 +18,12 @@ import { applyStaticMethods } from "./save-backup/mixin.js";
 import { SaveBackupSettings } from "./save-backup/settings.js";
 import { SaveBackupStore } from "./save-backup/store.js";
 import { SaveBackupTransfer } from "./save-backup/transfer.js";
+
+// DOM lib 自带同名 StorageManager（浏览器存储 API），与 RPG Maker 注入的
+// StorageManager 全局冲突。调用时统一收窄成 any，避免 TS 把两者混在一起。
+function getStorageManager() {
+  return /** @type {any} */ (StorageManager);
+}
 
 /**
  * 存档时间机器入口。
@@ -38,10 +45,12 @@ export class SaveBackupCheat {
   /* ------------------------------------------------------------------ 环境 */
 
   // 供面板在 FileReader 读取前先拦一次超大文件
+  /** @this {SaveBackupApi} */
   static getMaxImportBytes() {
     return MAX_IMPORT_BYTES;
   }
 
+  /** @this {SaveBackupApi} */
   static isLocalMode() {
     try {
       // 快照功能依赖文件系统：真正决定能否用的是 require("fs") 能不能拿到，
@@ -56,10 +65,12 @@ export class SaveBackupCheat {
   //   MV：savefileId -> fileN.rpgsave，StorageManager.saveToLocalFile(id, json) 内部 LZString
   //   MZ：saveName  -> fileN.rmmzsave，StorageManager.saveToLocalFile(name, zip) 要求 pako 压缩后的数据
   // 引擎判定统一走 SettingsPath.isMZEngine()，避免两处探测逻辑漂移。
+  /** @this {SaveBackupApi} */
   static isMZ() {
     return isMZEngine();
   }
 
+  /** @this {SaveBackupApi} */
   static getSaveName(slot) {
     slot = Number(slot);
 
@@ -79,6 +90,7 @@ export class SaveBackupCheat {
     return `file${slot}`;
   }
 
+  /** @this {SaveBackupApi} */
   static maxSavefiles() {
     try {
       if (typeof DataManager === "undefined") {
@@ -100,6 +112,7 @@ export class SaveBackupCheat {
   // 顺序很重要：$gameSystem._savefileId 只有部分游戏 / 插件会写，
   // 而 DataManager._lastAccessedId 是引擎自己在存档 / 读档时维护的，
   // 两个都拿不到才返回 -1（未知）。
+  /** @this {SaveBackupApi} */
   static getLoadedSlot() {
     const isUsableSlot = (value) => Number.isInteger(value) && value > 0;
 
@@ -129,6 +142,7 @@ export class SaveBackupCheat {
   // 引擎自己的存档头读取：json 尾部带 {system:{_playtime,_savefileId},...} 摘要，
   // 不需要解压整个存档。菜单里的「读取」列表用的就是它，所以展示值与游戏一致，
   // 而且对 pako 等其他压缩方式的游戏同样有效（读不出完整 JSON 也能读头）。
+  /** @this {SaveBackupApi} */
   static readSavefileInfo(slot) {
     if (typeof DataManager === "undefined") {
       return null;
@@ -176,6 +190,7 @@ export class SaveBackupCheat {
     }
   }
 
+  /** @this {SaveBackupApi} */
   static getPlaytimeText() {
     try {
       if (!$gameSystem) {
@@ -190,6 +205,7 @@ export class SaveBackupCheat {
 
   /* ------------------------------------------------------- StorageManager */
 
+  /** @this {SaveBackupApi} */
   static hasSave(slot) {
     slot = Number(slot);
     if (!Number.isInteger(slot) || slot < 1) {
@@ -208,14 +224,14 @@ export class SaveBackupCheat {
       }
 
       if (this.isLocalMode()) {
-        if (typeof StorageManager.localFileExists === "function") {
-          return !!StorageManager.localFileExists(slot);
+        if (typeof getStorageManager().localFileExists === "function") {
+          return !!getStorageManager().localFileExists(slot);
         }
         return this.readSaveText(slot) !== null;
       }
 
-      if (typeof StorageManager.webStorageExists === "function") {
-        return !!StorageManager.webStorageExists(slot);
+      if (typeof getStorageManager().webStorageExists === "function") {
+        return !!getStorageManager().webStorageExists(slot);
       }
     } catch (error) {
       console.warn("[cheat plugin] 检查存档是否存在失败", error);
@@ -229,6 +245,7 @@ export class SaveBackupCheat {
   // 只在「读」的时候解压一次：快照里存的是明文 JSON，还原时再压缩一次写盘。
   // （早期实现把 .rpgsave 的 base64 直接再压缩一层存起来，快照体积翻倍且
   //  语义混乱 —— 现在快照文件本身就是 JSON + LZString 压缩，可以直接查看。）
+  /** @this {SaveBackupApi} */
   static readSaveText(slot) {
     slot = Number(slot);
     if (!Number.isInteger(slot) || slot < 1) {
@@ -255,7 +272,7 @@ export class SaveBackupCheat {
         return null;
       }
 
-      return StorageManager.loadFromWebStorage(slot);
+      return getStorageManager().loadFromWebStorage(slot);
     } catch (error) {
       console.warn("[cheat plugin] 读取存档数据失败", error);
       return null;
@@ -267,6 +284,7 @@ export class SaveBackupCheat {
   //   MZ  ：pako 压缩后的二进制字符串
   // 解码实现复用 save-backup/codec.js：按 JSON 特征依次尝试明文 / pako /
   // LZString / 裸 base64，只有解出来确实像 JSON 才认。
+  /** @this {SaveBackupApi} */
   static decodeEngineSaveText(raw) {
     if (raw === null || raw === undefined || raw === "") {
       return null;
@@ -282,6 +300,7 @@ export class SaveBackupCheat {
   }
 
   // jsonText 必须是 readSaveText / readPayload 得到的明文 JSON 文本
+  /** @this {SaveBackupApi} */
   static writeSaveText(slot, jsonText) {
     slot = Number(slot);
     if (!Number.isInteger(slot) || slot < 1) {
@@ -333,7 +352,7 @@ export class SaveBackupCheat {
         return;
       }
 
-      StorageManager.saveToLocalFile(slot, jsonText);
+      getStorageManager().saveToLocalFile(slot, jsonText);
       return;
     }
 
@@ -341,10 +360,11 @@ export class SaveBackupCheat {
       throw new Error(t("saveBackup.browserUnsupported"));
     }
 
-    StorageManager.saveToWebStorage(slot, jsonText);
+    getStorageManager().saveToWebStorage(slot, jsonText);
   }
 
   // 快照数据文件在磁盘上是否存在（用于「文件丢失」提示，不读内容）
+  /** @this {SaveBackupApi} */
   static isSnapshotPresent(entry) {
     if (!entry) {
       return false;
@@ -359,6 +379,7 @@ export class SaveBackupCheat {
     }
   }
 
+  /** @this {SaveBackupApi} */
   static getSaveFilePath(slot) {
     if (!this.isLocalMode()) {
       return null;
@@ -366,8 +387,8 @@ export class SaveBackupCheat {
 
     // MV：localFilePath(savefileId) 直接给出 fileN.rpgsave 的绝对路径
     try {
-      if (typeof StorageManager.localFilePath === "function") {
-        const filePath = StorageManager.localFilePath(slot);
+      if (typeof getStorageManager().localFilePath === "function") {
+        const filePath = getStorageManager().localFilePath(slot);
         if (typeof filePath === "string" && filePath.length > 0) {
           return filePath;
         }
@@ -381,8 +402,8 @@ export class SaveBackupCheat {
 
     // MZ：只有 filePath(saveName)，传入 "fileN" 才会得到 fileN.rmmzsave
     try {
-      if (typeof StorageManager.filePath === "function") {
-        const filePath = StorageManager.filePath(this.getSaveName(slot));
+      if (typeof getStorageManager().filePath === "function") {
+        const filePath = getStorageManager().filePath(this.getSaveName(slot));
         if (typeof filePath === "string" && filePath.length > 0) {
           return filePath;
         }
@@ -412,6 +433,7 @@ export class SaveBackupCheat {
 
   /* ------------------------------------------------------------- 快照 */
 
+  /** @this {SaveBackupApi} */
   static listBackups() {
     if (!this.isLocalMode()) {
       return [];
@@ -468,6 +490,7 @@ export class SaveBackupCheat {
   //   b. 存档头明确没有时长（老版本 MV 的存档本来就不写 _playtime）→
   //      打上 backfillChecked 标记，避免每次刷新都白写一遍元数据文件。
   // 只改元数据、绝不碰快照数据本身。
+  /** @this {SaveBackupApi} */
   static backfillFromSavefileInfo() {
     if (!this.isLocalMode()) {
       return 0;
@@ -588,6 +611,7 @@ export class SaveBackupCheat {
   //
   // 标记用 payloadBackfillChecked（旧版本叫 backfillMapChecked）：
   // 老版本只补过地图、没补过时长，如果沿用旧标记，这些快照的时长会永远补不上。
+  /** @this {SaveBackupApi} */
   static backfillMapFromIndex(entries) {
     const fs = this.requireFs();
     let anyChanged = false;
@@ -695,6 +719,7 @@ export class SaveBackupCheat {
     return anyChanged;
   }
 
+  /** @this {SaveBackupApi} */
   static getStats() {
     if (!this.isLocalMode()) {
       return {
@@ -729,6 +754,7 @@ export class SaveBackupCheat {
     };
   }
 
+  /** @this {SaveBackupApi} */
   static createSnapshot(
     slot,
     kind = BACKUP_KIND_MANUAL,
@@ -806,6 +832,7 @@ export class SaveBackupCheat {
     return meta;
   }
 
+  /** @this {SaveBackupApi} */
   static getGameVersion() {
     try {
       const version = $dataSystem && $dataSystem.versionId;
@@ -819,6 +846,7 @@ export class SaveBackupCheat {
 
   // 每个槽只保留最近 N 份自动快照（N 取自设置），超出部分连磁盘文件一起删。
   // 按槽分别裁剪，手动快照永远不会被自动清理。
+  /** @this {SaveBackupApi} */
   static pruneAutoBackups(slot) {
     const keepCount = this.getSettings().autoKeep;
     const all = this.readIndex();
@@ -843,6 +871,7 @@ export class SaveBackupCheat {
     return removable.length;
   }
 
+  /** @this {SaveBackupApi} */
   static removeSnapshotFiles(entry) {
     const fs = this.requireFs();
     const payloadFile = this.findPayloadPath(entry);
@@ -863,6 +892,7 @@ export class SaveBackupCheat {
     }
   }
 
+  /** @this {SaveBackupApi} */
   static renameBackup(id, newLabel) {
     const label = String(newLabel || "")
       .trim()
@@ -891,6 +921,7 @@ export class SaveBackupCheat {
     return label;
   }
 
+  /** @this {SaveBackupApi} */
   static deleteBackup(id) {
     if (!this.isLocalMode()) {
       throw new Error(WARN_NO_NWJS);
@@ -907,6 +938,7 @@ export class SaveBackupCheat {
     this.writeIndex(entries.filter((item) => item.id !== id));
   }
 
+  /** @this {SaveBackupApi} */
   static clearBackups(kind = null) {
     if (!this.isLocalMode()) {
       throw new Error(WARN_NO_NWJS);
@@ -933,6 +965,7 @@ export class SaveBackupCheat {
   //
   // 返回值必须是三态，调用方才能区分「不需要备份」「已有等价快照」和
   // 「备份失败」：以前统一返回 null，备份失败时还原仍会继续覆盖且谎报已备份。
+  /** @this {SaveBackupApi} */
   static backupCurrentSave(slot) {
     if (!this.hasSave(slot)) {
       return { status: "skipped", reason: "no-save" };
@@ -959,6 +992,7 @@ export class SaveBackupCheat {
   }
 
   // 该槽位最近的一份自动快照（用来判断「当前存档是否已经留过档」）
+  /** @this {SaveBackupApi} */
   static findNewestAutoSnapshot(slot) {
     const key = Number(slot);
 
@@ -980,6 +1014,7 @@ export class SaveBackupCheat {
   // 不更新索引会出现两种问题：
   //   1. 还原到空槽位后，读档列表里看不到这个新存档；
   //   2. 还原到已有槽位后，列表里的时长 / 头像 / 时间还是旧存档的。
+  /** @this {SaveBackupApi} */
   static updateGlobalInfoAfterRestore(slot, sourceSlot, jsonText) {
     try {
       const saveObject = this.parseAnySaveData(jsonText) || {};
@@ -1051,6 +1086,7 @@ export class SaveBackupCheat {
   //
   // targetSlot 省略时写回快照自己的槽位（默认行为）；传入别的槽位就是
   // 「还原到自定义槽位」—— 用来把一份快照复制成另一个存档，原槽位不动。
+  /** @this {SaveBackupApi} */
   static restoreBackup(id, targetSlot = null) {
     const meta = this.readMeta(id);
 
@@ -1085,6 +1121,7 @@ export class SaveBackupCheat {
 
     // 只在「会覆盖已有存档」时才留退路。写到空槽位不用备份，
     // 尤其不能去备份目标槽位 —— 那会凭空造出一份空快照。
+    /** @type {{ status: string, reason?: string, snapshot?: any, error?: any }} */
     let backupResult = { status: "skipped", reason: "no-save" };
 
     if (this.hasSave(slot)) {
@@ -1141,6 +1178,7 @@ export class SaveBackupCheat {
     };
   }
 
+  /** @this {SaveBackupApi} */
   static touchBackup(id) {
     try {
       const entries = this.readIndex();
@@ -1169,6 +1207,7 @@ export class SaveBackupCheat {
 
   // 把「引擎真正在用的存档文件」复制一份到快照目录，方便手工备份 / 发给别人。
   // 这是唯一直接操作引擎存档路径的功能，失败不影响时间机器本身。
+  /** @this {SaveBackupApi} */
   static copySaveFileToLocal(slot) {
     if (!this.isLocalMode()) {
       throw new Error(WARN_NO_NWJS);
@@ -1202,4 +1241,6 @@ applyStaticMethods(SaveBackupCheat, SaveBackupMetadata);
 applyStaticMethods(SaveBackupCheat, SaveBackupTransfer);
 applyStaticMethods(SaveBackupCheat, SaveBackupSettings);
 
-SaveBackupCheat.installSaveHook();
+// installSaveHook 来自 settings.js，applyStaticMethods 之后才挂到类上；
+// TS 看不到这层运行时合并，这里按最终合并后的形状调用。
+/** @type {any} */ (SaveBackupCheat).installSaveHook();

@@ -13,18 +13,7 @@ const cheatRoot = path.join(repoRoot, "cheat-engine", "www", "cheat");
 // Files that intentionally do not carry `// @ts-check` yet:
 // - vendor bundles / generated version file are excluded for the same reason
 //   as in jsconfig.json.
-// - the save-backup split modules are mixed together at runtime by
-//   applyStaticMethods(); TypeScript cannot see the methods that each partial
-//   class borrows from the others, so checking them individually reports
-//   dozens of false "property does not exist" errors.
-const UNTYPED_ALLOWLIST = new Set([
-  "js/SaveBackupHelper.js",
-  "js/save-backup/codec.js",
-  "js/save-backup/metadata.js",
-  "js/save-backup/settings.js",
-  "js/save-backup/store.js",
-  "js/save-backup/transfer.js",
-]);
+const UNTYPED_ALLOWLIST = new Set([]);
 
 const IGNORED_PREFIXES = ["libs/"];
 const IGNORED_FILES = new Set(["version.js"]);

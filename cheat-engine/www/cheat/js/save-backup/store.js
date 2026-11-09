@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 快照索引 / 元数据 / 载荷文件的读写。
  */
@@ -9,6 +10,7 @@ import { t } from "../strings.js";
 export class SaveBackupStore {
   /* ----------------------------------------------------------- 索引读写 */
 
+  /** @this {SaveBackupApi} */
   static readIndex() {
     const fs = this.requireFs();
     let data = [];
@@ -79,6 +81,7 @@ export class SaveBackupStore {
 
   // 从 <id>.json 元数据重建索引。读取时不反向调用 readMeta/readIndex，
   // 避免递归；损坏的元数据直接跳过。
+  /** @this {SaveBackupApi} */
   static rebuildIndexFromMetas() {
     const fs = this.requireFs();
     const path = require("path");
@@ -138,6 +141,7 @@ export class SaveBackupStore {
   }
 
   // 快照 ID 会直接拼进文件路径，必须挡住 ../、绝对路径、盘符等写法。
+  /** @this {SaveBackupApi} */
   static isValidSnapshotId(id) {
     return (
       typeof id === "string" &&
@@ -148,6 +152,7 @@ export class SaveBackupStore {
     );
   }
 
+  /** @this {SaveBackupApi} */
   static assertSnapshotId(id) {
     if (!this.isValidSnapshotId(id)) {
       throw new Error(t("saveBackup.snapshotIdInvalid"));
@@ -158,6 +163,7 @@ export class SaveBackupStore {
 
   // saveExt 会被直接拼进文件路径，必须限制成 ".rmmzsave" / ".rpgsave"
   // 这种单段扩展名，挡住被篡改 meta 里的 "/../../"。
+  /** @this {SaveBackupApi} */
   static isSafeSaveExt(extension) {
     return (
       typeof extension === "string" && /^\.[A-Za-z0-9]{1,16}$/.test(extension)
@@ -166,6 +172,7 @@ export class SaveBackupStore {
 
   // 手工改过 index.json 时 payloadFile 可能指向快照目录以外。
   // 读取 / 删除 / 展示前都必须确认目标仍在 save-backups/ 内。
+  /** @this {SaveBackupApi} */
   static isPathInsideBackupDir(file) {
     try {
       if (typeof file !== "string" || file.length === 0) {
@@ -182,6 +189,7 @@ export class SaveBackupStore {
     }
   }
 
+  /** @this {SaveBackupApi} */
   static writeIndex(entries) {
     this.ensureBackupDir();
 
@@ -190,10 +198,12 @@ export class SaveBackupStore {
     writeJsonAtomic(getIndexFile(), data);
   }
 
+  /** @this {SaveBackupApi} */
   static getMetaPath(id) {
     return `${getBackupDir()}/${this.assertSnapshotId(id)}.json`;
   }
 
+  /** @this {SaveBackupApi} */
   static getSnapshotCodec() {
     if (this.isMZ()) {
       return this.getPako() ? "pako" : "base64";
@@ -202,10 +212,13 @@ export class SaveBackupStore {
     return this.getLZString() ? "lzstring" : "base64";
   }
 
-  static getPayloadExtension(codec = this.getSnapshotCodec()) {
-    return codec === "pako" ? ".rmmzsave" : ".rpgsave";
+  /** @this {SaveBackupApi} */
+  static getPayloadExtension(codec = null) {
+    const resolvedCodec = codec ?? this.getSnapshotCodec();
+    return resolvedCodec === "pako" ? ".rmmzsave" : ".rpgsave";
   }
 
+  /** @this {SaveBackupApi} */
   static getPayloadPath(id, meta = null) {
     const safeId = this.assertSnapshotId(id);
     const codec =
@@ -221,6 +234,7 @@ export class SaveBackupStore {
   }
 
   // 旧索引可能没有 payloadFile（或者扩展名与当前引擎不同），读取时按候选顺序探测。
+  /** @this {SaveBackupApi} */
   static findPayloadPath(meta) {
     const fs = this.requireFs();
 
@@ -261,6 +275,7 @@ export class SaveBackupStore {
     return candidates[0] || null;
   }
 
+  /** @this {SaveBackupApi} */
   static ensureBackupDir() {
     const fs = this.requireFs();
     const path = require("path");
@@ -273,10 +288,12 @@ export class SaveBackupStore {
     return dir;
   }
 
+  /** @this {SaveBackupApi} */
   static writeMeta(meta) {
     writeJsonAtomic(this.getMetaPath(meta.id), meta);
   }
 
+  /** @this {SaveBackupApi} */
   static readMeta(id) {
     const fs = this.requireFs();
     let file;
@@ -304,6 +321,7 @@ export class SaveBackupStore {
     return meta;
   }
 
+  /** @this {SaveBackupApi} */
   static writePayload(meta, jsonText) {
     if (!meta.codec) {
       meta.codec = this.getSnapshotCodec();
@@ -327,6 +345,7 @@ export class SaveBackupStore {
   }
 
   // 返回快照里存的明文 JSON 文本，直接可以交给 writeSaveText
+  /** @this {SaveBackupApi} */
   static readPayload(meta) {
     const fs = this.requireFs();
     const payloadFile = this.findPayloadPath(meta);

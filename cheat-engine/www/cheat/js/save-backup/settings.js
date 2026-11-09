@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 存档时间机器的设置与「存档后自动快照」钩子。
  */
@@ -13,10 +14,12 @@ import {
 export class SaveBackupSettings {
   /* --------------------------------------------------------- 设置 + 自动快照 */
 
+  /** @this {SaveBackupApi} */
   static getSettingsPath() {
     return `${getBackupDir()}/config.json`;
   }
 
+  /** @this {SaveBackupApi} */
   static getDefaultSettings() {
     return {
       // 默认关闭：不主动往玩家硬盘里写东西，需要的人在面板上一键打开。
@@ -29,6 +32,7 @@ export class SaveBackupSettings {
     };
   }
 
+  /** @this {SaveBackupApi} */
   static getSettings() {
     const defaults = this.getDefaultSettings();
 
@@ -73,6 +77,7 @@ export class SaveBackupSettings {
     }
   }
 
+  /** @this {SaveBackupApi} */
   static writeSettings(patch) {
     if (!this.isLocalMode()) {
       throw new Error(WARN_NO_NWJS);
@@ -85,12 +90,14 @@ export class SaveBackupSettings {
     return next;
   }
 
+  /** @this {SaveBackupApi} */
   static isAutoOnSaveEnabled() {
     return this.getSettings().autoOnSave === true;
   }
 
   // $gameSystem._saveCount：引擎自己维护的存档次数，用来判断
   // 「这份快照对应第几次存档」以及去重。读不到时返回 0。
+  /** @this {SaveBackupApi} */
   static getSaveCount() {
     try {
       const value = Number($gameSystem && $gameSystem._saveCount);
@@ -100,6 +107,7 @@ export class SaveBackupSettings {
     }
   }
 
+  /** @this {SaveBackupApi} */
   static getAutoSnapshotMarker() {
     if (!this.autoSnapshotMarker) {
       this.autoSnapshotMarker = new Map();
@@ -110,6 +118,7 @@ export class SaveBackupSettings {
 
   // 记录「这个槽位已经因为第 saveCount 次存档留过档了」。
   // 存档后钩子与还原前快照共用这份记录，保证同一次存档不会留两份。
+  /** @this {SaveBackupApi} */
   static markAutoSnapshot(slot, saveCount) {
     const key = Number(slot);
 
@@ -125,6 +134,7 @@ export class SaveBackupSettings {
   //  1. 用 $gameSystem._saveCount 去重 —— 保证「一次存档 = 最多一份快照」，
   //     存档流程内部再调一次 saveGame 也不会重复留档；
   //  2. 按 autoSaveInterval 节流，给「每次存档都留太占地方」的玩家一个旋钮。
+  /** @this {SaveBackupApi} */
   static onGameSave(savefileId) {
     const slot = Number(savefileId);
 
@@ -182,6 +192,7 @@ export class SaveBackupSettings {
 
   // 新游戏 / 读档后清空去重标记。否则读一个旧档再玩到相同 _saveCount 时，
   // 会被上一周目留下的标记误判为「已经留过快照」而静默跳过自动备份。
+  /** @this {SaveBackupApi} */
   static installAutoSnapshotResetHooks() {
     if (typeof DataManager === "undefined" || !DataManager) {
       return false;
@@ -213,6 +224,7 @@ export class SaveBackupSettings {
   }
 
   // 接管引擎的存档函数。只在能拿到 DataManager 时执行，且只包一层。
+  /** @this {SaveBackupApi} */
   static installSaveHook() {
     if (this.saveHookInstalled) {
       return false;

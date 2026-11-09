@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 快照集合的导入 / 导出。
  */
@@ -21,6 +22,7 @@ export class SaveBackupTransfer {
 
   // 导出到快照目录下的一个 json 文件（含快照的原始数据），返回值供界面展示路径。
   // ids 为空时导出全部；指定 ids 时只导出选中的快照。
+  /** @this {SaveBackupApi} */
   static exportBackups(ids = null) {
     if (!this.isLocalMode()) {
       throw new Error(WARN_NO_NWJS);
@@ -61,24 +63,29 @@ export class SaveBackupTransfer {
     return file;
   }
 
+  /** @this {SaveBackupApi} */
   static exportAll() {
     return this.exportBackups();
   }
 
+  /** @this {SaveBackupApi} */
   static exportSelected(ids) {
     return this.exportBackups(ids);
   }
 
   // 返回 { added, skipped }；不覆盖已有快照，避免导入把现有记录冲掉
+  /** @this {SaveBackupApi} */
   static importFromJson(text) {
     if (!this.isLocalMode()) {
       throw new Error(WARN_NO_NWJS);
     }
 
     const textValue = String(text ?? "");
+    // 用 TextEncoder 而不是 Buffer：NW.js、浏览器与 node --test 都可用，
+    // 也不需要为了一个字节数引入 Node 类型声明。
     const byteLength =
-      typeof Buffer !== "undefined"
-        ? Buffer.byteLength(textValue, "utf8")
+      typeof TextEncoder !== "undefined"
+        ? new TextEncoder().encode(textValue).length
         : textValue.length;
 
     if (byteLength > MAX_IMPORT_BYTES) {

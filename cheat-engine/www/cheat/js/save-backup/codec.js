@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * 存档 / 快照的压缩与解码（MV LZString、MZ pako）。
  */
@@ -14,6 +15,7 @@ export class SaveBackupCodec {
   // 这时全局取不到，而引擎自己的 StorageManager 是通过模块作用域拿到它的。
   // 取不到就会退化成「裸 base64」，解出来是乱码 → JSON.parse 失败 →
   // 地图名/时长全部读不出来（这正是此前存档内进度只剩大小的原因）。
+  /** @this {SaveBackupApi} */
   static getLZString() {
     if (this.lzStringCache !== undefined) {
       return this.lzStringCache;
@@ -25,6 +27,7 @@ export class SaveBackupCodec {
 
   // 找 pako。MZ 的 pako 在 nw.js 下可能只走 module.exports 分支，
   // 不能假设全局一定存在；优先全局，再按游戏目录探测模块。
+  /** @this {SaveBackupApi} */
   static getPako() {
     if (this.pakoCache !== undefined) {
       return this.pakoCache;
@@ -34,6 +37,7 @@ export class SaveBackupCodec {
     return this.pakoCache;
   }
 
+  /** @this {SaveBackupApi} */
   static resolvePako() {
     try {
       if (typeof globalThis !== "undefined" && globalThis.pako) {
@@ -80,6 +84,7 @@ export class SaveBackupCodec {
     return null;
   }
 
+  /** @this {SaveBackupApi} */
   static resolveLZString() {
     try {
       if (typeof globalThis !== "undefined" && globalThis.LZString) {
@@ -147,11 +152,13 @@ export class SaveBackupCodec {
   // 快照文件的内部编码与引擎存档保持一致：
   //   MV：LZString base64，扩展名 .rpgsave，可直接改名回存档
   //   MZ：pako 压缩，扩展名 .rmmzsave，可直接改名回存档
-  static encodePayloadText(jsonText, codec = this.getSnapshotCodec()) {
+  /** @this {SaveBackupApi} */
+  static encodePayloadText(jsonText, codec = null) {
+    const resolvedCodec = codec ?? this.getSnapshotCodec();
     const text = String(jsonText);
 
     try {
-      if (codec === "pako") {
+      if (resolvedCodec === "pako") {
         const pakoLib = this.getPako();
         if (!pakoLib || typeof pakoLib.deflate !== "function") {
           throw new Error(t("saveBackup.pakoMissing"));
@@ -160,7 +167,7 @@ export class SaveBackupCodec {
         return pakoLib.deflate(text, { to: "string", level: 1 });
       }
 
-      if (codec === "lzstring") {
+      if (resolvedCodec === "lzstring") {
         const lz = this.getLZString();
         if (lz && typeof lz.compressToBase64 === "function") {
           return lz.compressToBase64(text);
@@ -184,10 +191,12 @@ export class SaveBackupCodec {
   }
 
   // 兼容旧调用：按当前引擎编码
+  /** @this {SaveBackupApi} */
   static encodeSaveText(jsonText) {
     return this.encodePayloadText(jsonText);
   }
 
+  /** @this {SaveBackupApi} */
   static decodePayloadText(raw, codec = null, label = null) {
     label = label || t("saveBackup.snapshotData");
     if (raw === null || raw === undefined || raw === "") {
@@ -251,11 +260,13 @@ export class SaveBackupCodec {
   }
 
   // 兼容旧调用：自动探测编码
+  /** @this {SaveBackupApi} */
   static decodeSaveText(text, label = null) {
     label = label || t("saveBackup.saveData");
     return this.decodePayloadText(text, null, label);
   }
 
+  /** @this {SaveBackupApi} */
   static requireFs() {
     return require("fs");
   }
